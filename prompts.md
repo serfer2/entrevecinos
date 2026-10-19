@@ -275,6 +275,38 @@ Genera los siguientes tres tickets de desarrollo. Da todo el detalle requerido p
 - Ticket 3 - Frontend : Añade las configuraciones para el frontend, incluye lo necesario en docker y docker compose pero sin implementar todavía el código del frontend
 ```
 
+**Prompt 2:** Dev Makefile
+
+**Agente:** Claude Code (Sonnet 5) - **Contexto:** Facilitamos las pruebas y el desarollo
+
+```
+Genera un ticket de desarrollo. Da todo el detalle requerido para desarrollar la tarea de inicio a fin teniendo en cuenta las buenas prácticas al respecto.
+El ticklet es para crear un Makefile con comandos:
+ - build-frontend: construye las imágenes de docker necesarias para lanzar el servidor de desarrollo del frontend.
+ - build-backend: construye las imágenes de docker necesarias para lanzar el servidor de desarrollo del backend.
+ - build: build-frontend y build-backend.
+ - dev: genera las imágenes de frontend y backend necesarias y levanta los servidores de desarollo de frontend y backend.
+ - clean: tumba los servidores dedesarrollo de frontendy backend y elimina las imágenes de docker creadas.
+```
+
+**Prompt 3:** Organización de tickets
+
+**Agente:** Claude Code (Sonnet 5) - **Contexto:** Facilitamos las pruebas y el desarollo
+
+```
+Los tickets de cada historia de usuario deben estar agrupados en carpetas con nombre "HU-xxx-<nombre-de-la-historia-de-usuario>" donde xxx es la secuencia o número de historia de usuario. Los 4 tickets existentes deben ser movidos a docs/product/tickets/00-infra/. Actualiza el README.
+```
+
+#### 6.1 Implementación de tickets de trabajo
+
+**Prompt 3:** Implementar infra de desarrollo
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets de infra están listos
+
+```
+Implement infra tickets TK-01..TK-04  
+```
+
 ---
 
 ### 7. Pull Requests
