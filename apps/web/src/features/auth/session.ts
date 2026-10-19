@@ -2,7 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 
-export const SESSION_COOKIE = "ev_session";
+import { SESSION_COOKIE } from "./routes";
 
 /** Guarda el JWT en una cookie httpOnly: el JavaScript del navegador nunca lo ve. */
 export async function createSession(token: string, expiresIn: number): Promise<void> {

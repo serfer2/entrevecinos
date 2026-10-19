@@ -52,3 +52,15 @@ export function fieldErrorsOf<F extends string>(error: z.ZodError): Partial<Reco
   }
   return errors;
 }
+
+export const LOGIN_MESSAGES = {
+  email: "Introduce un correo electrónico válido.",
+  password: "Introduce tu contraseña.",
+} as const;
+
+export const loginSchema = z.object({
+  email: z.string().trim().pipe(z.email({ error: LOGIN_MESSAGES.email })),
+  password: z.string().min(1, { error: LOGIN_MESSAGES.password }),
+});
+
+export type LoginField = keyof z.input<typeof loginSchema>;

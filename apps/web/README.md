@@ -68,6 +68,26 @@ Las variables `NEXT_PUBLIC_*` se incorporan al compilar y llegan al navegador: n
 - `apiFetch` nunca lanza excepciones: devuelve `{ ok: true, data }` o `{ ok: false, error }` (`status: 0` si la API no responde).
 - `src/components/ui/TextField.tsx`: campo con etiqueta, ayuda y error accesibles, compartido por los formularios.
 
+## Rutas privadas
+
+Todas las rutas son privadas salvo las de `PUBLIC_ROUTES` (`src/features/auth/routes.ts`: `/`, `/registro` e `/iniciar-sesion`). La protección tiene dos niveles:
+
+1. `src/proxy.ts`: si no existe la *cookie* `ev_session`, redirige a `/iniciar-sesion?next=<ruta>`. No valida el token.
+2. DAL (`src/features/auth/dal.ts`): `requireUser()` valida la sesión contra `GET /v1/users/me` (una vez por petición) y, si el token ya no es válido, redirige a `/iniciar-sesion?motivo=sesion-caducada`.
+
+Para crear una página privada, colócala en `src/app/(privado)/` y llama a `requireUser()` en la propia página (y en cada *Server Action* privada), no solo en el *layout*:
+
+```tsx
+import { requireUser } from "@/features/auth/dal";
+
+export default async function MiPagina() {
+  const user = await requireUser();
+  return <h1>Hola, {user.full_name}</h1>;
+}
+```
+
+`safeNextPath()` (`src/features/auth/redirect.ts`) valida el parámetro `next` para que solo se redirija a rutas internas.
+
 ## Pruebas
 
 Vitest + Testing Library (`vitest.config.mts`). Las pruebas viven junto al código (`*.test.ts(x)`). Los formularios reciben su *Server Action* por *props*, así que se prueban con una acción simulada; las acciones se prueban simulando `apiFetch`, `next/headers` y `next/navigation`.
