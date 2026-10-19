@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 import jwt
 
 from entrevecinos.application.users.ports import AccessToken
+from entrevecinos.domain.users.errors import NotAuthenticated
 
 # Fijo en código: nunca se acepta `none` ni otro algoritmo elegido desde fuera.
 ALGORITHM = "HS256"
@@ -23,3 +24,15 @@ class JwtTokenService:
         }
         token = jwt.encode(claims, self._secret, algorithm=ALGORITHM)
         return AccessToken(token=token, expires_in=self._ttl_seconds)
+
+    def decode(self, token: str) -> uuid.UUID:
+        try:
+            claims = jwt.decode(
+                token,
+                self._secret,
+                algorithms=[ALGORITHM],
+                options={"require": ["exp", "iat", "sub"]},
+            )
+            return uuid.UUID(claims["sub"])
+        except (jwt.PyJWTError, ValueError) as error:
+            raise NotAuthenticated from error

@@ -74,9 +74,23 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 ## Autenticación
 
 - `POST /v1/auth/register` crea la cuenta y devuelve un JWT (`AuthResponse`).
+- `POST /v1/auth/token` inicia sesión. Ante cualquier fallo responde `401` con el mismo mensaje (`Correo o contraseña incorrectos.`) y el mismo coste de verificación, exista o no la cuenta.
+- `GET /v1/users/me` devuelve el usuario autenticado.
 - Contraseñas con Argon2id (`pwdlib`); tokens HS256 (`pyjwt`) con `sub`, `iat` y `exp`. El algoritmo está fijado en código.
 - Los errores `422` solo devuelven `loc`, `msg` y `type` (nunca los valores enviados).
 - Los errores de dominio se traducen a HTTP en `presentation/errors.py`.
+
+### Proteger un endpoint
+
+Usa siempre la dependencia `CurrentUserDep` (`presentation/dependencies.py`); valida el token (firma, `exp`, algoritmo HS256) y que el usuario siga activo y no eliminado. Si falla, responde `401` con `WWW-Authenticate: Bearer`:
+
+```python
+from entrevecinos.presentation.dependencies import CurrentUserDep
+
+@router.get("/algo", responses=UNAUTHORIZED)
+def algo(user: CurrentUserDep) -> ...:
+    ...
+```
 
 ## Pruebas y lint
 

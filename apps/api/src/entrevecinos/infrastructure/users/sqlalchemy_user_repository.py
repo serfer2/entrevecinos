@@ -1,4 +1,6 @@
-from sqlalchemy import select
+import uuid
+
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -24,9 +26,17 @@ class SqlAlchemyUserRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def get_by_id(self, user_id: uuid.UUID) -> User | None:
+        model = self._session.get(UserModel, user_id)
+        return to_domain(model) if model else None
+
     def get_by_email(self, email: str) -> User | None:
         model = self._session.scalars(select(UserModel).where(UserModel.email == email)).first()
         return to_domain(model) if model else None
+
+    def get_credentials(self, email: str) -> tuple[User, str] | None:
+        model = self._session.scalars(select(UserModel).where(UserModel.email == email)).first()
+        return (to_domain(model), model.password_hash) if model else None
 
     def add(self, user: NewUser, password_hash: str) -> User:
         model = UserModel(
@@ -45,3 +55,8 @@ class SqlAlchemyUserRepository:
             raise
         self._session.refresh(model)
         return to_domain(model)
+
+    def update_password_hash(self, user_id: uuid.UUID, password_hash: str) -> None:
+        self._session.execute(
+            update(UserModel).where(UserModel.id == user_id).values(password_hash=password_hash)
+        )

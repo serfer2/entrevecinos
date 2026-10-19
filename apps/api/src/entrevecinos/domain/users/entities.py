@@ -30,3 +30,7 @@ class User:
     is_active: bool
     created_at: datetime
     deleted_at: datetime | None = None
+
+    @property
+    def can_authenticate(self) -> bool:
+        return self.is_active and self.deleted_at is None

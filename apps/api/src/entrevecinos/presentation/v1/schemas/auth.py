@@ -24,6 +24,13 @@ class RegisterRequest(BaseModel):
         return value
 
 
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
+    password: str
+
+
 class AuthResponse(BaseModel):
     access_token: str
     token_type: Literal["Bearer"] = "Bearer"
