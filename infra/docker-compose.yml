@@ -32,6 +32,8 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-entrevecinos}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}@db:5432/${POSTGRES_DB:-entrevecinos}
       ASSETS_DIR: /var/lib/entrevecinos/assets
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-86400}
     depends_on:
       db:
         condition: service_healthy

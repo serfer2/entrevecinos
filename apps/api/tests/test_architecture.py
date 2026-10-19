@@ -14,6 +14,9 @@ FRAMEWORKS = {
     "sqlalchemy",
     "alembic",
     "psycopg",
+    "pwdlib",
+    "jwt",
+    "email_validator",
 }
 
 FORBIDDEN = {

@@ -68,6 +68,15 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 | `ASSETS_DIR` | Directorio de ficheros persistentes (volumen `api_assets`) | `/var/lib/entrevecinos/assets` |
 | `CORS_ORIGINS` | Orígenes permitidos, separados por comas | `http://localhost:3000` |
 | `ENVIRONMENT` | `development` o `production` | `development` |
+| `JWT_SECRET` | Clave de firma de los JWT (HS256, mínimo 32 caracteres) | obligatoria |
+| `JWT_TTL_SECONDS` | Duración del token de acceso en segundos | `86400` |
+
+## Autenticación
+
+- `POST /v1/auth/register` crea la cuenta y devuelve un JWT (`AuthResponse`).
+- Contraseñas con Argon2id (`pwdlib`); tokens HS256 (`pyjwt`) con `sub`, `iat` y `exp`. El algoritmo está fijado en código.
+- Los errores `422` solo devuelven `loc`, `msg` y `type` (nunca los valores enviados).
+- Los errores de dominio se traducen a HTTP en `presentation/errors.py`.
 
 ## Pruebas y lint
 
