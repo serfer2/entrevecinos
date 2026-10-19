@@ -22,8 +22,37 @@ services:
       retries: 5
       start_period: 10s
 
+  api:
+    build:
+      context: ../apps/api
+      target: dev
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-entrevecinos}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}@db:5432/${POSTGRES_DB:-entrevecinos}
+      ASSETS_DIR: /var/lib/entrevecinos/assets
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ../apps/api/src:/app/src            # recarga en desarrollo
+      - api_assets:/var/lib/entrevecinos/assets
+    networks:
+      - data
+      - edge
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 volumes:
   db_data:
+  api_assets:
 
 networks:
   data:

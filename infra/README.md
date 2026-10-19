@@ -25,6 +25,7 @@ COMPOSE="docker compose --env-file .env -f infra/docker-compose.yml"
 | Servicio | Imagen | Redes | Puertos en el host |
 |---|---|---|---|
 | `db` | `postgres:16` | `data` (interna) | ninguno por defecto |
+| `api` | `apps/api/Dockerfile` (etapa `dev`) | `data`, `edge` | `${API_PORT:-8000}` |
 
 - `data`: red interna (`internal: true`). La base de datos no es accesible desde fuera de Docker.
 - `edge`: red normal para los servicios que deben ser accesibles desde el navegador.
@@ -61,3 +62,18 @@ psql -h 127.0.0.1 -p 5432 -U entrevecinos entrevecinos
 ```
 
 El puerto se publica solo en `127.0.0.1` y se puede cambiar con `POSTGRES_HOST_PORT` en `.env` si el 5432 ya está ocupado. Vuelve a la configuración por defecto con `$COMPOSE up -d db`.
+
+## API (`api`)
+
+```bash
+$COMPOSE up -d --build api        # levanta db (si hace falta) y la API
+$COMPOSE run --rm api pytest      # pruebas
+$COMPOSE logs -f api              # logs
+```
+
+- http://localhost:8000/docs — documentación interactiva.
+- `apps/api/src` se monta en el contenedor y uvicorn recarga al guardar.
+- Los ficheros de `ASSETS_DIR` viven en el volumen `api_assets` y sobreviven a `down` (no a `down -v`).
+- El healthcheck comprueba el puerto TCP hasta que exista el endpoint `/v1/health`.
+
+Más detalles en `apps/api/README.md`.
