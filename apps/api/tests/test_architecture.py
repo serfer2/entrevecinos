@@ -6,7 +6,15 @@ from pathlib import Path
 import pytest
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1] / "src" / "entrevecinos"
-FRAMEWORKS = {"fastapi", "starlette", "pydantic_settings", "uvicorn"}
+FRAMEWORKS = {
+    "fastapi",
+    "starlette",
+    "pydantic_settings",
+    "uvicorn",
+    "sqlalchemy",
+    "alembic",
+    "psycopg",
+}
 
 FORBIDDEN = {
     "domain": FRAMEWORKS

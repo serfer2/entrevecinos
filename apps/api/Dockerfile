@@ -28,6 +28,8 @@ FROM base AS dev
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-install-project
 COPY src ./src
+COPY alembic.ini ./
+COPY migrations ./migrations
 COPY tests ./tests
 RUN uv sync --frozen && chown -R app:app /app
 
@@ -40,6 +42,8 @@ FROM base AS prod
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
+COPY alembic.ini ./
+COPY migrations ./migrations
 RUN uv sync --frozen --no-dev --no-editable
 
 USER app

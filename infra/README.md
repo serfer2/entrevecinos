@@ -30,7 +30,8 @@ El `Makefile` de la raíz envuelve los comandos de Compose más habituales:
 | `make build-frontend` | Construye solo la imagen de `web` |
 | `make build-backend` | Construye solo la imagen de `api` |
 | `make build` | Construye las imágenes de `web` y `api` |
-| `make dev` | Construye las imágenes y levanta `db`, `api` y `web` en segundo plano |
+| `make dev` | Construye las imágenes, levanta `db`, `api` y `web` en segundo plano y aplica las migraciones |
+| `make migrate` | Aplica las migraciones pendientes de la base de datos |
 | `make clean` | Elimina contenedores e imágenes construidas localmente; **conserva** los volúmenes (`db_data`, `api_assets`…) |
 
 Todos comprueban antes que exista `.env`. Para usar otro fichero: `make dev ENV_FILE=.env.local`. Para borrar también los datos, usa `$COMPOSE down -v` (ver más abajo).

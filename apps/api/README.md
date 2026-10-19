@@ -30,11 +30,41 @@ $COMPOSE up -d --build api      # levanta db y api; recarga automática al edita
 - Documentación interactiva: http://localhost:8000/docs
 - Especificación de referencia de la API: `docs/api/openapi.yaml`
 
+## Base de datos y migraciones
+
+Persistencia con SQLAlchemy 2 (síncrono) y psycopg 3; esquema versionado con Alembic en `migrations/`.
+
+- Modelos ORM: `src/entrevecinos/infrastructure/db/models/` (registrarlos en `models/__init__.py`).
+- Sesión por petición: dependencia `get_session()` de `infrastructure/db/session.py` (commit al terminar, rollback si hay error).
+- La tabla de usuarios se llama `users` (`user` es palabra reservada en PostgreSQL).
+
+```bash
+make migrate                                                  # aplica las migraciones pendientes
+$COMPOSE run --rm api alembic current                         # versión actual
+$COMPOSE run --rm -v "$PWD/apps/api/migrations:/app/migrations" api \
+  alembic revision --autogenerate -m "descripcion"            # nueva migración (revísala siempre)
+$COMPOSE run --rm api alembic downgrade -1                    # revertir la última
+$COMPOSE run --rm api alembic check                           # el modelo y las migraciones coinciden
+```
+
+`make dev` aplica las migraciones al levantar el entorno. Cada migración debe incluir `downgrade()`.
+
+### Pruebas con base de datos
+
+Las pruebas marcadas con `@pytest.mark.db` usan la base de datos `<POSTGRES_DB>_test`, que la fixture `db_engine` crea y migra automáticamente. Cada prueba recibe `db_session`, dentro de una transacción que se revierte al terminar: la base de datos de desarrollo nunca se modifica.
+
+```bash
+$COMPOSE run --rm api pytest -m db        # solo integración
+$COMPOSE run --rm api pytest -m "not db"  # sin base de datos
+```
+
+Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
+
 ## Configuración
 
 | Variable | Uso | Valor por defecto |
 |---|---|---|
-| `DATABASE_URL` | Cadena de conexión a PostgreSQL | obligatoria |
+| `DATABASE_URL` | Cadena de conexión a PostgreSQL (`postgresql+psycopg://…`) | obligatoria |
 | `ASSETS_DIR` | Directorio de ficheros persistentes (volumen `api_assets`) | `/var/lib/entrevecinos/assets` |
 | `CORS_ORIGINS` | Orígenes permitidos, separados por comas | `http://localhost:3000` |
 | `ENVIRONMENT` | `development` o `production` | `development` |
