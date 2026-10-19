@@ -1,0 +1,31 @@
+parameters:
+  - $ref: ../components/parameters/CategoryId.yaml
+patch:
+  tags: [Categorías]
+  operationId: updateCategory
+  summary: Actualizar o desactivar una categoría
+  description: "Solo `platform_admin`. Desactivar (`is_active: false`) oculta la categoría para nuevos anuncios sin borrar los existentes."
+  x-mvp: true
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/CategoryUpdate.yaml
+  responses:
+    "200":
+      description: Categoría actualizada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Category.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "409":
+      $ref: ../components/responses/Conflict.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

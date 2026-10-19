@@ -1,0 +1,31 @@
+post:
+  tags: [Autenticación]
+  operationId: loginUser
+  summary: Iniciar sesión
+  description: Valida las credenciales y emite un token JWT. Acceso público.
+  x-mvp: true
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/LoginRequest.yaml
+        example:
+          email: vecino@example.com
+          password: UnaClaveSegura123!
+  responses:
+    "200":
+      description: Inicio de sesión correcto.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/AuthResponse.yaml
+    "401":
+      description: Correo o contraseña incorrectos, o cuenta desactivada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

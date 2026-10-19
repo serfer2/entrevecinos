@@ -1,0 +1,31 @@
+parameters:
+  - $ref: ../components/parameters/UserId.yaml
+patch:
+  tags: [Administración]
+  operationId: adminUpdateUser
+  summary: Activar, desactivar o cambiar el rol de un usuario
+  description: Solo `platform_admin`. No puede desactivarse ni degradarse a sí mismo.
+  x-mvp: false
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/AdminUserUpdate.yaml
+  responses:
+    "200":
+      description: Usuario actualizado.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/User.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "409":
+      $ref: ../components/responses/Conflict.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

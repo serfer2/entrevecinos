@@ -1,0 +1,10 @@
+type: object
+additionalProperties: false
+required: [status]
+description: Gestión de una denuncia. `status` admite `reviewing`, `resolved` o `rejected`; `resolution` es obligatoria al cerrarla.
+properties:
+  status:
+    $ref: ./ReportStatus.yaml
+  resolution:
+    type: [string, "null"]
+    maxLength: 2000

@@ -1,0 +1,5 @@
+description: Los datos enviados no superan la validación (formato estándar de FastAPI).
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/ValidationError.yaml

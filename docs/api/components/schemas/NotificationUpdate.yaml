@@ -1,0 +1,7 @@
+type: object
+additionalProperties: false
+required: [read]
+properties:
+  read:
+    type: boolean
+    description: "`true` marca como leída (fija `read_at`); `false` la marca como no leída."

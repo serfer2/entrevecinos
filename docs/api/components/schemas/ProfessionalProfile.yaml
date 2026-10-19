@@ -1,0 +1,31 @@
+type: object
+required: [id, user, description, service_area, is_active, services, images, created_at, updated_at]
+properties:
+  id:
+    type: string
+    format: uuid
+  user:
+    $ref: ./ListingOwner.yaml
+  description:
+    type: string
+  service_area:
+    type: string
+    maxLength: 160
+  availability:
+    type: [string, "null"]
+  is_active:
+    type: boolean
+  services:
+    type: array
+    items:
+      $ref: ./ProfessionalService.yaml
+  images:
+    type: array
+    items:
+      $ref: ./ProfessionalImage.yaml
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time

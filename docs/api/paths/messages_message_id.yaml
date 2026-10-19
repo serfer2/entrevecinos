@@ -1,0 +1,17 @@
+parameters:
+  - $ref: ../components/parameters/MessageId.yaml
+delete:
+  tags: [Mensajería]
+  operationId: deleteMessage
+  summary: Eliminar un mensaje propio
+  description: Borrado lógico (`deleted_at`). Solo el remitente.
+  x-mvp: false
+  responses:
+    "204":
+      description: Mensaje eliminado.
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml

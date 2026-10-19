@@ -1,0 +1,7 @@
+name: asset_id
+in: path
+required: true
+description: Identificador del fichero de imagen.
+schema:
+  type: string
+  format: uuid

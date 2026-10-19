@@ -1,0 +1,27 @@
+parameters:
+  - $ref: ../components/parameters/NotificationId.yaml
+patch:
+  tags: [Notificaciones]
+  operationId: updateNotification
+  summary: Marcar una notificación como leída o no leída
+  description: Solo su destinatario.
+  x-mvp: false
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/NotificationUpdate.yaml
+  responses:
+    "200":
+      description: Notificación actualizada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Notification.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

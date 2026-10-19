@@ -1,0 +1,7 @@
+name: report_id
+in: path
+required: true
+description: Identificador de la denuncia.
+schema:
+  type: string
+  format: uuid

@@ -1,0 +1,53 @@
+parameters:
+  - $ref: ../components/parameters/ReportId.yaml
+get:
+  tags: [Denuncias]
+  operationId: getReport
+  summary: Obtener una denuncia
+  description: Su autor, los moderadores de la comunidad del anuncio o un `platform_admin`.
+  x-mvp: false
+  responses:
+    "200":
+      description: Denuncia.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Report.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+patch:
+  tags: [Denuncias]
+  operationId: updateReport
+  summary: Gestionar una denuncia
+  description: >-
+    Pasa la denuncia a `reviewing`, `resolved` o `rejected`. Solo `community_admin`/`moderator` de la comunidad
+    o `platform_admin`. Fija `reviewed_by` y `reviewed_at`.
+  x-mvp: false
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ReportUpdate.yaml
+        example:
+          status: resolved
+          resolution: Anuncio retirado por incumplir las normas.
+  responses:
+    "200":
+      description: Denuncia actualizada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Report.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

@@ -1,0 +1,7 @@
+description: Token ausente, inválido o caducado.
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/Error.yaml
+    example:
+      detail: "Autenticación requerida."

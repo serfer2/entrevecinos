@@ -1,0 +1,24 @@
+type: object
+additionalProperties: false
+minProperties: 1
+description: Actualización parcial de un anuncio propio. Para cambiar el estado use `PATCH /listings/{listing_id}/status`; para las imágenes, `PUT /listings/{listing_id}/images`.
+properties:
+  category_id:
+    type: string
+    format: uuid
+  title:
+    type: string
+    minLength: 1
+    maxLength: 160
+  description:
+    type: string
+    minLength: 1
+  type:
+    $ref: ./ListingType.yaml
+  price:
+    type: ["number", "null"]
+    minimum: 0
+    multipleOf: 0.01
+  currency:
+    type: ["string", "null"]
+    pattern: "^[A-Z]{3}$"

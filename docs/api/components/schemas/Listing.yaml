@@ -1,0 +1,48 @@
+type: object
+required:
+  - id
+  - community_id
+  - owner
+  - category_id
+  - title
+  - description
+  - type
+  - status
+  - published_at
+properties:
+  id:
+    type: string
+    format: uuid
+  community_id:
+    type: string
+    format: uuid
+  owner:
+    $ref: ./ListingOwner.yaml
+  category_id:
+    type: string
+    format: uuid
+  title:
+    type: string
+    maxLength: 160
+  description:
+    type: string
+  type:
+    $ref: ./ListingType.yaml
+  price:
+    type: ["number", "null"]
+    minimum: 0
+  currency:
+    type: ["string", "null"]
+    pattern: "^[A-Z]{3}$"
+  images:
+    type: array
+    items:
+      $ref: ./ListingImage.yaml
+  status:
+    $ref: ./ListingStatus.yaml
+  published_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time

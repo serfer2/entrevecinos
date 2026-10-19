@@ -1,0 +1,11 @@
+type: object
+additionalProperties: false
+required: [asset_ids]
+description: Sustituye las imágenes del perfil; el orden del array define `position`.
+properties:
+  asset_ids:
+    type: array
+    maxItems: 10
+    items:
+      type: string
+      format: uuid

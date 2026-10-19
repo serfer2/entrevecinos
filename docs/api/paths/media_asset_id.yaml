@@ -1,0 +1,42 @@
+parameters:
+  - $ref: ../components/parameters/AssetId.yaml
+get:
+  tags: [Media]
+  operationId: getMedia
+  summary: Leer una imagen
+  description: >-
+    Comprueba los permisos de lectura (el fichero pertenece a un anuncio o perfil visible para el usuario, o
+    lo subió él) y redirige a una URL prefirmada de corta duración del almacenamiento de objetos.
+  x-mvp: true
+  responses:
+    "302":
+      description: Redirección a la URL prefirmada de la imagen.
+      headers:
+        Location:
+          description: URL prefirmada del fichero.
+          schema:
+            type: string
+            format: uri
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+delete:
+  tags: [Media]
+  operationId: deleteMedia
+  summary: Eliminar una imagen
+  description: Solo quien la subió. Falla si el fichero sigue asociado a un anuncio, perfil o avatar.
+  x-mvp: true
+  responses:
+    "204":
+      description: Imagen eliminada.
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "409":
+      $ref: ../components/responses/Conflict.yaml

@@ -1,0 +1,31 @@
+type: object
+additionalProperties: false
+required: [category_id, title, description, type]
+properties:
+  category_id:
+    type: string
+    format: uuid
+  title:
+    type: string
+    minLength: 1
+    maxLength: 160
+  description:
+    type: string
+    minLength: 1
+  type:
+    $ref: ./ListingType.yaml
+  price:
+    type: ["number", "null"]
+    minimum: 0
+    multipleOf: 0.01
+  currency:
+    type: ["string", "null"]
+    pattern: "^[A-Z]{3}$"
+    description: Código de moneda ISO 4217; requerido si se indica precio.
+  image_asset_ids:
+    type: array
+    maxItems: 10
+    description: Ficheros subidos con `POST /media`. El primero se usa como portada.
+    items:
+      type: string
+      format: uuid

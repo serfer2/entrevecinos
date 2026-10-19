@@ -1,0 +1,16 @@
+type: object
+additionalProperties: false
+required: [name]
+properties:
+  name:
+    type: string
+    minLength: 1
+    maxLength: 120
+  description:
+    type: [string, "null"]
+  postal_code:
+    type: [string, "null"]
+    maxLength: 16
+  city:
+    type: [string, "null"]
+    maxLength: 120

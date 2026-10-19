@@ -1,0 +1,60 @@
+get:
+  tags: [Usuarios]
+  operationId: getCurrentUser
+  summary: Obtener el perfil propio
+  description: Devuelve el usuario autenticado. Requiere estar autenticado.
+  x-mvp: true
+  responses:
+    "200":
+      description: Perfil del usuario.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/User.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+patch:
+  tags: [Usuarios]
+  operationId: updateCurrentUser
+  summary: Actualizar el perfil propio
+  description: >-
+    Actualización parcial de nombre, teléfono, avatar o contraseña. Para cambiar la contraseña
+    hay que enviar `password` y `current_password`. Requiere estar autenticado.
+  x-mvp: true
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/UserUpdate.yaml
+        example:
+          full_name: Alex Vecino García
+          phone: "+34600111222"
+  responses:
+    "200":
+      description: Perfil actualizado.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/User.yaml
+    "400":
+      $ref: ../components/responses/BadRequest.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml
+delete:
+  tags: [Usuarios]
+  operationId: deleteCurrentUser
+  summary: Eliminar la cuenta propia
+  description: >-
+    Borrado lógico (`deleted_at`): la cuenta deja de poder iniciar sesión y sus anuncios
+    dejan de mostrarse. Requiere estar autenticado.
+  x-mvp: true
+  responses:
+    "204":
+      description: Cuenta eliminada.
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml

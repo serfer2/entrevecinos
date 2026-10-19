@@ -1,0 +1,16 @@
+type: object
+description: Membresía del usuario autenticado, con la comunidad embebida.
+required: [community, role, status, requested_at]
+properties:
+  community:
+    $ref: ./Community.yaml
+  role:
+    $ref: ./MembershipRole.yaml
+  status:
+    $ref: ./MembershipStatus.yaml
+  requested_at:
+    type: string
+    format: date-time
+  joined_at:
+    type: [string, "null"]
+    format: date-time

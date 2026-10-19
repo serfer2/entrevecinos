@@ -1,0 +1,116 @@
+parameters:
+  - $ref: ../components/parameters/CommunityId.yaml
+get:
+  tags: [Anuncios]
+  operationId: listCommunityListings
+  summary: Buscar anuncios de una comunidad
+  description: >-
+    Permite explorar anuncios y aplicar búsqueda, filtros y ordenación. Solo devuelve anuncios
+    `active` y `reserved`. Requiere una membresía aprobada en la comunidad.
+  x-mvp: true
+  parameters:
+    - name: q
+      in: query
+      required: false
+      description: Busca palabras clave en el título y la descripción.
+      schema:
+        type: string
+        maxLength: 160
+    - name: type
+      in: query
+      required: false
+      description: Filtra por modalidad de anuncio.
+      schema:
+        $ref: ../components/schemas/ListingType.yaml
+    - name: category_id
+      in: query
+      required: false
+      description: Filtra por categoría.
+      schema:
+        type: string
+        format: uuid
+    - name: sort
+      in: query
+      required: false
+      description: Campo de ordenación.
+      schema:
+        type: string
+        enum: [published_at, price]
+        default: published_at
+    - name: order
+      in: query
+      required: false
+      description: Dirección de ordenación.
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+    - $ref: ../components/parameters/Page.yaml
+    - $ref: ../components/parameters/PageSize.yaml
+  responses:
+    "200":
+      description: Anuncios encontrados.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/PageMeta.yaml
+              - type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: ../components/schemas/Listing.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      description: El usuario no pertenece a la comunidad o su membresía no está aprobada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml
+post:
+  tags: [Anuncios]
+  operationId: createListing
+  summary: Publicar un anuncio
+  description: Crea un anuncio `active` en la comunidad. El usuario debe tener una membresía aprobada.
+  x-mvp: true
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ListingCreate.yaml
+        example:
+          category_id: 98bff8e2-588e-4cdf-8ba2-03166a249477
+          title: Bicicleta infantil
+          description: Bicicleta en buen estado, poco uso.
+          type: sell
+          price: 45.00
+          currency: EUR
+  responses:
+    "201":
+      description: Anuncio creado.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Listing.yaml
+    "400":
+      $ref: ../components/responses/BadRequest.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      description: El usuario no tiene una membresía aprobada en la comunidad.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

@@ -1,0 +1,7 @@
+name: listing_id
+in: path
+required: true
+description: Identificador del anuncio.
+schema:
+  type: string
+  format: uuid

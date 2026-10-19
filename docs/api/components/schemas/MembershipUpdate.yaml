@@ -1,0 +1,9 @@
+type: object
+additionalProperties: false
+minProperties: 1
+description: Revisión de una solicitud o cambio de rol. `status` admite `approved`, `rejected` o `blocked`.
+properties:
+  status:
+    $ref: ./MembershipStatus.yaml
+  role:
+    $ref: ./MembershipRole.yaml

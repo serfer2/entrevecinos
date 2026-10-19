@@ -1,0 +1,7 @@
+name: conversation_id
+in: path
+required: true
+description: Identificador de la conversación.
+schema:
+  type: string
+  format: uuid

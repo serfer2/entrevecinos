@@ -1,0 +1,63 @@
+get:
+  tags: [Perfil profesional]
+  operationId: getMyProfessionalProfile
+  summary: Obtener mi perfil profesional
+  description: 404 si el usuario aún no ha creado su perfil profesional.
+  x-mvp: false
+  responses:
+    "200":
+      description: Perfil profesional propio.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ProfessionalProfile.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+put:
+  tags: [Perfil profesional]
+  operationId: upsertMyProfessionalProfile
+  summary: Crear o actualizar mi perfil profesional
+  description: Un usuario tiene como máximo un perfil profesional. Crea el perfil si no existe y lo reemplaza si existe.
+  x-mvp: false
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ProfessionalProfileUpsert.yaml
+        example:
+          description: Electricista autónomo con 15 años de experiencia.
+          service_area: Majadahonda y Las Rozas
+          availability: Lunes a viernes de 9:00 a 18:00
+  responses:
+    "200":
+      description: Perfil actualizado.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ProfessionalProfile.yaml
+    "201":
+      description: Perfil creado.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ProfessionalProfile.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml
+delete:
+  tags: [Perfil profesional]
+  operationId: deleteMyProfessionalProfile
+  summary: Eliminar mi perfil profesional
+  description: Elimina el perfil junto con sus servicios e imágenes.
+  x-mvp: false
+  responses:
+    "204":
+      description: Perfil eliminado.
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml

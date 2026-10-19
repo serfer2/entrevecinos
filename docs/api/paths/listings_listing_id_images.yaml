@@ -1,0 +1,38 @@
+parameters:
+  - $ref: ../components/parameters/ListingId.yaml
+put:
+  tags: [Anuncios]
+  operationId: replaceListingImages
+  summary: Sustituir las imágenes de un anuncio
+  description: >-
+    Asocia al anuncio los ficheros subidos previamente con `POST /media` (máximo 10), definiendo orden y portada.
+    Solo el autor del anuncio; los ficheros deben haber sido subidos por él.
+  x-mvp: true
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ListingImagesUpdate.yaml
+        example:
+          images:
+            - asset_id: 3f0c3f0e-7f0d-4b1a-9d43-0a3d2f6a7c11
+              is_cover: true
+            - asset_id: 6a1b9c7d-2e10-4f55-8a90-1c2d3e4f5a66
+  responses:
+    "200":
+      description: Imágenes actualizadas.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Listing.yaml
+    "400":
+      $ref: ../components/responses/BadRequest.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

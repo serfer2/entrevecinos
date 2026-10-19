@@ -1,0 +1,31 @@
+get:
+  tags: [Usuarios]
+  operationId: listMyListings
+  summary: Listar mis anuncios
+  description: Anuncios publicados por el usuario autenticado, de cualquier comunidad y estado visible.
+  x-mvp: true
+  parameters:
+    - name: status
+      in: query
+      required: false
+      schema:
+        $ref: ../components/schemas/ListingStatus.yaml
+    - $ref: ../components/parameters/Page.yaml
+    - $ref: ../components/parameters/PageSize.yaml
+  responses:
+    "200":
+      description: Anuncios del usuario.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/PageMeta.yaml
+              - type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: ../components/schemas/Listing.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml

@@ -1,0 +1,7 @@
+name: service_id
+in: path
+required: true
+description: Identificador del servicio profesional.
+schema:
+  type: string
+  format: uuid

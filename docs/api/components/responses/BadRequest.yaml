@@ -1,0 +1,7 @@
+description: Solicitud inválida o incompatible con el estado actual del recurso.
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/Error.yaml
+    example:
+      detail: "Datos inválidos."

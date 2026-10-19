@@ -1,0 +1,7 @@
+description: El recurso no existe o no es visible para el usuario.
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/Error.yaml
+    example:
+      detail: "Recurso no encontrado."

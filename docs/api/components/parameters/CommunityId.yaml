@@ -1,0 +1,7 @@
+name: community_id
+in: path
+required: true
+description: Identificador de la comunidad.
+schema:
+  type: string
+  format: uuid

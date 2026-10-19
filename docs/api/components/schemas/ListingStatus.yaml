@@ -1,0 +1,3 @@
+type: string
+description: "Estado visible del anuncio. `draft` y `deleted` del modelo de datos no se exponen: un anuncio borrado responde 404."
+enum: [active, reserved, completed, hidden]

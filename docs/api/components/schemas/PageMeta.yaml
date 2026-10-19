@@ -1,0 +1,14 @@
+type: object
+description: Metadatos de paginación comunes a todos los listados.
+required: [page, page_size, total]
+properties:
+  page:
+    type: integer
+    minimum: 1
+  page_size:
+    type: integer
+    minimum: 1
+  total:
+    type: integer
+    minimum: 0
+    description: Total de elementos que cumplen el filtro.

@@ -1,0 +1,39 @@
+parameters:
+  - $ref: ../components/parameters/CommunityId.yaml
+get:
+  tags: [Denuncias]
+  operationId: listCommunityReports
+  summary: Listar las denuncias de una comunidad
+  description: Solo `community_admin` o `moderator` de la comunidad, o `platform_admin`.
+  x-mvp: false
+  parameters:
+    - name: status
+      in: query
+      required: false
+      schema:
+        $ref: ../components/schemas/ReportStatus.yaml
+    - $ref: ../components/parameters/Page.yaml
+    - $ref: ../components/parameters/PageSize.yaml
+  responses:
+    "200":
+      description: Denuncias de la comunidad.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/PageMeta.yaml
+              - type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: ../components/schemas/Report.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

@@ -1,0 +1,14 @@
+type: object
+required: [access_token, token_type, expires_in, user]
+properties:
+  access_token:
+    type: string
+    description: JWT de acceso.
+  token_type:
+    type: string
+    enum: [Bearer]
+  expires_in:
+    type: integer
+    description: Duración del token en segundos.
+  user:
+    $ref: ./User.yaml

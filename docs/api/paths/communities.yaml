@@ -1,0 +1,75 @@
+get:
+  tags: [Comunidades]
+  operationId: listCommunities
+  summary: Buscar comunidades
+  description: Explora las comunidades activas para solicitar el acceso. Requiere estar autenticado.
+  x-mvp: true
+  parameters:
+    - name: q
+      in: query
+      required: false
+      description: Busca en el nombre y la descripción.
+      schema:
+        type: string
+        maxLength: 160
+    - name: city
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 120
+    - name: postal_code
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 16
+    - $ref: ../components/parameters/Page.yaml
+    - $ref: ../components/parameters/PageSize.yaml
+  responses:
+    "200":
+      description: Comunidades encontradas.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/PageMeta.yaml
+              - type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: ../components/schemas/Community.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml
+post:
+  tags: [Comunidades]
+  operationId: createCommunity
+  summary: Crear una comunidad
+  description: El creador queda registrado como `community_admin` con membresía `approved`. Requiere estar autenticado.
+  x-mvp: true
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/CommunityCreate.yaml
+        example:
+          name: Urbanización Los Olivos
+          description: Vecinos de Los Olivos, fases 1 a 3.
+          postal_code: "28220"
+          city: Majadahonda
+  responses:
+    "201":
+      description: Comunidad creada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Community.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

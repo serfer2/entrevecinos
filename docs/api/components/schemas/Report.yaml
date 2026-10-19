@@ -1,0 +1,27 @@
+type: object
+required: [id, listing, reporter, reason, status, created_at]
+properties:
+  id:
+    type: string
+    format: uuid
+  listing:
+    $ref: ./ListingSummary.yaml
+  reporter:
+    $ref: ./UserSummary.yaml
+  reason:
+    $ref: ./ReportReason.yaml
+  details:
+    type: [string, "null"]
+  status:
+    $ref: ./ReportStatus.yaml
+  reviewed_by:
+    type: [string, "null"]
+    format: uuid
+  resolution:
+    type: [string, "null"]
+  created_at:
+    type: string
+    format: date-time
+  reviewed_at:
+    type: [string, "null"]
+    format: date-time

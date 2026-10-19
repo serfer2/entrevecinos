@@ -1,0 +1,6 @@
+type: object
+additionalProperties: false
+required: [is_active]
+properties:
+  is_active:
+    type: boolean

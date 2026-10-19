@@ -1,0 +1,3 @@
+type: string
+description: Rol del usuario dentro de la comunidad.
+enum: [member, community_admin, moderator]

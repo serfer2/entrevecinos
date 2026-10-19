@@ -1,0 +1,28 @@
+get:
+  tags: [Usuarios]
+  operationId: listMyMemberships
+  summary: Listar mis comunidades y solicitudes
+  description: Membresías del usuario autenticado en cualquier estado, con la comunidad embebida.
+  x-mvp: true
+  parameters:
+    - name: status
+      in: query
+      required: false
+      description: Filtra por estado de la membresía.
+      schema:
+        $ref: ../components/schemas/MembershipStatus.yaml
+  responses:
+    "200":
+      description: Membresías del usuario.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [items]
+            properties:
+              items:
+                type: array
+                items:
+                  $ref: ../components/schemas/MyMembership.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml

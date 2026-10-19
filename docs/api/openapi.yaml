@@ -1,0 +1,291 @@
+openapi: 3.1.0
+info:
+  title: API de EntreVecinos
+  version: 1.0.0
+  description: |
+    API REST del marketplace de proximidad **EntreVecinos**.
+
+    ## Convenciones
+    - **Autenticación:** JWT en `Authorization: Bearer <token>` (`/auth/register`, `/auth/token`). Los endpoints públicos declaran `security: []`.
+    - **Autorización (RBAC):** cada operación indica en su descripción el rol necesario: usuario autenticado, miembro aprobado de la comunidad, `community_admin`/`moderator` o `platform_admin`.
+    - **MVP:** la extensión `x-mvp` marca con `true` las operaciones del MVP y con `false` las de fases posteriores.
+    - **Paginación:** los listados aceptan `page` y `page_size` y devuelven `{items, page, page_size, total}`.
+    - **Errores:** cuerpo `{"detail": "..."}`; los errores de validación (422) siguen el formato estándar de FastAPI.
+    - **Imágenes:** se suben con `POST /media` y se asocian después a anuncios, perfiles o al avatar por su `id`.
+    - **Borrado:** usuarios, anuncios y mensajes usan borrado lógico.
+servers:
+  - url: https://api.entrevecinos.example.com/v1
+    description: Producción
+  - url: http://localhost:8000/v1
+    description: Desarrollo local
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Sistema
+    description: Comprobaciones de disponibilidad.
+  - name: Autenticación
+    description: Registro e inicio de sesión.
+  - name: Usuarios
+    description: Perfil del usuario autenticado y sus recursos.
+  - name: Categorías
+    description: Catálogo de categorías de anuncios.
+  - name: Comunidades
+    description: Creación y consulta de comunidades.
+  - name: Membresías
+    description: Solicitudes de acceso, aprobación y gestión de miembros.
+  - name: Anuncios
+    description: Consulta, publicación y gestión de anuncios.
+  - name: Media
+    description: Subida y lectura de imágenes.
+  - name: Mensajería
+    description: Conversaciones privadas entre usuarios, asociadas a anuncios (post-MVP).
+  - name: Notificaciones
+    description: Avisos al usuario (post-MVP).
+  - name: Perfil profesional
+    description: Perfiles y servicios profesionales (post-MVP).
+  - name: Denuncias
+    description: Denuncia y moderación de anuncios (post-MVP).
+  - name: Administración
+    description: Gestión de la plataforma por `platform_admin` (post-MVP).
+
+paths:
+  /health:
+    $ref: ./paths/health.yaml
+  /auth/register:
+    $ref: ./paths/auth_register.yaml
+  /auth/token:
+    $ref: ./paths/auth_token.yaml
+  /users/me:
+    $ref: ./paths/users_me.yaml
+  /users/me/memberships:
+    $ref: ./paths/users_me_memberships.yaml
+  /users/me/listings:
+    $ref: ./paths/users_me_listings.yaml
+  /users/me/professional-profile:
+    $ref: ./paths/users_me_professional_profile.yaml
+  /users/me/professional-profile/services:
+    $ref: ./paths/users_me_professional_profile_services.yaml
+  /users/me/professional-profile/services/{service_id}:
+    $ref: ./paths/users_me_professional_profile_services_service_id.yaml
+  /users/me/professional-profile/images:
+    $ref: ./paths/users_me_professional_profile_images.yaml
+  /categories:
+    $ref: ./paths/categories.yaml
+  /categories/{category_id}:
+    $ref: ./paths/categories_category_id.yaml
+  /communities:
+    $ref: ./paths/communities.yaml
+  /communities/{community_id}:
+    $ref: ./paths/communities_community_id.yaml
+  /communities/{community_id}/memberships:
+    $ref: ./paths/communities_community_id_memberships.yaml
+  /communities/{community_id}/memberships/{user_id}:
+    $ref: ./paths/communities_community_id_memberships_user_id.yaml
+  /communities/{community_id}/listings:
+    $ref: ./paths/communities_community_id_listings.yaml
+  /communities/{community_id}/reports:
+    $ref: ./paths/communities_community_id_reports.yaml
+  /listings/{listing_id}:
+    $ref: ./paths/listings_listing_id.yaml
+  /listings/{listing_id}/status:
+    $ref: ./paths/listings_listing_id_status.yaml
+  /listings/{listing_id}/images:
+    $ref: ./paths/listings_listing_id_images.yaml
+  /listings/{listing_id}/conversations:
+    $ref: ./paths/listings_listing_id_conversations.yaml
+  /listings/{listing_id}/reports:
+    $ref: ./paths/listings_listing_id_reports.yaml
+  /media:
+    $ref: ./paths/media.yaml
+  /media/{asset_id}:
+    $ref: ./paths/media_asset_id.yaml
+  /conversations:
+    $ref: ./paths/conversations.yaml
+  /conversations/{conversation_id}:
+    $ref: ./paths/conversations_conversation_id.yaml
+  /conversations/{conversation_id}/messages:
+    $ref: ./paths/conversations_conversation_id_messages.yaml
+  /conversations/{conversation_id}/read:
+    $ref: ./paths/conversations_conversation_id_read.yaml
+  /messages/{message_id}:
+    $ref: ./paths/messages_message_id.yaml
+  /notifications:
+    $ref: ./paths/notifications.yaml
+  /notifications/read-all:
+    $ref: ./paths/notifications_read_all.yaml
+  /notifications/{notification_id}:
+    $ref: ./paths/notifications_notification_id.yaml
+  /professionals:
+    $ref: ./paths/professionals.yaml
+  /professionals/{user_id}:
+    $ref: ./paths/professionals_user_id.yaml
+  /reports/{report_id}:
+    $ref: ./paths/reports_report_id.yaml
+  /admin/users:
+    $ref: ./paths/admin_users.yaml
+  /admin/users/{user_id}:
+    $ref: ./paths/admin_users_user_id.yaml
+  /admin/communities:
+    $ref: ./paths/admin_communities.yaml
+  /admin/communities/{community_id}:
+    $ref: ./paths/admin_communities_community_id.yaml
+
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: ./components/securitySchemes/bearerAuth.yaml
+  parameters:
+    AssetId:
+      $ref: ./components/parameters/AssetId.yaml
+    CategoryId:
+      $ref: ./components/parameters/CategoryId.yaml
+    CommunityId:
+      $ref: ./components/parameters/CommunityId.yaml
+    ConversationId:
+      $ref: ./components/parameters/ConversationId.yaml
+    ListingId:
+      $ref: ./components/parameters/ListingId.yaml
+    MessageId:
+      $ref: ./components/parameters/MessageId.yaml
+    NotificationId:
+      $ref: ./components/parameters/NotificationId.yaml
+    Page:
+      $ref: ./components/parameters/Page.yaml
+    PageSize:
+      $ref: ./components/parameters/PageSize.yaml
+    ReportId:
+      $ref: ./components/parameters/ReportId.yaml
+    ServiceId:
+      $ref: ./components/parameters/ServiceId.yaml
+    UserId:
+      $ref: ./components/parameters/UserId.yaml
+  responses:
+    BadRequest:
+      $ref: ./components/responses/BadRequest.yaml
+    Conflict:
+      $ref: ./components/responses/Conflict.yaml
+    Forbidden:
+      $ref: ./components/responses/Forbidden.yaml
+    NotFound:
+      $ref: ./components/responses/NotFound.yaml
+    Unauthorized:
+      $ref: ./components/responses/Unauthorized.yaml
+    ValidationError:
+      $ref: ./components/responses/ValidationError.yaml
+  schemas:
+    AdminCommunityUpdate:
+      $ref: ./components/schemas/AdminCommunityUpdate.yaml
+    AdminUserUpdate:
+      $ref: ./components/schemas/AdminUserUpdate.yaml
+    AuthResponse:
+      $ref: ./components/schemas/AuthResponse.yaml
+    Category:
+      $ref: ./components/schemas/Category.yaml
+    CategoryCreate:
+      $ref: ./components/schemas/CategoryCreate.yaml
+    CategoryUpdate:
+      $ref: ./components/schemas/CategoryUpdate.yaml
+    Community:
+      $ref: ./components/schemas/Community.yaml
+    CommunityCreate:
+      $ref: ./components/schemas/CommunityCreate.yaml
+    CommunityUpdate:
+      $ref: ./components/schemas/CommunityUpdate.yaml
+    Conversation:
+      $ref: ./components/schemas/Conversation.yaml
+    ConversationCreate:
+      $ref: ./components/schemas/ConversationCreate.yaml
+    ConversationStatus:
+      $ref: ./components/schemas/ConversationStatus.yaml
+    ConversationUpdate:
+      $ref: ./components/schemas/ConversationUpdate.yaml
+    Error:
+      $ref: ./components/schemas/Error.yaml
+    Health:
+      $ref: ./components/schemas/Health.yaml
+    Listing:
+      $ref: ./components/schemas/Listing.yaml
+    ListingCreate:
+      $ref: ./components/schemas/ListingCreate.yaml
+    ListingImage:
+      $ref: ./components/schemas/ListingImage.yaml
+    ListingImagesUpdate:
+      $ref: ./components/schemas/ListingImagesUpdate.yaml
+    ListingOwner:
+      $ref: ./components/schemas/ListingOwner.yaml
+    ListingStatus:
+      $ref: ./components/schemas/ListingStatus.yaml
+    ListingStatusUpdate:
+      $ref: ./components/schemas/ListingStatusUpdate.yaml
+    ListingSummary:
+      $ref: ./components/schemas/ListingSummary.yaml
+    ListingType:
+      $ref: ./components/schemas/ListingType.yaml
+    ListingUpdate:
+      $ref: ./components/schemas/ListingUpdate.yaml
+    LoginRequest:
+      $ref: ./components/schemas/LoginRequest.yaml
+    MediaAsset:
+      $ref: ./components/schemas/MediaAsset.yaml
+    MediaUpload:
+      $ref: ./components/schemas/MediaUpload.yaml
+    Membership:
+      $ref: ./components/schemas/Membership.yaml
+    MembershipRole:
+      $ref: ./components/schemas/MembershipRole.yaml
+    MembershipStatus:
+      $ref: ./components/schemas/MembershipStatus.yaml
+    MembershipUpdate:
+      $ref: ./components/schemas/MembershipUpdate.yaml
+    Message:
+      $ref: ./components/schemas/Message.yaml
+    MessageCreate:
+      $ref: ./components/schemas/MessageCreate.yaml
+    MyMembership:
+      $ref: ./components/schemas/MyMembership.yaml
+    Notification:
+      $ref: ./components/schemas/Notification.yaml
+    NotificationType:
+      $ref: ./components/schemas/NotificationType.yaml
+    NotificationUpdate:
+      $ref: ./components/schemas/NotificationUpdate.yaml
+    PageMeta:
+      $ref: ./components/schemas/PageMeta.yaml
+    PlatformRole:
+      $ref: ./components/schemas/PlatformRole.yaml
+    ProfessionalImage:
+      $ref: ./components/schemas/ProfessionalImage.yaml
+    ProfessionalImagesUpdate:
+      $ref: ./components/schemas/ProfessionalImagesUpdate.yaml
+    ProfessionalProfile:
+      $ref: ./components/schemas/ProfessionalProfile.yaml
+    ProfessionalProfileUpsert:
+      $ref: ./components/schemas/ProfessionalProfileUpsert.yaml
+    ProfessionalService:
+      $ref: ./components/schemas/ProfessionalService.yaml
+    ProfessionalServiceCreate:
+      $ref: ./components/schemas/ProfessionalServiceCreate.yaml
+    ProfessionalServiceUpdate:
+      $ref: ./components/schemas/ProfessionalServiceUpdate.yaml
+    RegisterRequest:
+      $ref: ./components/schemas/RegisterRequest.yaml
+    Report:
+      $ref: ./components/schemas/Report.yaml
+    ReportCreate:
+      $ref: ./components/schemas/ReportCreate.yaml
+    ReportReason:
+      $ref: ./components/schemas/ReportReason.yaml
+    ReportStatus:
+      $ref: ./components/schemas/ReportStatus.yaml
+    ReportUpdate:
+      $ref: ./components/schemas/ReportUpdate.yaml
+    User:
+      $ref: ./components/schemas/User.yaml
+    UserSummary:
+      $ref: ./components/schemas/UserSummary.yaml
+    UserUpdate:
+      $ref: ./components/schemas/UserUpdate.yaml
+    ValidationError:
+      $ref: ./components/schemas/ValidationError.yaml
