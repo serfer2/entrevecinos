@@ -26,6 +26,7 @@ COMPOSE="docker compose --env-file .env -f infra/docker-compose.yml"
 |---|---|---|---|
 | `db` | `postgres:16` | `data` (interna) | ninguno por defecto |
 | `api` | `apps/api/Dockerfile` (etapa `dev`) | `data`, `edge` | `${API_PORT:-8000}` |
+| `web` | `apps/web/Dockerfile` (etapa `dev`) | `edge` | `${WEB_PORT:-3000}` |
 
 - `data`: red interna (`internal: true`). La base de datos no es accesible desde fuera de Docker.
 - `edge`: red normal para los servicios que deben ser accesibles desde el navegador.
@@ -77,3 +78,16 @@ $COMPOSE logs -f api              # logs
 - El healthcheck comprueba el puerto TCP hasta que exista el endpoint `/v1/health`.
 
 Más detalles en `apps/api/README.md`.
+
+## Web (`web`)
+
+```bash
+$COMPOSE up -d --build web        # levanta db, api y web
+$COMPOSE exec web npm run lint
+```
+
+- http://localhost:3000 — página marcador.
+- `web` solo está en `edge`: no puede alcanzar `db`.
+- `apps/web` se monta en el contenedor; `node_modules` y `.next` viven en los volúmenes `web_node_modules` y `web_next_cache`.
+
+Más detalles en `apps/web/README.md`.
