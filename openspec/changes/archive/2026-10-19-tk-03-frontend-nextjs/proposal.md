@@ -1,6 +1,6 @@
 ## Why
 
-El README define el frontend como React + Next.js 16 + TypeScript + TailwindCSS, organizado en `apps/web/src/` (`app/`, `features/`, `components/`, `lib/`, `styles/`), con las cabeceras de seguridad de Helmet configuradas en Next.js. No existe todavía el proyecto web. Ticket de origen: `docs/product/tickets/00-infra/TK-03-frontend-nextjs.md`.
+El README define el frontend como React + Next.js 16 + TypeScript + TailwindCSS, organizado en `apps/web/src/` (`app/`, `features/`, `components/`, `lib/`, `styles/`), con las cabeceras de seguridad de Helmet configuradas en Next.js. No existe todavía el proyecto web. Ticket de origen: `docs/product/tickets/00-infra/TK-003-frontend-nextjs.md`.
 
 ## What Changes
 

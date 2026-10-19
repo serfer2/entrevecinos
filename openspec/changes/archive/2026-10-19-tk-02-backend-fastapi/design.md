@@ -1,6 +1,6 @@
 ## Context
 
-TK-01 dejó `infra/docker-compose.yml` con `db` en la red interna `data` y la red `edge` declarada. Este cambio añade el backend vacío. `uv` no está instalado en el host, así que todo el flujo Python (lock, pruebas, lint) se ejecuta en contenedores.
+TK-001 dejó `infra/docker-compose.yml` con `db` en la red interna `data` y la red `edge` declarada. Este cambio añade el backend vacío. `uv` no está instalado en el host, así que todo el flujo Python (lock, pruebas, lint) se ejecuta en contenedores.
 
 ## Goals / Non-Goals
 

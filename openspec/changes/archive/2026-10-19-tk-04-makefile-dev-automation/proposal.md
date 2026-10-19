@@ -1,6 +1,6 @@
 ## Why
 
-TK-01, TK-02 y TK-03 definen `db`, `api` y `web` en `infra/docker-compose.yml`, pero cada operación exige escribir `docker compose --env-file .env -f infra/docker-compose.yml ...` con flags distintos, lo que es propenso a errores y frena el onboarding. Ticket de origen: `docs/product/tickets/00-infra/TK-04-makefile-dev-automation.md`.
+TK-001, TK-002 y TK-003 definen `db`, `api` y `web` en `infra/docker-compose.yml`, pero cada operación exige escribir `docker compose --env-file .env -f infra/docker-compose.yml ...` con flags distintos, lo que es propenso a errores y frena el onboarding. Ticket de origen: `docs/product/tickets/00-infra/TK-004-makefile-dev-automation.md`.
 
 ## What Changes
 

@@ -1,4 +1,4 @@
-# Comandos de desarrollo de EntreVecinos (TK-04). Ejecuta `make` para ver la ayuda.
+# Comandos de desarrollo de EntreVecinos (TK-004). Ejecuta `make` para ver la ayuda.
 
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c

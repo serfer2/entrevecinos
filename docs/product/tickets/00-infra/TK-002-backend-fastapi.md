@@ -1,11 +1,11 @@
-# TK-02 · Backend: esqueleto de FastAPI y su contenedor
+# TK-002 · Backend: esqueleto de FastAPI y su contenedor
 
 | Campo | Valor |
 |---|---|
 | **Tipo** | Backend / estructura |
 | **Componente** | `apps/api/` e `infra/` |
 | **Prioridad** | Alta (bloquea toda la implementación del backend) |
-| **Depende de** | TK-01 |
+| **Depende de** | TK-001 |
 | **Referencias** | `readme.md` §2.2 (componentes), §2.3 (estructura y arquitectura limpia), §2.5 (seguridad), §4 (API); `docs/api/openapi.yaml` |
 
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.

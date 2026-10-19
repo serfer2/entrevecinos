@@ -297,15 +297,44 @@ El ticklet es para crear un Makefile con comandos:
 Los tickets de cada historia de usuario deben estar agrupados en carpetas con nombre "HU-xxx-<nombre-de-la-historia-de-usuario>" donde xxx es la secuencia o número de historia de usuario. Los 4 tickets existentes deben ser movidos a docs/product/tickets/00-infra/. Actualiza el README.
 ```
 
+**Prompt 4:** Crear tickets para Épica 1 — Registro y perfil básico
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets de infra están listos e implementados
+
+```
+Crea los tickets para `Épica 1 — Registro y perfil básico`. Un fichero por cada ticket. Siguiendo la estructura de carpetas: crea una carpeta para la épica en docs/product/tickets y una subcarpeta por cada historia de usuario, numeradas en el orden en que han sido definidas en user-stories.md
+```
+
+**Prompt 4.1:** Correcciones
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets de Épica 1 han sidpo creados, los refinamos
+
+```
+- En Tk-05, el nombre de la tabla de usuarios será users.
+- Renombra los ficheros de ticket siguiendo el siguiente patrón Tk-05 -> Tk-005
+```
+
 #### 6.1 Implementación de tickets de trabajo
 
-**Prompt 3:** Implementar infra de desarrollo
+**Prompt 1:** Implementar infra de desarrollo
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets de infra están listos
 
 ```
 Implement infra tickets TK-01..TK-04  
 ```
+
+**Prompt 2:** Implementar tickets de Epica 1
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets de Épica 1 están listos
+
+```
+Los tickets de la Épica1 ya están revisados, impleméntalos
+```
+
+**NOTE**
+
+Claude propone ir creando las specs en openspec a partir de los ficheros de tickets que hay en la carpeta `docs/product/tickets/00-infra`.
 
 ---
 

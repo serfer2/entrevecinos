@@ -1,6 +1,6 @@
 ## Why
 
-El README define un backend FastAPI en contenedor Docker, organizado con arquitectura limpia (`domain`, `application`, `infrastructure`, `presentation`) en `apps/api/src/entrevecinos/`. No existe todavía ningún código de backend y todas las funcionalidades dependen de esta base. Ticket de origen: `docs/product/tickets/00-infra/TK-02-backend-fastapi.md`.
+El README define un backend FastAPI en contenedor Docker, organizado con arquitectura limpia (`domain`, `application`, `infrastructure`, `presentation`) en `apps/api/src/entrevecinos/`. No existe todavía ningún código de backend y todas las funcionalidades dependen de esta base. Ticket de origen: `docs/product/tickets/00-infra/TK-002-backend-fastapi.md`.
 
 ## What Changes
 

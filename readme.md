@@ -1310,13 +1310,13 @@ Las historias completas del MVP (17 historias en 6 épicas) están en [`docs/pro
 
 Los tickets completos están en [`docs/product/tickets/`](docs/product/tickets/). Los tres primeros tickets del desarrollo preparan el entorno: base de datos (Docker Compose con PostgreSQL 16), esqueleto del backend (FastAPI) y configuración del frontend (Next.js).
 
-**Ticket 1** — TK-01 · Infraestructura: Docker Compose con PostgreSQL 16
+**Ticket 1** — TK-001 · Infraestructura: Docker Compose con PostgreSQL 16
 
 | Campo | Valor |
 |---|---|
 | **Tipo** | Infraestructura / DevOps |
 | **Componente** | `infra/` |
-| **Prioridad** | Alta (bloquea TK-02 y TK-03) |
+| **Prioridad** | Alta (bloquea TK-002 y TK-003) |
 | **Depende de** | — |
 | **Referencias** | `readme.md` §2.1 (arquitectura), §2.3 (estructura de ficheros), §2.4 (desarrollo local), §2.5 (seguridad) |
 
@@ -1326,7 +1326,7 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 
 El README define que el entorno local se levanta con Docker Compose y que PostgreSQL 16 se ejecuta en un contenedor con volumen persistente, dentro de una red interna y sin exponerse a Internet. El repositorio aún no contiene ninguna configuración de Docker.
 
-**Objetivo:** crear la base de la configuración de Docker Compose del proyecto con un primer servicio, `db` (PostgreSQL 16), con datos persistentes, credenciales fuera del repositorio y comprobación de salud, de forma que TK-02 y TK-03 puedan añadir sus servicios sobre esta base.
+**Objetivo:** crear la base de la configuración de Docker Compose del proyecto con un primer servicio, `db` (PostgreSQL 16), con datos persistentes, credenciales fuera del repositorio y comprobación de salud, de forma que TK-002 y TK-003 puedan añadir sus servicios sobre esta base.
 
 #### 2. Alcance
 
@@ -1339,7 +1339,7 @@ El README define que el entorno local se levanta con Docker Compose y que Postgr
 
 **No incluye**
 - Esquema, tablas, enums, migraciones ni datos semilla (tickets posteriores de base de datos).
-- Servicios `api` y `web` (TK-02 y TK-03).
+- Servicios `api` y `web` (TK-002 y TK-003).
 - Almacenamiento de imágenes, copias de seguridad automáticas y configuración de producción.
 
 #### 3. Requisitos técnicos
@@ -1357,7 +1357,7 @@ El README define que el entorno local se levanta con Docker Compose y que Postgr
 ##### 3.2 Redes
 
 - `data`: red interna (`internal: true`) para `db` y, más adelante, `api`. Impide que la base de datos sea accesible desde fuera de Docker.
-- `edge`: red normal donde se conectarán `web` y `api` (se usa en TK-02 y TK-03; se declara ya para no reescribir el fichero).
+- `edge`: red normal donde se conectarán `web` y `api` (se usa en TK-002 y TK-003; se declara ya para no reescribir el fichero).
 
 ##### 3.3 Acceso desde el host
 
@@ -1498,14 +1498,14 @@ docker compose --env-file .env -f infra/docker-compose.yml down -v          # li
 - **Scripts de `initdb` no se reejecutan** si el volumen ya existe; documentado en `infra/README.md`.
 - **Copias de seguridad de `db_data`:** el README las exige en producción; quedan fuera de este ticket.
 
-**Ticket 2** — TK-02 · Backend: esqueleto de FastAPI y su contenedor
+**Ticket 2** — TK-002 · Backend: esqueleto de FastAPI y su contenedor
 
 | Campo | Valor |
 |---|---|
 | **Tipo** | Backend / estructura |
 | **Componente** | `apps/api/` e `infra/` |
 | **Prioridad** | Alta (bloquea toda la implementación del backend) |
-| **Depende de** | TK-01 |
+| **Depende de** | TK-001 |
 | **Referencias** | `readme.md` §2.2 (componentes), §2.3 (estructura y arquitectura limpia), §2.5 (seguridad), §4 (API); `docs/api/openapi.yaml` |
 
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.
@@ -1731,14 +1731,14 @@ docker compose --env-file .env -f infra/docker-compose.yml run --rm api ruff che
 - **Cadena de conexión:** se define `DATABASE_URL` sin usarla todavía; si el driver elegido más adelante requiere otro esquema (por ejemplo `postgresql+psycopg://`), se ajusta en el ticket de persistencia.
 - **`/health`:** aparece en `docs/api/` pero no se implementa aquí por la restricción del ticket; el healthcheck de Compose usa TCP hasta entonces.
 
-**Ticket 3** — TK-03 · Frontend: configuración de Next.js y su contenedor
+**Ticket 3** — TK-003 · Frontend: configuración de Next.js y su contenedor
 
 | Campo | Valor |
 |---|---|
 | **Tipo** | Frontend / configuración |
 | **Componente** | `apps/web/` e `infra/` |
 | **Prioridad** | Alta (bloquea toda la implementación del frontend) |
-| **Depende de** | TK-01 y TK-02 (comparte `infra/docker-compose.yml` y la red `edge`) |
+| **Depende de** | TK-001 y TK-002 (comparte `infra/docker-compose.yml` y la red `edge`) |
 | **Referencias** | `readme.md` §2.1, §2.2 (frontend), §2.3 (estructura), §2.5 (Helmet y cabeceras) |
 
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.

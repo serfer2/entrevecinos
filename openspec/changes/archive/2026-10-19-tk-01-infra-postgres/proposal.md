@@ -1,6 +1,6 @@
 ## Why
 
-El README define que el entorno local se levanta con Docker Compose y que PostgreSQL 16 corre en un contenedor con volumen persistente, en una red interna y sin exponerse fuera de Docker. El repositorio aún no tiene ninguna configuración de Docker, y TK-02 (API) y TK-03 (web) necesitan esta base para añadir sus servicios. Ticket de origen: `docs/product/tickets/00-infra/TK-01-infra-postgres.md`.
+El README define que el entorno local se levanta con Docker Compose y que PostgreSQL 16 corre en un contenedor con volumen persistente, en una red interna y sin exponerse fuera de Docker. El repositorio aún no tiene ninguna configuración de Docker, y TK-002 (API) y TK-003 (web) necesitan esta base para añadir sus servicios. Ticket de origen: `docs/product/tickets/00-infra/TK-001-infra-postgres.md`.
 
 ## What Changes
 
@@ -21,4 +21,4 @@ El README define que el entorno local se levanta con Docker Compose y que Postgr
 
 - Ficheros nuevos en `infra/` y en la raíz (`.env.example`); cambio en `.gitignore`.
 - Requiere Docker con el plugin Compose v2.
-- Sin impacto en código de aplicación (todavía no existe). TK-02 y TK-03 ampliarán `infra/docker-compose.yml`.
+- Sin impacto en código de aplicación (todavía no existe). TK-002 y TK-003 ampliarán `infra/docker-compose.yml`.

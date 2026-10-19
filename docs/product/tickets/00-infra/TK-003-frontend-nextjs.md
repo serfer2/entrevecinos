@@ -1,11 +1,11 @@
-# TK-03 · Frontend: configuración de Next.js y su contenedor
+# TK-003 · Frontend: configuración de Next.js y su contenedor
 
 | Campo | Valor |
 |---|---|
 | **Tipo** | Frontend / configuración |
 | **Componente** | `apps/web/` e `infra/` |
 | **Prioridad** | Alta (bloquea toda la implementación del frontend) |
-| **Depende de** | TK-01 y TK-02 (comparte `infra/docker-compose.yml` y la red `edge`) |
+| **Depende de** | TK-001 y TK-002 (comparte `infra/docker-compose.yml` y la red `edge`) |
 | **Referencias** | `readme.md` §2.1, §2.2 (frontend), §2.3 (estructura), §2.5 (Helmet y cabeceras) |
 
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.

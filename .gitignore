@@ -123,7 +123,7 @@ dmypy.json
 # custom ignores
 dist
 package-lock.json
-# TK-03: el lockfile del frontend se versiona (npm ci en Docker)
+# TK-003: el lockfile del frontend se versiona (npm ci en Docker)
 !apps/web/package-lock.json
 yarn.lock
 

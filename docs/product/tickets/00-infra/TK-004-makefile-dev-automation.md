@@ -1,17 +1,17 @@
-# TK-04 · Automatización: Makefile para entornos de desarrollo
+# TK-004 · Automatización: Makefile para entornos de desarrollo
 
 | Campo | Valor |
 |---|---|
 | **Tipo** | Tarea técnica / herramienta de desarrollo |
 | **Componente** | `Makefile` (raíz del repo) |
 | **Prioridad** | Media (mejora DX; no bloquea funcionalidad de producto) |
-| **Depende de** | TK-01, TK-02, TK-03 |
-| **Referencias** | `infra/docker-compose.yml` (TK-01 servicio `db`, TK-02 servicio `api`, TK-03 servicio `web`), `readme.md` §2.4 |
+| **Depende de** | TK-001, TK-002, TK-003 |
+| **Referencias** | `infra/docker-compose.yml` (TK-001 servicio `db`, TK-002 servicio `api`, TK-003 servicio `web`), `readme.md` §2.4 |
 
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.
 
 ## 1. Contexto y objetivo
-TK-01, TK-02 y TK-03 definen los servicios `db`, `api` y `web` en `infra/docker-compose.yml`, pero cada operación (construir imágenes, levantar el entorno, limpiarlo) requiere invocar `docker compose --env-file .env -f infra/docker-compose.yml ...` manualmente con flags distintos. Esto es propenso a errores y ralentiza el onboarding de nuevos desarrolladores.
+TK-001, TK-002 y TK-003 definen los servicios `db`, `api` y `web` en `infra/docker-compose.yml`, pero cada operación (construir imágenes, levantar el entorno, limpiarlo) requiere invocar `docker compose --env-file .env -f infra/docker-compose.yml ...` manualmente con flags distintos. Esto es propenso a errores y ralentiza el onboarding de nuevos desarrolladores.
 
 **Objetivo:** proveer un `Makefile` en la raíz del repositorio que exponga comandos cortos y memorables (`make build`, `make dev`, `make clean`, etc.) que envuelvan las operaciones de Docker Compose ya definidas, sin introducir lógica nueva de infraestructura.
 
@@ -29,7 +29,7 @@ TK-01, TK-02 y TK-03 definen los servicios `db`, `api` y `web` en `infra/docker-
 **No incluye**
 - Targets de producción/despliegue (`build-prod`, `deploy`) — no solicitados.
 - Targets de test/lint/CI — corresponden a una entrega posterior.
-- Modificación de `infra/docker-compose.yml` o de los `Dockerfile` de `api`/`web` — ya definidos en TK-01/02/03.
+- Modificación de `infra/docker-compose.yml` o de los `Dockerfile` de `api`/`web` — ya definidos en TK-001/02/03.
 - Eliminación de volúmenes de datos (reset completo) — fuera de alcance; evita pérdida accidental de datos de desarrollo.
 
 ## 3. Requisitos técnicos
@@ -102,7 +102,7 @@ COMPOSE      := docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
 
 ## 6. Verificación
 ```bash
-# Pre-requisito: .env existente (ver TK-01)
+# Pre-requisito: .env existente (ver TK-001)
 test -f .env || cp .env.example .env
 
 make help                 # lista los targets disponibles con descripción
@@ -137,5 +137,5 @@ docker volume ls | grep db_data            # el volumen persiste (no se elimina)
 ## 8. Riesgos y decisiones abiertas
 - **Modo de `dev` (detached vs foreground):** se asume `up -d` (background) ya que el usuario no especificó si debe seguir logs en vivo; si se prefiere, se puede añadir un target adicional `logs` en un ticket posterior (asumido).
 - **`clean` y volúmenes:** se decide explícitamente NO usar `down -v`, para no borrar `db_data` por accidente; si se necesita un reset completo de datos, correspondería un target separado (p. ej. `clean-all`), fuera de alcance de este ticket.
-- **Endpoint `/health` de `api`:** TK-02 aún no define un endpoint `/health` real (solo TCP check); la verificación con `curl /v1/health` en este ticket asume que dicho endpoint ya existirá para cuando se implemente TK-04, o se sustituye temporalmente por una comprobación de puerto (asumido).
-- **Prefijo de nombres de imagen:** se asume que Docker Compose genera imágenes con prefijo `entrevecinos-` a partir de `name: entrevecinos` (TK-01), usado en los comandos de verificación (asumido).
+- **Endpoint `/health` de `api`:** TK-002 aún no define un endpoint `/health` real (solo TCP check); la verificación con `curl /v1/health` en este ticket asume que dicho endpoint ya existirá para cuando se implemente TK-004, o se sustituye temporalmente por una comprobación de puerto (asumido).
+- **Prefijo de nombres de imagen:** se asume que Docker Compose genera imágenes con prefijo `entrevecinos-` a partir de `name: entrevecinos` (TK-001), usado en los comandos de verificación (asumido).

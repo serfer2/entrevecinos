@@ -1,6 +1,6 @@
 ## Context
 
-TK-01 y TK-02 dejaron `db` y `api` en Compose con las redes `data` y `edge`. Este cambio añade el frontend vacío en `edge`, sin acceso a `data`.
+TK-001 y TK-002 dejaron `db` y `api` en Compose con las redes `data` y `edge`. Este cambio añade el frontend vacío en `edge`, sin acceso a `data`.
 
 ## Goals / Non-Goals
 
