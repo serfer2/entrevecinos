@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Mapping
 
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
@@ -60,3 +61,11 @@ class SqlAlchemyUserRepository:
         self._session.execute(
             update(UserModel).where(UserModel.id == user_id).values(password_hash=password_hash)
         )
+
+    def update_profile(self, user_id: uuid.UUID, values: Mapping[str, str | None]) -> User:
+        model = self._session.get_one(UserModel, user_id)
+        for field, value in values.items():
+            setattr(model, field, value)
+        self._session.flush()
+        self._session.refresh(model)
+        return to_domain(model)

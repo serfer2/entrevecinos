@@ -28,7 +28,8 @@ class UserModel(Base):
     platform_role: Mapped[str] = mapped_column(USER_ROLE, server_default="user")
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # statement_timestamp(): now() devolvería el inicio de la transacción, no el del cambio.
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.statement_timestamp()
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

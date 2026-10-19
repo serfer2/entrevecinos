@@ -1,6 +1,8 @@
 """Implementaciones en memoria de los puertos, para las pruebas unitarias."""
 
+import dataclasses
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime
 
 from entrevecinos.application.users.ports import AccessToken
@@ -25,6 +27,10 @@ class InMemoryUserRepository:
 
     def update_password_hash(self, user_id: uuid.UUID, password_hash: str) -> None:
         self.password_hashes[user_id] = password_hash
+
+    def update_profile(self, user_id: uuid.UUID, values: Mapping[str, str | None]) -> User:
+        self.users[user_id] = dataclasses.replace(self.users[user_id], **values)
+        return self.users[user_id]
 
     def add(self, user: NewUser, password_hash: str) -> User:
         if self.get_by_email(user.email):

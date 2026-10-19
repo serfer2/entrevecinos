@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -25,6 +26,10 @@ class UserRepository(Protocol):
         ...
 
     def update_password_hash(self, user_id: uuid.UUID, password_hash: str) -> None: ...
+
+    def update_profile(self, user_id: uuid.UUID, values: Mapping[str, str | None]) -> User:
+        """Actualiza solo los campos de `values` (`full_name`, `phone`)."""
+        ...
 
 
 class PasswordHasher(Protocol):
