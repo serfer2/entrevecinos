@@ -1,0 +1,65 @@
+parameters:
+  - $ref: ../components/parameters/CommunityId.yaml
+get:
+  tags: [Membresías]
+  operationId: listCommunityMemberships
+  summary: Listar miembros y solicitudes de una comunidad
+  description: Solo `community_admin` o `moderator` de la comunidad, o `platform_admin`.
+  x-mvp: true
+  parameters:
+    - name: status
+      in: query
+      required: false
+      description: Filtra por estado (p. ej. `pending` para solicitudes por revisar).
+      schema:
+        $ref: ../components/schemas/MembershipStatus.yaml
+    - $ref: ../components/parameters/Page.yaml
+    - $ref: ../components/parameters/PageSize.yaml
+  responses:
+    "200":
+      description: Membresías de la comunidad.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/PageMeta.yaml
+              - type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: ../components/schemas/Membership.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+post:
+  tags: [Membresías]
+  operationId: requestMembership
+  summary: Solicitar el acceso a una comunidad
+  description: >-
+    Crea una membresía `pending` con rol `member` para el usuario autenticado; un administrador
+    debe aprobarla. Sin cuerpo de petición.
+  x-mvp: true
+  responses:
+    "201":
+      description: Solicitud registrada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Membership.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "409":
+      description: El usuario ya tiene una membresía (pendiente, aprobada, rechazada o bloqueada) en la comunidad.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Error.yaml

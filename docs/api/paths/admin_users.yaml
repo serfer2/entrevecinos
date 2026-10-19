@@ -1,0 +1,42 @@
+get:
+  tags: [Administración]
+  operationId: adminListUsers
+  summary: Listar usuarios de la plataforma
+  description: Solo `platform_admin`.
+  x-mvp: false
+  parameters:
+    - name: q
+      in: query
+      required: false
+      description: Busca por nombre o correo.
+      schema:
+        type: string
+        maxLength: 160
+    - name: is_active
+      in: query
+      required: false
+      schema:
+        type: boolean
+    - $ref: ../components/parameters/Page.yaml
+    - $ref: ../components/parameters/PageSize.yaml
+  responses:
+    "200":
+      description: Usuarios.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/PageMeta.yaml
+              - type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: ../components/schemas/User.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

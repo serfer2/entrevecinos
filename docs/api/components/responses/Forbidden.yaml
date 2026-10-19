@@ -1,0 +1,7 @@
+description: El usuario autenticado no tiene permisos para esta operación.
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/Error.yaml
+    example:
+      detail: "No tienes permisos para realizar esta acción."

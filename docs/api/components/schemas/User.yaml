@@ -1,0 +1,25 @@
+type: object
+description: Datos completos del usuario autenticado (nunca incluye el hash de contraseña).
+required: [id, email, full_name, platform_role, is_active, created_at]
+properties:
+  id:
+    type: string
+    format: uuid
+  email:
+    type: string
+    format: email
+  full_name:
+    type: string
+  phone:
+    type: [string, "null"]
+  avatar_url:
+    type: [string, "null"]
+    format: uri-reference
+    description: URL relativa del avatar (`/media/{asset_id}`).
+  platform_role:
+    $ref: ./PlatformRole.yaml
+  is_active:
+    type: boolean
+  created_at:
+    type: string
+    format: date-time

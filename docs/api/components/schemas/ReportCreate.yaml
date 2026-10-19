@@ -1,0 +1,9 @@
+type: object
+additionalProperties: false
+required: [reason]
+properties:
+  reason:
+    $ref: ./ReportReason.yaml
+  details:
+    type: [string, "null"]
+    maxLength: 2000

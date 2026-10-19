@@ -1,0 +1,27 @@
+put:
+  tags: [Perfil profesional]
+  operationId: replaceProfessionalImages
+  summary: Sustituir las imágenes de mi perfil profesional
+  description: Asocia ficheros subidos con `POST /media` (máximo 10); el orden del array define `position`.
+  x-mvp: false
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ProfessionalImagesUpdate.yaml
+  responses:
+    "200":
+      description: Imágenes actualizadas.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ProfessionalProfile.yaml
+    "400":
+      $ref: ../components/responses/BadRequest.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

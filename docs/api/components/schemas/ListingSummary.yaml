@@ -1,0 +1,11 @@
+type: object
+description: Referencia mínima a un anuncio (conversaciones, denuncias).
+required: [id, title, status]
+properties:
+  id:
+    type: string
+    format: uuid
+  title:
+    type: string
+  status:
+    $ref: ./ListingStatus.yaml

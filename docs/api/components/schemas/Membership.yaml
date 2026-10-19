@@ -1,0 +1,25 @@
+type: object
+description: Pertenencia de un usuario a una comunidad.
+required: [community_id, user, role, status, requested_at]
+properties:
+  community_id:
+    type: string
+    format: uuid
+  user:
+    $ref: ./UserSummary.yaml
+  role:
+    $ref: ./MembershipRole.yaml
+  status:
+    $ref: ./MembershipStatus.yaml
+  reviewed_by:
+    type: [string, "null"]
+    format: uuid
+  requested_at:
+    type: string
+    format: date-time
+  reviewed_at:
+    type: [string, "null"]
+    format: date-time
+  joined_at:
+    type: [string, "null"]
+    format: date-time

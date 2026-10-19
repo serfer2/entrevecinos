@@ -1,0 +1,13 @@
+type: object
+required: [id, name, is_active]
+properties:
+  id:
+    type: string
+    format: uuid
+  name:
+    type: string
+    maxLength: 120
+  description:
+    type: [string, "null"]
+  is_active:
+    type: boolean

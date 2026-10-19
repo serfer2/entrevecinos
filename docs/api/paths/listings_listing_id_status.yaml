@@ -1,0 +1,33 @@
+parameters:
+  - $ref: ../components/parameters/ListingId.yaml
+patch:
+  tags: [Anuncios]
+  operationId: updateListingStatus
+  summary: Cambiar el estado de un anuncio
+  description: >-
+    El autor puede pasar entre `active`, `reserved` y `completed`. Solo un `community_admin`/`moderator`
+    o `platform_admin` puede establecer o levantar `hidden` (retirada de anuncios problemáticos).
+  x-mvp: true
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ListingStatusUpdate.yaml
+        example:
+          status: reserved
+  responses:
+    "200":
+      description: Estado actualizado.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Listing.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

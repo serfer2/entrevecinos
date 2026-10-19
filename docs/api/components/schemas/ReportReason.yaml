@@ -1,0 +1,3 @@
+type: string
+description: Motivo de la denuncia.
+enum: [inappropriate, fraud, prohibited_item, spam, other]

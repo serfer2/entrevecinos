@@ -1,0 +1,12 @@
+type: object
+required: [asset_id, url, position]
+properties:
+  asset_id:
+    type: string
+    format: uuid
+  url:
+    type: string
+    format: uri-reference
+  position:
+    type: integer
+    minimum: 0

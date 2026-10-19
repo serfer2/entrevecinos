@@ -1,0 +1,71 @@
+parameters:
+  - $ref: ../components/parameters/ListingId.yaml
+get:
+  tags: [Anuncios]
+  operationId: getListing
+  summary: Obtener el detalle de un anuncio
+  description: >-
+    Devuelve el anuncio con imágenes y datos del anunciante (incluido el teléfono, canal de contacto
+    del MVP). Requiere membresía aprobada en la comunidad del anuncio. Un anuncio `hidden` solo lo ven
+    su autor y los moderadores.
+  x-mvp: true
+  responses:
+    "200":
+      description: Anuncio.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Listing.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+patch:
+  tags: [Anuncios]
+  operationId: updateListing
+  summary: Editar un anuncio propio
+  description: Actualización parcial. Solo el autor del anuncio.
+  x-mvp: true
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ListingUpdate.yaml
+        example:
+          price: 40.00
+          currency: EUR
+  responses:
+    "200":
+      description: Anuncio actualizado.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Listing.yaml
+    "400":
+      $ref: ../components/responses/BadRequest.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml
+delete:
+  tags: [Anuncios]
+  operationId: deleteListing
+  summary: Eliminar un anuncio
+  description: Borrado lógico (`deleted_at`). Puede hacerlo el autor, un `community_admin`/`moderator` de la comunidad o un `platform_admin`.
+  x-mvp: true
+  responses:
+    "204":
+      description: Anuncio eliminado.
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml

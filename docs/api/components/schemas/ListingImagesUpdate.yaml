@@ -1,0 +1,19 @@
+type: object
+additionalProperties: false
+required: [images]
+description: Sustituye el conjunto de imágenes. El orden del array define `position`; como máximo una imagen puede ser portada (si ninguna lo es, lo será la primera).
+properties:
+  images:
+    type: array
+    maxItems: 10
+    items:
+      type: object
+      additionalProperties: false
+      required: [asset_id]
+      properties:
+        asset_id:
+          type: string
+          format: uuid
+        is_cover:
+          type: boolean
+          default: false

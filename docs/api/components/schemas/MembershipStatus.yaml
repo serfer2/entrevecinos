@@ -1,0 +1,3 @@
+type: string
+description: Estado de la solicitud de acceso a la comunidad.
+enum: [pending, approved, rejected, blocked]

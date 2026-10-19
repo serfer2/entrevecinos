@@ -1,0 +1,35 @@
+get:
+  tags: [Administración]
+  operationId: adminListCommunities
+  summary: Listar todas las comunidades
+  description: Solo `platform_admin`. Incluye las comunidades desactivadas.
+  x-mvp: false
+  parameters:
+    - name: is_active
+      in: query
+      required: false
+      schema:
+        type: boolean
+    - $ref: ../components/parameters/Page.yaml
+    - $ref: ../components/parameters/PageSize.yaml
+  responses:
+    "200":
+      description: Comunidades.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/PageMeta.yaml
+              - type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: ../components/schemas/Community.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

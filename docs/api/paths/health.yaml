@@ -1,0 +1,16 @@
+get:
+  tags: [Sistema]
+  operationId: getHealth
+  summary: Comprobar el estado del servicio
+  description: Endpoint público para sondas de disponibilidad (balanceador, Docker healthcheck).
+  x-mvp: true
+  security: []
+  responses:
+    "200":
+      description: Servicio operativo.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Health.yaml
+    "503":
+      description: Servicio no disponible (p. ej. sin conexión con la base de datos).

@@ -1,0 +1,3 @@
+type: string
+description: Rol global del usuario en la plataforma.
+enum: [user, platform_admin]

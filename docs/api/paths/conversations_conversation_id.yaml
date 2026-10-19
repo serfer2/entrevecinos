@@ -1,0 +1,48 @@
+parameters:
+  - $ref: ../components/parameters/ConversationId.yaml
+get:
+  tags: [Mensajería]
+  operationId: getConversation
+  summary: Obtener una conversación
+  description: Solo sus participantes (`buyer` o `seller`).
+  x-mvp: false
+  responses:
+    "200":
+      description: Conversación.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Conversation.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+patch:
+  tags: [Mensajería]
+  operationId: updateConversation
+  summary: Cerrar o archivar una conversación
+  description: Solo sus participantes. Una conversación `closed` no admite nuevos mensajes.
+  x-mvp: false
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ConversationUpdate.yaml
+  responses:
+    "200":
+      description: Conversación actualizada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Conversation.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

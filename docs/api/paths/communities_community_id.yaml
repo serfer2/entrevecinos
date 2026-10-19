@@ -1,0 +1,46 @@
+parameters:
+  - $ref: ../components/parameters/CommunityId.yaml
+get:
+  tags: [Comunidades]
+  operationId: getCommunity
+  summary: Obtener una comunidad
+  description: Requiere estar autenticado. Los datos básicos son visibles para solicitar el acceso.
+  x-mvp: true
+  responses:
+    "200":
+      description: Comunidad.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Community.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+patch:
+  tags: [Comunidades]
+  operationId: updateCommunity
+  summary: Actualizar una comunidad
+  description: Solo `community_admin` de la comunidad o `platform_admin`.
+  x-mvp: true
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/CommunityUpdate.yaml
+  responses:
+    "200":
+      description: Comunidad actualizada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Community.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

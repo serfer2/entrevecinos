@@ -1,0 +1,3 @@
+type: string
+description: "Modalidad del anuncio: vendo, busco, ofrezco servicio, necesito servicio, regalo, otros."
+enum: [sell, wanted, offer_service, need_service, free, other]

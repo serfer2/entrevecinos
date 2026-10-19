@@ -1,0 +1,25 @@
+type: object
+required: [id, name, is_active, created_at]
+properties:
+  id:
+    type: string
+    format: uuid
+  name:
+    type: string
+    maxLength: 120
+  description:
+    type: [string, "null"]
+  postal_code:
+    type: [string, "null"]
+    maxLength: 16
+  city:
+    type: [string, "null"]
+    maxLength: 120
+  created_by:
+    type: string
+    format: uuid
+  is_active:
+    type: boolean
+  created_at:
+    type: string
+    format: date-time

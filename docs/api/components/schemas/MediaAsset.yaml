@@ -1,0 +1,19 @@
+type: object
+required: [id, url, mime_type, size_bytes, created_at]
+properties:
+  id:
+    type: string
+    format: uuid
+  url:
+    type: string
+    format: uri-reference
+    description: URL relativa de lectura (`/media/{id}`).
+  mime_type:
+    type: string
+    enum: [image/jpeg, image/png, image/webp]
+  size_bytes:
+    type: integer
+    minimum: 1
+  created_at:
+    type: string
+    format: date-time

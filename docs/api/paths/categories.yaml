@@ -1,0 +1,51 @@
+get:
+  tags: [Categorías]
+  operationId: listCategories
+  summary: Listar categorías
+  description: Devuelve las categorías activas, necesarias para clasificar un anuncio. Requiere estar autenticado.
+  x-mvp: true
+  responses:
+    "200":
+      description: Categorías activas.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [items]
+            properties:
+              items:
+                type: array
+                items:
+                  $ref: ../components/schemas/Category.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+post:
+  tags: [Categorías]
+  operationId: createCategory
+  summary: Crear una categoría
+  description: Solo `platform_admin`.
+  x-mvp: true
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/CategoryCreate.yaml
+        example:
+          name: Hogar y jardín
+          slug: hogar-y-jardin
+  responses:
+    "201":
+      description: Categoría creada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Category.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "409":
+      $ref: ../components/responses/Conflict.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

@@ -1,0 +1,52 @@
+parameters:
+  - $ref: ../components/parameters/CommunityId.yaml
+  - $ref: ../components/parameters/UserId.yaml
+patch:
+  tags: [Membresías]
+  operationId: updateMembership
+  summary: Revisar una solicitud o cambiar el rol de un miembro
+  description: >-
+    Aprobar, rechazar o bloquear (`status`) y asignar rol (`role`). Solo `community_admin` de la
+    comunidad o `platform_admin`; solo un `community_admin` puede asignar el rol `community_admin`.
+    Al aprobar se fijan `reviewed_by`, `reviewed_at` y `joined_at`.
+  x-mvp: true
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/MembershipUpdate.yaml
+        example:
+          status: approved
+  responses:
+    "200":
+      description: Membresía actualizada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Membership.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml
+delete:
+  tags: [Membresías]
+  operationId: deleteMembership
+  summary: Salir de una comunidad o expulsar a un miembro
+  description: Un usuario puede eliminar su propia membresía; un `community_admin` puede eliminar la de otros. No se puede eliminar al último administrador.
+  x-mvp: true
+  responses:
+    "204":
+      description: Membresía eliminada.
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "409":
+      $ref: ../components/responses/Conflict.yaml

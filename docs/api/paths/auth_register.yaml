@@ -1,0 +1,29 @@
+post:
+  tags: [Autenticación]
+  operationId: registerUser
+  summary: Registrar una cuenta
+  description: Crea una cuenta con rol `user` y devuelve un token JWT para iniciar la sesión. Acceso público.
+  x-mvp: true
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/RegisterRequest.yaml
+        example:
+          email: vecino@example.com
+          password: UnaClaveSegura123!
+          full_name: Alex Vecino
+          phone: "+34600111222"
+  responses:
+    "201":
+      description: Cuenta creada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/AuthResponse.yaml
+    "409":
+      $ref: ../components/responses/Conflict.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

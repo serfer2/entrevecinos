@@ -1,0 +1,35 @@
+get:
+  tags: [Notificaciones]
+  operationId: listNotifications
+  summary: Listar mis notificaciones
+  description: Notificaciones del usuario autenticado, más recientes primero.
+  x-mvp: false
+  parameters:
+    - name: unread
+      in: query
+      required: false
+      description: Si es `true`, devuelve solo las no leídas.
+      schema:
+        type: boolean
+        default: false
+    - $ref: ../components/parameters/Page.yaml
+    - $ref: ../components/parameters/PageSize.yaml
+  responses:
+    "200":
+      description: Notificaciones del usuario.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/PageMeta.yaml
+              - type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: ../components/schemas/Notification.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

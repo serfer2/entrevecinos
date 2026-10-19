@@ -1,0 +1,28 @@
+post:
+  tags: [Perfil profesional]
+  operationId: createProfessionalService
+  summary: Añadir un servicio a mi perfil profesional
+  description: Requiere haber creado el perfil profesional.
+  x-mvp: false
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ProfessionalServiceCreate.yaml
+        example:
+          name: Instalación eléctrica
+          description: Cuadros, enchufes y puntos de luz.
+  responses:
+    "201":
+      description: Servicio creado.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ProfessionalService.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

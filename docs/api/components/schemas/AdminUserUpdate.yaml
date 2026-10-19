@@ -1,0 +1,8 @@
+type: object
+additionalProperties: false
+minProperties: 1
+properties:
+  is_active:
+    type: boolean
+  platform_role:
+    $ref: ./PlatformRole.yaml

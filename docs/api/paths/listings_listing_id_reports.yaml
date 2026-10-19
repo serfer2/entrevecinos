@@ -1,0 +1,36 @@
+parameters:
+  - $ref: ../components/parameters/ListingId.yaml
+post:
+  tags: [Denuncias]
+  operationId: reportListing
+  summary: Denunciar un anuncio
+  description: >-
+    Registra una denuncia `pending`. Requiere membresía aprobada en la comunidad del anuncio. Un usuario solo
+    puede tener una denuncia abierta por anuncio.
+  x-mvp: false
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ReportCreate.yaml
+        example:
+          reason: spam
+          details: Se repite en varias categorías.
+  responses:
+    "201":
+      description: Denuncia registrada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Report.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "409":
+      $ref: ../components/responses/Conflict.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

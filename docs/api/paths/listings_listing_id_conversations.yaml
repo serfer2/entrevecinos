@@ -1,0 +1,36 @@
+parameters:
+  - $ref: ../components/parameters/ListingId.yaml
+post:
+  tags: [Mensajería]
+  operationId: startConversation
+  summary: Contactar con el anunciante
+  description: >-
+    Crea la conversación entre el usuario autenticado (`buyer`) y el autor del anuncio (`seller`) con un primer
+    mensaje. Si ya existe una para ese anuncio, se añade el mensaje a la existente. El autor no puede
+    contactarse a sí mismo. Requiere membresía aprobada en la comunidad del anuncio.
+  x-mvp: false
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ConversationCreate.yaml
+        example:
+          body: Hola, ¿sigue disponible la bicicleta?
+  responses:
+    "201":
+      description: Conversación creada o mensaje añadido.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Conversation.yaml
+    "400":
+      $ref: ../components/responses/BadRequest.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

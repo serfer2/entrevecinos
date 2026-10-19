@@ -1,0 +1,6 @@
+type: http
+scheme: bearer
+bearerFormat: JWT
+description: >-
+  Token JWT obtenido en `/auth/register` o `/auth/token`, enviado en la cabecera
+  `Authorization: Bearer <token>`.

@@ -1,0 +1,45 @@
+get:
+  tags: [Perfil profesional]
+  operationId: listProfessionals
+  summary: Buscar profesionales
+  description: >-
+    Perfiles profesionales activos de usuarios con membresía aprobada en alguna de las comunidades del usuario
+    autenticado (o solo en la indicada por `community_id`).
+  x-mvp: false
+  parameters:
+    - name: q
+      in: query
+      required: false
+      description: Busca en descripción, zona de actuación y nombre de los servicios.
+      schema:
+        type: string
+        maxLength: 160
+    - name: community_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    - $ref: ../components/parameters/Page.yaml
+    - $ref: ../components/parameters/PageSize.yaml
+  responses:
+    "200":
+      description: Profesionales encontrados.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/PageMeta.yaml
+              - type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: ../components/schemas/ProfessionalProfile.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

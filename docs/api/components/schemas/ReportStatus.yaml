@@ -1,0 +1,3 @@
+type: string
+description: Estado de la denuncia.
+enum: [pending, reviewing, resolved, rejected]

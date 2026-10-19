@@ -1,0 +1,14 @@
+type: object
+description: Anunciante. `phone` se muestra a miembros aprobados de la comunidad y es el canal de contacto del MVP.
+required: [id, full_name]
+properties:
+  id:
+    type: string
+    format: uuid
+  full_name:
+    type: string
+  phone:
+    type: [string, "null"]
+  avatar_url:
+    type: [string, "null"]
+    format: uri-reference

@@ -1,0 +1,28 @@
+type: object
+required: [id, listing, buyer, seller, status, unread_count, created_at, updated_at]
+properties:
+  id:
+    type: string
+    format: uuid
+  listing:
+    $ref: ./ListingSummary.yaml
+  buyer:
+    $ref: ./UserSummary.yaml
+  seller:
+    $ref: ./UserSummary.yaml
+  status:
+    $ref: ./ConversationStatus.yaml
+  last_message:
+    oneOf:
+      - $ref: ./Message.yaml
+      - type: "null"
+  unread_count:
+    type: integer
+    minimum: 0
+    description: Mensajes sin leer para el usuario autenticado.
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time

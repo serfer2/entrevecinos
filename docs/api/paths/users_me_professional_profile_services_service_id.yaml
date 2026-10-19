@@ -1,0 +1,39 @@
+parameters:
+  - $ref: ../components/parameters/ServiceId.yaml
+patch:
+  tags: [Perfil profesional]
+  operationId: updateProfessionalService
+  summary: Actualizar un servicio de mi perfil
+  description: "Actualización parcial; `is_active: false` lo oculta sin borrarlo."
+  x-mvp: false
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ProfessionalServiceUpdate.yaml
+  responses:
+    "200":
+      description: Servicio actualizado.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/ProfessionalService.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml
+delete:
+  tags: [Perfil profesional]
+  operationId: deleteProfessionalService
+  summary: Eliminar un servicio de mi perfil
+  x-mvp: false
+  responses:
+    "204":
+      description: Servicio eliminado.
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml

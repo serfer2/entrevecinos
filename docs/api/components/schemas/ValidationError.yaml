@@ -1,0 +1,18 @@
+type: object
+required: [detail]
+properties:
+  detail:
+    type: array
+    items:
+      type: object
+      required: [loc, msg, type]
+      properties:
+        loc:
+          type: array
+          description: Ruta del campo erróneo (`body`, `query`, `path` y nombre del campo).
+          items:
+            type: [string, integer]
+        msg:
+          type: string
+        type:
+          type: string

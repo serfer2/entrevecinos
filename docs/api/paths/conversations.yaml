@@ -1,0 +1,40 @@
+get:
+  tags: [Mensajería]
+  operationId: listConversations
+  summary: Listar mis conversaciones
+  description: Conversaciones en las que participa el usuario autenticado, ordenadas por última actividad.
+  x-mvp: false
+  parameters:
+    - name: status
+      in: query
+      required: false
+      schema:
+        $ref: ../components/schemas/ConversationStatus.yaml
+    - name: listing_id
+      in: query
+      required: false
+      description: Filtra por anuncio.
+      schema:
+        type: string
+        format: uuid
+    - $ref: ../components/parameters/Page.yaml
+    - $ref: ../components/parameters/PageSize.yaml
+  responses:
+    "200":
+      description: Conversaciones del usuario.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/PageMeta.yaml
+              - type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: ../components/schemas/Conversation.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

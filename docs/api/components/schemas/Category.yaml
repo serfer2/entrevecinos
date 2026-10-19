@@ -1,0 +1,14 @@
+type: object
+required: [id, name, slug, is_active]
+properties:
+  id:
+    type: string
+    format: uuid
+  name:
+    type: string
+    maxLength: 80
+  slug:
+    type: string
+    maxLength: 100
+  is_active:
+    type: boolean

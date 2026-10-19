@@ -1,0 +1,29 @@
+parameters:
+  - $ref: ../components/parameters/CommunityId.yaml
+patch:
+  tags: [Administración]
+  operationId: adminUpdateCommunity
+  summary: Activar o desactivar una comunidad
+  description: Solo `platform_admin`. Una comunidad desactivada deja de ser visible y de admitir anuncios.
+  x-mvp: false
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/AdminCommunityUpdate.yaml
+  responses:
+    "200":
+      description: Comunidad actualizada.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/Community.yaml
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

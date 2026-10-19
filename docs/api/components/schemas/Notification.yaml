@@ -1,0 +1,21 @@
+type: object
+required: [id, type, created_at]
+properties:
+  id:
+    type: string
+    format: uuid
+  type:
+    $ref: ./NotificationType.yaml
+  message_id:
+    type: [string, "null"]
+    format: uuid
+  payload:
+    type: [object, "null"]
+    additionalProperties: true
+    description: Datos auxiliares según el tipo (p. ej. `conversation_id`, `listing_id`).
+  created_at:
+    type: string
+    format: date-time
+  read_at:
+    type: [string, "null"]
+    format: date-time

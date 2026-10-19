@@ -1,0 +1,7 @@
+name: category_id
+in: path
+required: true
+description: Identificador de la categoría.
+schema:
+  type: string
+  format: uuid

@@ -1,0 +1,10 @@
+extends:
+  - recommended
+
+rules:
+  # Proyecto académico sin licencia definida ni dominio real todavía.
+  info-license: off
+  no-server-example.com: off
+  # /health solo responde 200/503 y GET /media/{asset_id} responde con una redirección 302.
+  operation-4xx-response: off
+  operation-2xx-response: off

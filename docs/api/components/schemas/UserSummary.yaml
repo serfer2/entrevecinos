@@ -1,0 +1,12 @@
+type: object
+description: Datos públicos mínimos de un usuario.
+required: [id, full_name]
+properties:
+  id:
+    type: string
+    format: uuid
+  full_name:
+    type: string
+  avatar_url:
+    type: [string, "null"]
+    format: uri-reference
