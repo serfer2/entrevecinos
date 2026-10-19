@@ -226,3 +226,6 @@ typings/
 # Serverless directories
 .serverless
 
+
+# Artefactos del navegador de pruebas (Playwright MCP)
+.playwright-mcp/

@@ -24,11 +24,18 @@ COMPOSE="docker compose --env-file .env -f infra/docker-compose.yml"
 $COMPOSE up -d --build web          # levanta db, api y web
 $COMPOSE exec web npm run lint
 $COMPOSE exec web npm run typecheck
+$COMPOSE exec web npm run test
 ```
 
 - http://localhost:3000 (puerto configurable con `WEB_PORT`).
 - `apps/web` se monta en el contenedor y la página se recarga al guardar.
-- `node_modules` y `.next` viven en volúmenes del contenedor. Tras cambiar dependencias, recrea el volumen: `$COMPOSE up -d --build --renew-anon-volumes web` o `docker volume rm entrevecinos_web_node_modules`.
+- `node_modules` y `.next` viven en volúmenes con nombre del contenedor. Tras cambiar dependencias, el volumen conserva las antiguas: elimínalo y reconstruye.
+
+  ```bash
+  $COMPOSE stop web && $COMPOSE rm -f web
+  docker volume rm entrevecinos_web_node_modules
+  $COMPOSE up -d --build web
+  ```
 
 ## Sin Docker
 
@@ -41,6 +48,7 @@ npm ci
 npm run dev                  # http://localhost:3000
 npm run lint
 npm run typecheck
+npm run test                 # Vitest + Testing Library (Node ≥ 22.12)
 npm run build && npm run start
 ```
 
@@ -52,6 +60,17 @@ npm run build && npm run start
 | `API_INTERNAL_URL` | Servidor (Next) | URL de la API dentro de la red de Docker | `http://api:8000/v1` |
 
 Las variables `NEXT_PUBLIC_*` se incorporan al compilar y llegan al navegador: nunca guardes secretos en ellas.
+
+## Sesión y llamadas a la API
+
+- El navegador nunca recibe el JWT en JavaScript. Los formularios envían los datos a *Server Actions*; estas llaman a la API desde el servidor de Next (`API_INTERNAL_URL`) y guardan el token en la *cookie* `ev_session` (`HttpOnly`, `SameSite=Lax`, `Secure` en producción, misma duración que el token).
+- `src/lib/api/server.ts` (`apiFetch`) y `src/features/auth/session.ts` solo se pueden importar en el servidor (`server-only`): importarlos desde un componente de cliente rompe la compilación.
+- `apiFetch` nunca lanza excepciones: devuelve `{ ok: true, data }` o `{ ok: false, error }` (`status: 0` si la API no responde).
+- `src/components/ui/TextField.tsx`: campo con etiqueta, ayuda y error accesibles, compartido por los formularios.
+
+## Pruebas
+
+Vitest + Testing Library (`vitest.config.mts`). Las pruebas viven junto al código (`*.test.ts(x)`). Los formularios reciben su *Server Action* por *props*, así que se prueban con una acción simulada; las acciones se prueban simulando `apiFetch`, `next/headers` y `next/navigation`.
 
 ## Cabeceras de seguridad
 

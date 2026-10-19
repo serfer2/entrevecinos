@@ -1,0 +1,66 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+
+import type { SignupState } from "../actions";
+import { SignupForm } from "./SignupForm";
+
+async function submitWith(state: SignupState) {
+  const action = vi.fn(async () => state);
+  render(<SignupForm action={action} />);
+  // jsdom aplica la validación nativa (`required`): sin rellenar, el formulario no se envía.
+  await userEvent.type(screen.getByLabelText("Nombre"), "Alex Vecino");
+  await userEvent.type(screen.getByLabelText("Correo electrónico"), "vecino@example.com");
+  await userEvent.type(screen.getByLabelText("Contraseña"), "una-clave-cualquiera");
+  await userEvent.click(screen.getByRole("button", { name: "Crear cuenta" }));
+  return action;
+}
+
+describe("SignupForm", () => {
+  it("muestra los errores bajo cada campo y marca los campos inválidos", async () => {
+    await submitWith({
+      fieldErrors: { email: "Este correo ya está en uso.", full_name: "Introduce tu nombre." },
+      values: { full_name: "", email: "vecino@example.com", phone: "" },
+    });
+
+    const email = await screen.findByLabelText("Correo electrónico");
+    expect(email.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByText("Este correo ya está en uso.").id).toBe(
+      email.getAttribute("aria-describedby"),
+    );
+    expect(screen.getByLabelText("Nombre").getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("muestra el error general como alerta", async () => {
+    await submitWith({ formError: "No se pudo crear la cuenta. Inténtalo de nuevo." });
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "No se pudo crear la cuenta. Inténtalo de nuevo.",
+    );
+  });
+
+  it("conserva los valores devueltos pero no la contraseña", async () => {
+    await submitWith({
+      formError: "Error",
+      values: { full_name: "Alex Vecino", email: "vecino@example.com", phone: "600111222" },
+    });
+
+    await screen.findByRole("alert");
+    expect((screen.getByLabelText("Nombre") as HTMLInputElement).value).toBe("Alex Vecino");
+    expect((screen.getByLabelText("Correo electrónico") as HTMLInputElement).value).toBe(
+      "vecino@example.com",
+    );
+    expect((screen.getByLabelText("Teléfono (opcional)") as HTMLInputElement).value).toBe(
+      "600111222",
+    );
+    expect((screen.getByLabelText("Contraseña") as HTMLInputElement).value).toBe("");
+  });
+
+  it("enlaza con el inicio de sesión", () => {
+    render(<SignupForm action={vi.fn()} />);
+
+    expect(screen.getByRole("link", { name: "Inicia sesión" }).getAttribute("href")).toBe(
+      "/iniciar-sesion",
+    );
+  });
+});
