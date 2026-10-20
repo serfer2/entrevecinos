@@ -2,10 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { requireUser } from "@/features/auth/dal";
-import { MembershipAction } from "@/features/communities/components/MembershipAction";
+import { AccessNotice } from "@/features/communities/components/AccessNotice";
 import { getCommunity, getMyMembership } from "@/features/communities/data";
+import { firstParam, type SearchParams } from "@/lib/search-params";
 
-type CommunityPageProps = { params: Promise<{ communityId: string }> };
+type CommunityPageProps = {
+  params: Promise<{ communityId: string }>;
+  searchParams: Promise<SearchParams>;
+};
 
 export async function generateMetadata({ params }: CommunityPageProps): Promise<Metadata> {
   const { communityId } = await params;
@@ -13,16 +17,10 @@ export async function generateMetadata({ params }: CommunityPageProps): Promise<
   return { title: `${community.name} · EntreVecinos` };
 }
 
-const NOTICES = {
-  pending:
-    "Tu solicitud está pendiente de aprobación. Podrás ver y publicar anuncios cuando un administrador la apruebe.",
-  rejected: "No tienes acceso a esta comunidad.",
-  blocked: "No tienes acceso a esta comunidad.",
-} as const;
-
-export default async function CommunityPage({ params }: CommunityPageProps) {
+export default async function CommunityPage({ params, searchParams }: CommunityPageProps) {
   await requireUser();
   const { communityId } = await params;
+  const query = await searchParams;
   const [community, membership] = await Promise.all([
     getCommunity(communityId),
     getMyMembership(communityId),
@@ -37,34 +35,37 @@ export default async function CommunityPage({ params }: CommunityPageProps) {
           <h1 className="text-2xl font-semibold text-gray-900">{community.name}</h1>
           {place && <p className="mt-1 text-gray-600">{place}</p>}
         </div>
-        {/* Solo orientativo: la API decide los permisos (403 en la gestión). */}
-        {approved && membership.role === "community_admin" && (
-          <Link
-            href={`/comunidades/${community.id}/gestion/solicitudes`}
-            className="rounded-md border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
-          >
-            Gestionar comunidad
-          </Link>
+        {approved && (
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/comunidades/${community.id}/anuncios/nuevo`}
+              className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800"
+            >
+              Publicar anuncio
+            </Link>
+            {/* Solo orientativo: la API decide los permisos (403 en la gestión). */}
+            {membership.role === "community_admin" && (
+              <Link
+                href={`/comunidades/${community.id}/gestion/solicitudes`}
+                className="rounded-md border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
+              >
+                Gestionar comunidad
+              </Link>
+            )}
+          </div>
         )}
       </div>
       {community.description && (
         <p className="whitespace-pre-line text-gray-800">{community.description}</p>
       )}
 
-      {!approved && (
-        <section aria-label="Acceso a la comunidad" className="flex flex-col items-start gap-3">
-          {membership ? (
-            <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
-              {NOTICES[membership.status as keyof typeof NOTICES]}
-            </p>
-          ) : (
-            <>
-              <p className="text-gray-700">Solicita el acceso para ver y publicar anuncios.</p>
-              <MembershipAction communityId={community.id} status={undefined} />
-            </>
-          )}
-        </section>
+      {approved && firstParam(query, "publicado") === "1" && (
+        <p role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          Anuncio publicado.
+        </p>
       )}
+
+      {!approved && <AccessNotice communityId={community.id} membership={membership} />}
     </main>
   );
 }

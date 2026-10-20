@@ -72,7 +72,10 @@ Las variables `NEXT_PUBLIC_*` se incorporan al compilar y llegan al navegador: n
 - `src/components/ui/Forbidden.tsx`: aviso común para las páginas a las que la API responde `403`.
 - `src/components/ui/ConfirmDialog.tsx`: botón que pide confirmación en un `<dialog>` modal antes de enviar su formulario (sin JavaScript envía directamente).
 - `src/components/ui/Pagination.tsx`: «Anterior / Siguiente» de los listados; recibe `hrefFor(page)`.
-- Los ficheros `"use server"` solo pueden exportar funciones `async`: constantes y utilidades van en otro módulo (p. ej. `features/communities/admin/paths.ts`).
+- Imágenes: el navegador nunca habla con la API. Las sube la *Server Action* `uploadImage` (una por llamada; `serverActions.bodySizeLimit = "6mb"`) y las lee la ruta `GET /media/[assetId]`, que pide a la API la URL prefirmada sin seguir la redirección y redirige a ella (`403`/`404` → `404`). Usa `mediaSrc()` (`src/lib/media.ts`) para pintarlas con `<img>`.
+- `src/features/media/components/ImagePicker.tsx`: subida en serie, reordenar y quitar; envía los ids en campos ocultos `image_asset_ids`.
+- `src/features/listings/components/ListingForm.tsx`: formulario de anuncio (publicar y editar).
+- Los ficheros `"use server"` solo pueden exportar funciones `async`: constantes y utilidades van en otro módulo (p. ej. `features/communities/admin/paths.ts`). Lo comprueba `src/lib/server-actions.test.ts`.
 - `src/lib/forms.ts`: `formText()` (valor de un campo) e `isUuid()` (validar ids de la URL antes de llamar a la API).
 - `src/app/(privado)/layout.tsx`: cabecera de la zona privada; `NavLink` marca la sección actual con `aria-current="page"`. El *layout* no comprueba la sesión: cada página llama a `requireUser()`.
 
