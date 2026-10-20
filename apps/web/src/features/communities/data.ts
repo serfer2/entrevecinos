@@ -8,7 +8,7 @@ import type { ApiPage } from "@/lib/api/types";
 import { isUuid } from "@/lib/forms";
 
 import { type CommunitySearch, searchQuery } from "./search";
-import type { ApiCommunity, ApiMyMembership } from "./types";
+import type { ApiCommunity, ApiMembership, ApiMyMembership, MembershipStatus } from "./types";
 
 /** Comunidad activa o `notFound()`. Memorizada durante la petición. */
 export const getCommunity = cache(async (communityId: string): Promise<ApiCommunity> => {
@@ -34,4 +34,26 @@ export async function searchCommunities(search: CommunitySearch): Promise<ApiPag
   const result = await userApiFetch<ApiPage<ApiCommunity>>(`/communities?${searchQuery(search)}`);
   if (result.ok) return result.data;
   throw new Error(`No se pudo buscar comunidades (estado ${result.error.status})`);
+}
+
+export type CommunityMembershipsResult =
+  | { ok: true; page: ApiPage<ApiMembership> }
+  | { ok: false; forbidden: true };
+
+/** Membresías de la comunidad para su gestión. `forbidden` si la API responde 403. */
+export async function getCommunityMemberships(
+  communityId: string,
+  params: { status?: MembershipStatus; page?: number },
+): Promise<CommunityMembershipsResult> {
+  if (!isUuid(communityId)) notFound();
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.page && params.page > 1) query.set("page", String(params.page));
+  const result = await userApiFetch<ApiPage<ApiMembership>>(
+    `/communities/${communityId}/memberships?${query}`,
+  );
+  if (result.ok) return { ok: true, page: result.data };
+  if (result.error.status === 403) return { ok: false, forbidden: true };
+  if (result.error.status === 404) notFound();
+  throw new Error(`No se pudieron cargar las membresías (estado ${result.error.status})`);
 }

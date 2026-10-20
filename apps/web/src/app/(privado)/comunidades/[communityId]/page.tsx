@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { requireUser } from "@/features/auth/dal";
 import { MembershipAction } from "@/features/communities/components/MembershipAction";
@@ -31,9 +32,20 @@ export default async function CommunityPage({ params }: CommunityPageProps) {
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-10">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">{community.name}</h1>
-        {place && <p className="mt-1 text-gray-600">{place}</p>}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">{community.name}</h1>
+          {place && <p className="mt-1 text-gray-600">{place}</p>}
+        </div>
+        {/* Solo orientativo: la API decide los permisos (403 en la gestión). */}
+        {approved && membership.role === "community_admin" && (
+          <Link
+            href={`/comunidades/${community.id}/gestion/solicitudes`}
+            className="rounded-md border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
+          >
+            Gestionar comunidad
+          </Link>
+        )}
       </div>
       {community.description && (
         <p className="whitespace-pre-line text-gray-800">{community.description}</p>
