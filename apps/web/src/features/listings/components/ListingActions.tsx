@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { ApiListing } from "../types";
 
 export type ListingActionsProps = {
@@ -8,11 +10,23 @@ export type ListingActionsProps = {
   canModerate: boolean;
 };
 
+const secondary =
+  "rounded-md border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50";
+
 /**
  * Acciones del detalle según quién mira. Ocultarlas no protege nada: la API decide los permisos.
- * Los tickets de edición, borrado, estados y moderación añaden aquí sus botones.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- las props las usan los tickets siguientes
-export function ListingActions(_props: ListingActionsProps) {
-  return null;
+export function ListingActions({ listing, isOwner }: ListingActionsProps) {
+  const canEdit = isOwner && listing.status !== "hidden" && listing.status !== "completed";
+  if (!canEdit) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2" aria-label="Acciones del anuncio" role="group">
+      {canEdit && (
+        <Link href={`/anuncios/${listing.id}/editar`} className={secondary}>
+          Editar anuncio
+        </Link>
+      )}
+    </div>
+  );
 }

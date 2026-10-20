@@ -10,8 +10,14 @@ import { ListingGallery } from "@/features/listings/components/ListingGallery";
 import { getCategories, getListing } from "@/features/listings/data";
 import { LISTING_TYPE_LABELS } from "@/features/listings/labels";
 import { formatLongDate } from "@/lib/dates";
+import { firstParam, type SearchParams } from "@/lib/search-params";
 
-type ListingPageProps = { params: Promise<{ listingId: string }> };
+type ListingPageProps = {
+  params: Promise<{ listingId: string }>;
+  searchParams: Promise<SearchParams>;
+};
+
+const URL_MESSAGES = { actualizado: "Anuncio actualizado." } as const;
 
 const NO_ACCESS = "No tienes acceso a los anuncios de esta comunidad.";
 
@@ -21,9 +27,10 @@ export async function generateMetadata({ params }: ListingPageProps): Promise<Me
   return { title: result.ok ? `${result.listing.title} · EntreVecinos` : "Sin acceso · EntreVecinos" };
 }
 
-export default async function ListingPage({ params }: ListingPageProps) {
+export default async function ListingPage({ params, searchParams }: ListingPageProps) {
   const user = await requireUser();
   const { listingId } = await params;
+  const query = await searchParams;
   const result = await getListing(listingId);
   if (!result.ok) return <Forbidden message={NO_ACCESS} />;
 
@@ -46,6 +53,14 @@ export default async function ListingPage({ params }: ListingPageProps) {
       <Link href={`/comunidades/${community.id}`} className="self-start text-sm font-medium text-emerald-800 underline">
         Volver a {community.name}
       </Link>
+      {Object.entries(URL_MESSAGES).map(
+        ([param, message]) =>
+          firstParam(query, param) === "1" && (
+            <p key={param} role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+              {message}
+            </p>
+          ),
+      )}
 
       <div className="grid gap-8 md:grid-cols-2">
         <ListingGallery title={listing.title} images={listing.images} />

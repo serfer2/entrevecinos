@@ -1,3 +1,4 @@
+import type { ApiError } from "@/lib/api/errors";
 import { formText } from "@/lib/forms";
 
 import { LISTING_MESSAGES, type ListingField } from "./schemas";
@@ -61,3 +62,15 @@ export const ACCESS_MESSAGES = {
     "Tu solicitud está pendiente de aprobación. Podrás publicar cuando un administrador la apruebe.",
   denied: "No tienes acceso para publicar en esta comunidad.",
 } as const;
+
+export const EDIT_MESSAGES = {
+  forbidden: "Solo quien publicó el anuncio puede editarlo.",
+  error: "No se pudieron guardar los cambios. Inténtalo de nuevo.",
+  partial: "Los datos se han guardado, pero no las fotografías. Inténtalo de nuevo.",
+} as const;
+
+/** Mensaje de la API cuando el anuncio está bloqueado para el autor (retirado, finalizado…). */
+export function lockedMessage(error: ApiError): string | null {
+  const { detail } = error;
+  return typeof detail === "string" && /retirado|finalizado/.test(detail) ? detail : null;
+}
