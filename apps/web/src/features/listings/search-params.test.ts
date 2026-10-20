@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { clearSearchHref, listingApiQuery, listingSearchHref, parseListingSearch } from "./search-params";
+import {
+  clearFiltersHref,
+  clearSearchHref,
+  hasFilters,
+  listingApiQuery,
+  listingSearchHref,
+  parseListingSearch,
+} from "./search-params";
+
+const category = "0b5c4a7e-1d2f-4c3b-9a8e-7f6d5c4b3a21";
 
 describe("ListingSearchParams", () => {
   it.each([
@@ -19,13 +28,23 @@ describe("ListingSearchParams", () => {
     expect(parseListingSearch({ q: "x".repeat(200) }).q).toHaveLength(160);
   });
 
-  it("construye la consulta a la API y los enlaces conservando q", () => {
-    const search = parseListingSearch({ q: "bici roja", page: "2" });
+  it("type y category_id válidos; los inválidos se ignoran", () => {
+    expect(parseListingSearch({ type: "sell", category_id: category })).toMatchObject({
+      type: "sell",
+      categoryId: category,
+    });
+    expect(parseListingSearch({ type: "rent", category_id: "x" })).toMatchObject({ type: "", categoryId: "" });
+    expect(hasFilters(parseListingSearch({ type: "free" }))).toBe(true);
+    expect(hasFilters(parseListingSearch({ q: "bici" }))).toBe(false);
+  });
 
-    expect(listingApiQuery(search, 24)).toBe("q=bici+roja&page=2&page_size=24");
-    expect(listingSearchHref("c1", search, 1)).toBe("/comunidades/c1?q=bici+roja");
-    expect(listingSearchHref("c1", search, 3)).toBe("/comunidades/c1?q=bici+roja&page=3");
-    expect(clearSearchHref("c1", search)).toBe("/comunidades/c1");
+  it("construye la consulta a la API y los enlaces conservando los parámetros", () => {
+    const search = parseListingSearch({ q: "bici roja", type: "sell", category_id: category, page: "2" });
+
+    expect(listingApiQuery(search, 24)).toBe(`q=bici+roja&type=sell&category_id=${category}&page=2&page_size=24`);
+    expect(listingSearchHref("c1", search, 3)).toBe(`/comunidades/c1?q=bici+roja&type=sell&category_id=${category}&page=3`);
+    expect(clearSearchHref("c1", search)).toBe(`/comunidades/c1?type=sell&category_id=${category}`);
+    expect(clearFiltersHref("c1", search)).toBe("/comunidades/c1?q=bici+roja");
   });
 
   it("una búsqueda demasiado corta no llega a la API", () => {

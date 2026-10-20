@@ -1,9 +1,17 @@
 import Link from "next/link";
 
 import { Pagination } from "@/components/ui/Pagination";
+import { getMyMemberships } from "@/features/communities/data";
 
-import { getCommunityListings } from "../data";
-import { clearSearchHref, type ListingSearchParams, listingSearchHref } from "../search-params";
+import { getCategories, getCommunityListings } from "../data";
+import {
+  clearFiltersHref,
+  clearSearchHref,
+  hasFilters,
+  type ListingSearchParams,
+  listingSearchHref,
+} from "../search-params";
+import { CommunitySwitcher } from "./CommunitySwitcher";
 import { ListingCard } from "./ListingCard";
 import { ListingFilters } from "./ListingFilters";
 
@@ -12,15 +20,28 @@ type CommunityListingsProps = {
   search: ListingSearchParams;
 };
 
-/** Anuncios visibles de la comunidad (solo para miembros aprobados), con búsqueda. */
+/** Anuncios visibles de la comunidad (solo para miembros aprobados), con búsqueda y filtros. */
 export async function CommunityListings({ communityId, search }: CommunityListingsProps) {
-  const listings = await getCommunityListings(communityId, search);
+  const [listings, categories, memberships] = await Promise.all([
+    getCommunityListings(communityId, search),
+    getCategories(),
+    getMyMemberships(),
+  ]);
   const searching = search.q !== "";
+  const filtering = hasFilters(search);
+  const myCommunities = memberships.filter((m) => m.status === "approved").map((m) => m.community);
 
-  if (listings.total === 0 && !searching) {
+  const controls = (
+    <div className="flex flex-col gap-3">
+      <CommunitySwitcher currentId={communityId} communities={myCommunities} search={search} />
+      <ListingFilters communityId={communityId} search={search} categories={categories} />
+    </div>
+  );
+
+  if (listings.total === 0 && !searching && !filtering) {
     return (
       <div className="flex flex-col gap-4">
-        <ListingFilters communityId={communityId} search={search} />
+        {controls}
         <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-gray-300 p-6">
           <p className="text-gray-700">Todavía no hay anuncios en esta comunidad.</p>
           <Link
@@ -34,21 +55,28 @@ export async function CommunityListings({ communityId, search }: CommunityListin
     );
   }
 
+  let summary: string | null = null;
+  if (listings.total === 0) {
+    summary = filtering ? "No hay anuncios con estos filtros." : `No hay anuncios que coincidan con "${search.q}".`;
+  } else if (searching) {
+    summary = `${listings.total} ${listings.total === 1 ? "resultado" : "resultados"} para "${search.q}"`;
+  }
+
   return (
     <section aria-labelledby="listings-title" className="flex flex-col gap-4">
       <h2 id="listings-title" className="sr-only">
         Anuncios
       </h2>
-      <ListingFilters communityId={communityId} search={search} />
-      <p aria-live="polite" className={searching ? "text-sm text-gray-700" : "sr-only"}>
-        {searching &&
-          (listings.total === 0
-            ? `No hay anuncios que coincidan con "${search.q}".`
-            : `${listings.total} ${listings.total === 1 ? "resultado" : "resultados"} para "${search.q}"`)}
+      {controls}
+      <p aria-live="polite" className={summary ? "text-sm text-gray-700" : "sr-only"}>
+        {summary}
       </p>
-      {searching && listings.total === 0 && (
-        <Link href={clearSearchHref(communityId, search)} className="self-start font-medium text-emerald-800 underline">
-          Ver todos los anuncios
+      {listings.total === 0 && (
+        <Link
+          href={filtering ? clearFiltersHref(communityId, search) : clearSearchHref(communityId, search)}
+          className="self-start font-medium text-emerald-800 underline"
+        >
+          {filtering ? "Limpiar filtros" : "Ver todos los anuncios"}
         </Link>
       )}
       <ul className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
