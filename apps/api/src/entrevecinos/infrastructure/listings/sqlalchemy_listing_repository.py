@@ -149,6 +149,11 @@ class SqlAlchemyListingRepository:
                 if tsquery
                 else false()
             )
+        if query.type is not None:
+            conditions.append(ListingModel.type == query.type)
+        # Una categoría inexistente o inactiva simplemente no tiene anuncios: lista vacía.
+        if query.category_id is not None:
+            conditions.append(ListingModel.category_id == query.category_id)
         return conditions
 
     def update(self, listing_id: uuid.UUID, values: Mapping[str, object]) -> Listing:

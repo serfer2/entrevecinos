@@ -18,6 +18,7 @@ from entrevecinos.application.listings.ports import ListingQuery
 from entrevecinos.application.listings.publish_listing import PublishListing, PublishListingCommand
 from entrevecinos.application.listings.visibility import ListingVisibility
 from entrevecinos.application.unset import UNSET
+from entrevecinos.domain.listings.entities import ListingType
 from entrevecinos.domain.listings.search import MAX_QUERY_LENGTH, MIN_QUERY_LENGTH
 from entrevecinos.presentation.dependencies import (
     CategoryRepositoryDep,
@@ -44,7 +45,7 @@ from entrevecinos.presentation.v1.schemas.listings import (
 router = APIRouter(tags=["Anuncios"])
 
 # Parámetros del contrato que todavía no se implementan: mejor 422 que ignorarlos en silencio.
-UNSUPPORTED_LISTING_PARAMS = ("type", "category_id", "sort", "order")
+UNSUPPORTED_LISTING_PARAMS = ("sort", "order")
 
 
 def search_text(
@@ -101,9 +102,9 @@ def reject_unsupported_params(request: Request) -> None:
     summary="Buscar anuncios de una comunidad",
     description=(
         "Anuncios `active` y `reserved` de la comunidad, del más reciente al más antiguo, con "
-        "búsqueda por palabras clave (`q`). Requiere una membresía aprobada (si no, 403; con "
-        "`status` si la membresía existe). **Pendiente:** `type`, `category_id`, `sort` y "
-        "`order` responden 422."
+        "búsqueda por palabras clave (`q`) y filtros por tipo y categoría, combinados con AND. "
+        "Requiere una membresía aprobada (si no, 403; con `status` si la membresía existe). "
+        "**Pendiente:** `sort` y `order` responden 422."
     ),
     responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **VALIDATION_ERROR},
     dependencies=[Depends(reject_unsupported_params)],
@@ -115,8 +116,14 @@ def list_community_listings(
     listings: ListingRepositoryDep,
     page: PageParams,
     text: SearchTextDep,
+    type: Annotated[
+        ListingType | None, Query(description="Filtra por modalidad de anuncio.")
+    ] = None,
+    category_id: Annotated[uuid.UUID | None, Query(description="Filtra por categoría.")] = None,
 ) -> Page[ListingResponse]:
-    query = ListingQuery(community_id=community_id, page=page, text=text)
+    query = ListingQuery(
+        community_id=community_id, page=page, text=text, type=type, category_id=category_id
+    )
     result = ListCommunityListings(access, listings).execute(user, query)
     return Page.build(result, page, [ListingResponse.from_domain(item) for item in result.items])
 

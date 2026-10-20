@@ -127,7 +127,7 @@ def test_access_is_restricted(client: TestClient, community: dict) -> None:
     assert client.get(f"/v1/communities/{community['id']}/listings").status_code == 401
 
 
-@pytest.mark.parametrize("param", ["type", "category_id", "sort", "order"])
+@pytest.mark.parametrize("param", ["sort", "order"])
 def test_pending_parameters_are_rejected(
     client: TestClient, member: dict, community: dict, param: str
 ) -> None:
