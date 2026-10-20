@@ -20,7 +20,7 @@ export default function PrivateLayout({ children }: { children: ReactNode }) {
           </Link>
           <ul className="flex flex-wrap gap-1">
             <li>
-              <NavLink href="/comunidades/nueva" section="/comunidades">
+              <NavLink href="/comunidades" section="/comunidades">
                 Comunidades
               </NavLink>
             </li>

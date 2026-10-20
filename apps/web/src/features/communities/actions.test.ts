@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { userApiFetch, requireUser, redirect } = vi.hoisted(() => ({
+const { userApiFetch, requireUser, redirect, revalidatePath } = vi.hoisted(() => ({
   userApiFetch: vi.fn(),
+  revalidatePath: vi.fn(),
   requireUser: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT:${url}`);
@@ -11,8 +12,9 @@ const { userApiFetch, requireUser, redirect } = vi.hoisted(() => ({
 vi.mock("@/features/auth/api", () => ({ userApiFetch }));
 vi.mock("@/features/auth/dal", () => ({ requireUser }));
 vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("next/cache", () => ({ revalidatePath }));
 
-import { createCommunity } from "./actions";
+import { createCommunity, requestAccess } from "./actions";
 
 function form(values: Record<string, string>) {
   const data = new FormData();
@@ -74,5 +76,52 @@ describe("createCommunity", () => {
     const state = await createCommunity(undefined, form(filled));
 
     expect(state?.formError).toBe("No se pudo crear la comunidad. Inténtalo de nuevo.");
+  });
+});
+
+describe("requestAccess", () => {
+  const communityId = "0b5c4a7e-1d2f-4c3b-9a8e-7f6d5c4b3a21";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireUser.mockResolvedValue({ id: "u1" });
+  });
+
+  it.each([201, 409])("con %i revalida las páginas sin error", async (status) => {
+    userApiFetch.mockResolvedValue(
+      status === 201 ? { ok: true, status, data: {} } : { ok: false, error: { status, detail: "x" } },
+    );
+
+    const state = await requestAccess(undefined, form({ community_id: communityId }));
+
+    expect(state).toBeUndefined();
+    expect(userApiFetch).toHaveBeenCalledWith(`/communities/${communityId}/memberships`, {
+      method: "POST",
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/comunidades");
+    expect(revalidatePath).toHaveBeenCalledWith("/inicio");
+  });
+
+  it("404: la comunidad ya no está disponible", async () => {
+    userApiFetch.mockResolvedValue({ ok: false, error: { status: 404, detail: "x" } });
+
+    expect(await requestAccess(undefined, form({ community_id: communityId }))).toEqual({
+      error: "Esta comunidad ya no está disponible.",
+    });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("error de red: mensaje general", async () => {
+    userApiFetch.mockResolvedValue({ ok: false, error: { status: 0, detail: null } });
+
+    expect(await requestAccess(undefined, form({ community_id: communityId }))).toEqual({
+      error: "No se pudo enviar la solicitud. Inténtalo de nuevo.",
+    });
+  });
+
+  it("no llama a la API con un id no válido", async () => {
+    await requestAccess(undefined, form({ community_id: "../users" }));
+
+    expect(userApiFetch).not.toHaveBeenCalled();
   });
 });
