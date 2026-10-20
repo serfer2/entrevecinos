@@ -2,8 +2,8 @@ import Link from "next/link";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
-import { deleteListing, moderateListing } from "../actions";
-import type { ApiListing } from "../types";
+import { changeListingStatus, deleteListing, moderateListing } from "../actions";
+import type { ApiListing, ListingStatus } from "../types";
 
 export type ListingActionsProps = {
   listing: ApiListing;
@@ -15,6 +15,18 @@ export type ListingActionsProps = {
 
 const secondary =
   "rounded-md border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50";
+
+function StatusButton({ listingId, status, label }: { listingId: string; status: ListingStatus; label: string }) {
+  return (
+    <form action={changeListingStatus}>
+      <input type="hidden" name="listing_id" value={listingId} />
+      <input type="hidden" name="status" value={status} />
+      <button type="submit" className={secondary}>
+        {label}
+      </button>
+    </form>
+  );
+}
 
 /**
  * Acciones del detalle según quién mira; los roles se suman (un administrador que es el autor ve
@@ -37,6 +49,25 @@ export function ListingActions({ listing, isOwner, canModerate }: ListingActions
           <Link href={`/anuncios/${listing.id}/editar`} className={secondary}>
             Editar anuncio
           </Link>
+        )}
+        {isOwner && listing.status === "active" && (
+          <StatusButton listingId={listing.id} status="reserved" label="Marcar como reservado" />
+        )}
+        {isOwner && listing.status === "reserved" && (
+          <StatusButton listingId={listing.id} status="active" label="Quitar reserva" />
+        )}
+        {isOwner && (listing.status === "active" || listing.status === "reserved") && (
+          <ConfirmDialog
+            action={changeListingStatus}
+            triggerLabel="Marcar como finalizado"
+            title="¿Marcar este anuncio como finalizado?"
+            message="Dejará de mostrarse en el listado y no podrás volver a activarlo ni editarlo."
+            confirmLabel="Marcar como finalizado"
+            triggerClassName={secondary}
+          >
+            <input type="hidden" name="listing_id" value={listing.id} />
+            <input type="hidden" name="status" value="completed" />
+          </ConfirmDialog>
         )}
         {isOwner && (
           <ConfirmDialog

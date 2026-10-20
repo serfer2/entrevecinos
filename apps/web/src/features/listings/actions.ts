@@ -110,6 +110,32 @@ export async function updateListing(
   redirect(`/anuncios/${listingId}?actualizado=1`);
 }
 
+const AUTHOR_STATUS_RESULTS = { reserved: "reservado", active: "disponible", completed: "finalizado" } as const;
+
+/** El autor reserva, quita la reserva o finaliza su anuncio, y vuelve al detalle con el resultado. */
+export async function changeListingStatus(formData: FormData): Promise<void> {
+  await requireUser();
+  const listingId = formText(formData, "listing_id");
+  const status = formText(formData, "status");
+  if (!isUuid(listingId)) redirect("/inicio");
+  if (!(status in AUTHOR_STATUS_RESULTS)) redirect(`/anuncios/${listingId}?error=estado`);
+
+  const result = await userApiFetch<ApiListing>(`/listings/${listingId}/status`, {
+    method: "PATCH",
+    body: { status },
+  });
+  if (result.ok) {
+    revalidatePath(`/anuncios/${listingId}`);
+    revalidatePath(`/comunidades/${result.data.community_id}`);
+    redirect(`/anuncios/${listingId}?cambio=${AUTHOR_STATUS_RESULTS[status as keyof typeof AUTHOR_STATUS_RESULTS]}`);
+  }
+  const code = result.error.status;
+  if (code === 404) redirect("/inicio?no-disponible=1");
+  if (code === 403) redirect(`/anuncios/${listingId}?error=estado-permiso`);
+  if (code === 409) redirect(`/anuncios/${listingId}?error=estado-conflicto`);
+  redirect(`/anuncios/${listingId}?error=estado`);
+}
+
 /**
  * Retira (`hidden`) o restaura (`active`) un anuncio por moderación. Al retirar vuelve a la
  * comunidad; al restaurar se queda en el detalle. Los errores llegan por la URL.

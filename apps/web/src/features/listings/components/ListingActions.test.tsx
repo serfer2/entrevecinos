@@ -2,11 +2,12 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-const { deleteListing, moderateListing } = vi.hoisted(() => ({
+const { deleteListing, moderateListing, changeListingStatus } = vi.hoisted(() => ({
   deleteListing: vi.fn(),
   moderateListing: vi.fn(),
+  changeListingStatus: vi.fn(),
 }));
-vi.mock("../actions", () => ({ deleteListing, moderateListing }));
+vi.mock("../actions", () => ({ deleteListing, moderateListing, changeListingStatus }));
 
 import type { ApiListing } from "../types";
 import { ListingActions } from "./ListingActions";
@@ -91,5 +92,34 @@ describe("ListingActions", () => {
     const { container } = render(<ListingActions listing={listing} isOwner={false} canModerate={false} />);
 
     expect(container.innerHTML).toBe("");
+  });
+
+  it.each([
+    ["active", ["Marcar como reservado", "Marcar como finalizado"]],
+    ["reserved", ["Quitar reserva", "Marcar como finalizado"]],
+    ["completed", []],
+    ["hidden", []],
+  ] as const)("autor, anuncio %s: botones de estado %o", (status, expected) => {
+    render(<ListingActions listing={{ ...listing, status }} isOwner canModerate={false} />);
+
+    const labels = ["Marcar como reservado", "Quitar reserva", "Marcar como finalizado"];
+    expect(labels.filter((name) => screen.queryByRole("button", { name }))).toEqual(expected);
+  });
+
+  it("un administrador que no es el autor no ve los botones de estado", () => {
+    render(<ListingActions listing={listing} isOwner={false} canModerate />);
+
+    expect(screen.queryByRole("button", { name: "Marcar como reservado" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Marcar como finalizado" })).toBeNull();
+  });
+
+  it("finalizar pide confirmación y cancelar no llama a la acción", async () => {
+    render(<ListingActions listing={listing} isOwner canModerate={false} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Marcar como finalizado" }));
+    expect(screen.getByRole("dialog", { name: "¿Marcar este anuncio como finalizado?" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(changeListingStatus).not.toHaveBeenCalled();
   });
 });
