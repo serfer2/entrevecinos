@@ -58,8 +58,4 @@ post:
     "404":
       $ref: ../components/responses/NotFound.yaml
     "409":
-      description: El usuario ya tiene una membresía (pendiente, aprobada, rechazada o bloqueada) en la comunidad.
-      content:
-        application/json:
-          schema:
-            $ref: ../components/schemas/Error.yaml
+      $ref: ../components/responses/MembershipConflict.yaml

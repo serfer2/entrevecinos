@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -128,3 +129,14 @@ class MembershipErrorResponse(BaseModel):
 
     detail: str
     status: MembershipStatus
+
+
+class MembershipUpdateRequest(BaseModel):
+    """Subconjunto implementado de `MembershipUpdate`: revisar una solicitud pendiente.
+
+    `blocked` y `role` llegarán con la gestión de miembros (TK-040).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal[MembershipStatus.APPROVED, MembershipStatus.REJECTED]

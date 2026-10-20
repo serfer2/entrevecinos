@@ -168,6 +168,10 @@ components:
       $ref: ./components/responses/Conflict.yaml
     Forbidden:
       $ref: ./components/responses/Forbidden.yaml
+    MembershipConflict:
+      $ref: ./components/responses/MembershipConflict.yaml
+    MembershipForbidden:
+      $ref: ./components/responses/MembershipForbidden.yaml
     NotFound:
       $ref: ./components/responses/NotFound.yaml
     Unauthorized:
@@ -233,6 +237,8 @@ components:
       $ref: ./components/schemas/MediaUpload.yaml
     Membership:
       $ref: ./components/schemas/Membership.yaml
+    MembershipError:
+      $ref: ./components/schemas/MembershipError.yaml
     MembershipRole:
       $ref: ./components/schemas/MembershipRole.yaml
     MembershipStatus:

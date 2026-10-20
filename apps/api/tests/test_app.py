@@ -71,3 +71,34 @@ def test_missing_jwt_secret_fails(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_short_jwt_secret_fails() -> None:
     with pytest.raises(ValidationError, match="jwt_secret"):
         make_settings(jwt_secret="too-short")
+
+
+def test_permission_errors_map_to_403() -> None:
+    from fastapi.testclient import TestClient
+
+    from entrevecinos.domain.communities.entities import MembershipStatus
+    from entrevecinos.domain.communities.errors import MembershipNotApproved
+    from entrevecinos.domain.errors import PermissionDenied
+    from entrevecinos.presentation.main import create_app
+    from tests.conftest import make_settings
+
+    app = create_app(make_settings())
+
+    @app.get("/denied")
+    def denied() -> None:
+        raise PermissionDenied
+
+    @app.get("/pending")
+    def pending() -> None:
+        raise MembershipNotApproved(MembershipStatus.PENDING)
+
+    client = TestClient(app)
+    assert client.get("/denied").json() == {
+        "detail": "No tienes permisos para realizar esta acción."
+    }
+    response = client.get("/pending")
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Tu membresía en esta comunidad no está aprobada.",
+        "status": "pending",
+    }

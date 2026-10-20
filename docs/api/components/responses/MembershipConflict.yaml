@@ -1,0 +1,8 @@
+description: El usuario ya tiene una membresía (pendiente, aprobada, rechazada o bloqueada) en la comunidad.
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/MembershipError.yaml
+    example:
+      detail: "Ya tienes una membresía en esta comunidad."
+      status: pending

@@ -68,11 +68,7 @@ get:
     "401":
       $ref: ../components/responses/Unauthorized.yaml
     "403":
-      description: El usuario no pertenece a la comunidad o su membresía no está aprobada.
-      content:
-        application/json:
-          schema:
-            $ref: ../components/schemas/Error.yaml
+      $ref: ../components/responses/MembershipForbidden.yaml
     "404":
       $ref: ../components/responses/NotFound.yaml
     "422":
@@ -108,11 +104,7 @@ post:
     "401":
       $ref: ../components/responses/Unauthorized.yaml
     "403":
-      description: El usuario no tiene una membresía aprobada en la comunidad.
-      content:
-        application/json:
-          schema:
-            $ref: ../components/schemas/Error.yaml
+      $ref: ../components/responses/MembershipForbidden.yaml
     "404":
       $ref: ../components/responses/NotFound.yaml
     "422":

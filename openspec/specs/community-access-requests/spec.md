@@ -18,7 +18,7 @@ Búsqueda de comunidades, solicitudes de acceso y listado de las membresías pro
 - **THEN** recibe `201` con `status: "pending"` y la solicitud aparece en `GET /v1/users/me/memberships`
 
 ### Requirement: Sin solicitudes duplicadas
-Si el usuario ya tiene una membresía en la comunidad, en cualquier estado, la solicitud MUST responder `409 {"detail": "Ya tienes una membresía en esta comunidad.", "status": "<estado>"}` sin crear otra.
+Si el usuario ya tiene una membresía en la comunidad, en cualquier estado, la solicitud MUST responder `409 {"detail": "Ya tienes una membresía en esta comunidad.", "status": "<estado>"}` sin crear otra. El contrato documenta este cuerpo como `MembershipConflict` (`MembershipError`).
 
 #### Scenario: Ya pendiente
 - **WHEN** el usuario vuelve a solicitar el acceso

@@ -3,8 +3,12 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from entrevecinos.domain.communities.errors import MembershipAlreadyExists
-from entrevecinos.domain.errors import NotFoundError
+from entrevecinos.domain.communities.errors import (
+    MembershipAlreadyExists,
+    MembershipAlreadyReviewed,
+    MembershipNotApproved,
+)
+from entrevecinos.domain.errors import NotFoundError, PermissionDenied
 from entrevecinos.domain.users.errors import (
     EmailAlreadyRegistered,
     InvalidCredentials,
@@ -61,6 +65,34 @@ async def membership_already_exists_handler(
     )
 
 
+async def permission_denied_handler(request: Request, exc: PermissionDenied) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content={"detail": "No tienes permisos para realizar esta acción."},
+    )
+
+
+async def membership_not_approved_handler(
+    request: Request, exc: MembershipNotApproved
+) -> JSONResponse:
+    # `status` (MembershipForbidden en el contrato) permite mostrar «pendiente» o «sin acceso».
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content={
+            "detail": "Tu membresía en esta comunidad no está aprobada.",
+            "status": exc.status,
+        },
+    )
+
+
+async def membership_already_reviewed_handler(
+    request: Request, exc: MembershipAlreadyReviewed
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT, content={"detail": "La solicitud ya se ha revisado."}
+    )
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(EmailAlreadyRegistered, email_already_registered_handler)
@@ -68,3 +100,6 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(NotAuthenticated, not_authenticated_handler)
     app.add_exception_handler(NotFoundError, not_found_handler)
     app.add_exception_handler(MembershipAlreadyExists, membership_already_exists_handler)
+    app.add_exception_handler(PermissionDenied, permission_denied_handler)
+    app.add_exception_handler(MembershipNotApproved, membership_not_approved_handler)
+    app.add_exception_handler(MembershipAlreadyReviewed, membership_already_reviewed_handler)

@@ -90,6 +90,29 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 - `POST /v1/communities/{id}/memberships` crea una solicitud `pending`. Si ya existe una membresía en cualquier estado responde `409 {"detail": …, "status": "<estado>"}`.
 - `GET /v1/users/me/memberships` lista las membresías propias con la comunidad embebida (filtro `status`).
 
+- `GET /v1/communities/{id}/memberships` (gestores: `community_admin`, `moderator`, `platform_admin`) y `PATCH /v1/communities/{id}/memberships/{user_id}` (`community_admin`, `platform_admin`) revisan las solicitudes: solo `pending → approved | rejected`; otra transición → `409`.
+
+## Autorización por comunidad
+
+Todas las comprobaciones de permisos por comunidad pasan por `CommunityAccess` (`application/authorization/community_access.py`); ningún endpoint compara roles por su cuenta.
+
+- `require_member(user, community_id)`: exige membresía `approved`. Sin membresía → `PermissionDenied` (`403`); con membresía no aprobada → `MembershipNotApproved` (`403` con `status`, `MembershipForbidden` en el contrato).
+- `require_role(user, community_id, roles)`: además, uno de `roles` (`COMMUNITY_ADMINS`, `COMMUNITY_MANAGERS`). Sin permisos → `403` sin `status`.
+- Ambos responden antes `404` si la comunidad no existe y dejan pasar siempre a `platform_admin`.
+
+```python
+from entrevecinos.application.authorization.community_access import COMMUNITY_ADMINS
+
+class DoSomething:
+    def __init__(self, access: CommunityAccess, ...): ...
+
+    def execute(self, user: User, community_id: uuid.UUID) -> ...:
+        self._access.require_role(user, community_id, COMMUNITY_ADMINS)
+        ...
+```
+
+En los routers, la política se inyecta con `CommunityAccessDep`.
+
 ## Paginación
 
 Todos los listados paginados usan `PageParams` (`page ≥ 1`, por defecto 1; `page_size` de 1 a 100, por defecto 20) y responden `Page[T]` (`items`, `page`, `page_size`, `total`), definidos en `presentation/v1/pagination.py`. En aplicación, los repositorios reciben `PageRequest` y devuelven `PageResult[T]` (`application/pagination.py`). Una página posterior a la última devuelve `items: []` con el `total` real.

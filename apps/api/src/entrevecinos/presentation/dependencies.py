@@ -5,6 +5,7 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from entrevecinos.application.authorization.community_access import CommunityAccess
 from entrevecinos.application.users.authenticate_user import AuthenticateUser
 from entrevecinos.application.users.get_current_user import GetCurrentUser
 from entrevecinos.application.users.register_user import RegisterUser
@@ -84,3 +85,12 @@ def get_current_user(
 
 
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
+
+
+def get_community_access(
+    communities: CommunityRepositoryDep, memberships: MembershipRepositoryDep
+) -> CommunityAccess:
+    return CommunityAccess(communities, memberships)
+
+
+CommunityAccessDep = Annotated[CommunityAccess, Depends(get_community_access)]

@@ -37,6 +37,26 @@ class MembershipRepository(Protocol):
         """
         ...
 
+    def get_detail(
+        self, community_id: uuid.UUID, user_id: uuid.UUID
+    ) -> MembershipDetail | None: ...
+
+    def list_for_community(
+        self, community_id: uuid.UUID, status: MembershipStatus | None, page: PageRequest
+    ) -> PageResult[MembershipDetail]:
+        """Membresías de la comunidad, de la solicitud más antigua a la más reciente."""
+        ...
+
+    def review(
+        self,
+        community_id: uuid.UUID,
+        user_id: uuid.UUID,
+        status: MembershipStatus,
+        reviewer_id: uuid.UUID,
+    ) -> MembershipDetail:
+        """Fija el estado y `reviewed_by`/`reviewed_at` (y `joined_at` al aprobar)."""
+        ...
+
     def list_for_user(
         self, user_id: uuid.UUID, status: MembershipStatus | None = None
     ) -> list[MyMembership]:
