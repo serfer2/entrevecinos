@@ -4,16 +4,25 @@ import Link from "next/link";
 import { requireUser } from "@/features/auth/dal";
 import { MEMBERSHIP_STATUS_LABELS } from "@/features/communities/components/MembershipAction";
 import { getMyMemberships } from "@/features/communities/data";
+import { firstParam, type SearchParams } from "@/lib/search-params";
 
 export const metadata: Metadata = { title: "Inicio · EntreVecinos" };
 
-export default async function HomePage() {
+type HomePageProps = { searchParams: Promise<SearchParams> };
+
+export default async function HomePage({ searchParams }: HomePageProps) {
   const user = await requireUser();
   const memberships = await getMyMemberships();
+  const query = await searchParams;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10">
       <h1 className="text-2xl font-semibold text-gray-900">Hola, {user.full_name}</h1>
+      {firstParam(query, "no-disponible") === "1" && (
+        <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Este anuncio ya no estaba disponible.
+        </p>
+      )}
 
       <section aria-labelledby="my-communities" className="flex flex-col gap-3">
         <h2 id="my-communities" className="text-lg font-medium text-gray-900">

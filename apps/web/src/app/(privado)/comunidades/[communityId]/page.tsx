@@ -22,6 +22,7 @@ export async function generateMetadata({ params }: CommunityPageProps): Promise<
 const URL_MESSAGES = {
   publicado: "Anuncio publicado.",
   eliminado: "Anuncio eliminado.",
+  "no-disponible": "Este anuncio ya no estaba disponible.",
 } as const;
 
 export default async function CommunityPage({ params, searchParams }: CommunityPageProps) {

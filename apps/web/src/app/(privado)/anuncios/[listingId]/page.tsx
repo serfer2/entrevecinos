@@ -19,6 +19,11 @@ type ListingPageProps = {
 
 const URL_MESSAGES = { actualizado: "Anuncio actualizado." } as const;
 
+const URL_ERRORS = {
+  "eliminar-permiso": "No puedes eliminar este anuncio.",
+  eliminar: "No se pudo eliminar el anuncio. Inténtalo de nuevo.",
+} as const;
+
 const NO_ACCESS = "No tienes acceso a los anuncios de esta comunidad.";
 
 export async function generateMetadata({ params }: ListingPageProps): Promise<Metadata> {
@@ -60,6 +65,11 @@ export default async function ListingPage({ params, searchParams }: ListingPageP
               {message}
             </p>
           ),
+      )}
+      {firstParam(query, "error") in URL_ERRORS && (
+        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+          {URL_ERRORS[firstParam(query, "error") as keyof typeof URL_ERRORS]}
+        </p>
       )}
 
       <div className="grid gap-8 md:grid-cols-2">

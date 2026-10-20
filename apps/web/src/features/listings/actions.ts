@@ -7,7 +7,7 @@ import { userApiFetch } from "@/features/auth/api";
 import { requireUser } from "@/features/auth/dal";
 import { fieldErrorsOf } from "@/features/auth/schemas";
 import { invalidBodyFields, membershipStatusOf } from "@/lib/api/errors";
-import { isUuid } from "@/lib/forms";
+import { formText, isUuid } from "@/lib/forms";
 
 import { imagesChanged, listingChanges } from "./changes";
 import {
@@ -108,4 +108,26 @@ export async function updateListing(
   revalidatePath(`/anuncios/${listingId}`);
   revalidatePath(`/comunidades/${current.data.community_id}`);
   redirect(`/anuncios/${listingId}?actualizado=1`);
+}
+
+/** Elimina un anuncio propio y vuelve a su comunidad (el destino sale del anuncio, no del formulario). */
+export async function deleteListing(formData: FormData): Promise<void> {
+  await requireUser();
+  const listingId = formText(formData, "listing_id");
+  if (!isUuid(listingId)) redirect("/inicio");
+
+  const current = await userApiFetch<ApiListing>(`/listings/${listingId}`);
+  if (!current.ok) {
+    if (current.error.status === 404) redirect("/inicio?no-disponible=1");
+    redirect(`/anuncios/${listingId}?error=eliminar-permiso`);
+  }
+  const community = `/comunidades/${current.data.community_id}`;
+
+  const result = await userApiFetch<null>(`/listings/${listingId}`, { method: "DELETE" });
+  if (result.ok || result.error.status === 404) {
+    revalidatePath(community);
+    redirect(result.ok ? `${community}?eliminado=1` : `${community}?no-disponible=1`);
+  }
+  if (result.error.status === 403) redirect(`/anuncios/${listingId}?error=eliminar-permiso`);
+  redirect(`/anuncios/${listingId}?error=eliminar`);
 }

@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+
+import { deleteListing } from "../actions";
 import type { ApiListing } from "../types";
 
 export type ListingActionsProps = {
@@ -18,7 +21,7 @@ const secondary =
  */
 export function ListingActions({ listing, isOwner }: ListingActionsProps) {
   const canEdit = isOwner && listing.status !== "hidden" && listing.status !== "completed";
-  if (!canEdit) return null;
+  if (!isOwner) return null;
 
   return (
     <div className="flex flex-wrap gap-2" aria-label="Acciones del anuncio" role="group">
@@ -27,6 +30,15 @@ export function ListingActions({ listing, isOwner }: ListingActionsProps) {
           Editar anuncio
         </Link>
       )}
+      <ConfirmDialog
+        action={deleteListing}
+        triggerLabel="Eliminar anuncio"
+        title="¿Eliminar este anuncio?"
+        message="Dejará de verse en la comunidad. Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+      >
+        <input type="hidden" name="listing_id" value={listing.id} />
+      </ConfirmDialog>
     </div>
   );
 }
