@@ -1,6 +1,7 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 
 from entrevecinos.application.listings.delete_listing import DeleteListing
@@ -17,6 +18,7 @@ from entrevecinos.application.listings.ports import ListingQuery
 from entrevecinos.application.listings.publish_listing import PublishListing, PublishListingCommand
 from entrevecinos.application.listings.visibility import ListingVisibility
 from entrevecinos.application.unset import UNSET
+from entrevecinos.domain.listings.search import MAX_QUERY_LENGTH, MIN_QUERY_LENGTH
 from entrevecinos.presentation.dependencies import (
     CategoryRepositoryDep,
     CommunityAccessDep,
@@ -42,7 +44,40 @@ from entrevecinos.presentation.v1.schemas.listings import (
 router = APIRouter(tags=["Anuncios"])
 
 # Parámetros del contrato que todavía no se implementan: mejor 422 que ignorarlos en silencio.
-UNSUPPORTED_LISTING_PARAMS = ("q", "type", "category_id", "sort", "order")
+UNSUPPORTED_LISTING_PARAMS = ("type", "category_id", "sort", "order")
+
+
+def search_text(
+    q: Annotated[
+        str | None,
+        Query(
+            max_length=MAX_QUERY_LENGTH,
+            description=(
+                "Palabras clave en el título y la descripción, sin distinguir mayúsculas ni tildes "
+                "y por prefijo («bici» encuentra «bicicleta»). Vacío equivale a no enviarlo; con "
+                "menos de 2 caracteres, 422."
+            ),
+        ),
+    ] = None,
+) -> str | None:
+    """Texto de búsqueda recortado; vacío → sin búsqueda (HU-11 AC3); 1 carácter → 422."""
+    text = q.strip() if q is not None else ""
+    if not text:
+        return None
+    if len(text) < MIN_QUERY_LENGTH:
+        raise RequestValidationError(
+            [
+                {
+                    "loc": ("query", "q"),
+                    "msg": "La búsqueda debe tener al menos 2 caracteres.",
+                    "type": "string_too_short",
+                }
+            ]
+        )
+    return text
+
+
+SearchTextDep = Annotated[str | None, Depends(search_text)]
 
 
 def reject_unsupported_params(request: Request) -> None:
@@ -65,9 +100,10 @@ def reject_unsupported_params(request: Request) -> None:
     operation_id="listCommunityListings",
     summary="Buscar anuncios de una comunidad",
     description=(
-        "Anuncios `active` y `reserved` de la comunidad, del más reciente al más antiguo. "
-        "Requiere una membresía aprobada (si no, 403; con `status` si la membresía existe). "
-        "**Pendiente:** `q`, `type`, `category_id`, `sort` y `order` responden 422."
+        "Anuncios `active` y `reserved` de la comunidad, del más reciente al más antiguo, con "
+        "búsqueda por palabras clave (`q`). Requiere una membresía aprobada (si no, 403; con "
+        "`status` si la membresía existe). **Pendiente:** `type`, `category_id`, `sort` y "
+        "`order` responden 422."
     ),
     responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **VALIDATION_ERROR},
     dependencies=[Depends(reject_unsupported_params)],
@@ -78,8 +114,9 @@ def list_community_listings(
     access: CommunityAccessDep,
     listings: ListingRepositoryDep,
     page: PageParams,
+    text: SearchTextDep,
 ) -> Page[ListingResponse]:
-    query = ListingQuery(community_id=community_id, page=page)
+    query = ListingQuery(community_id=community_id, page=page, text=text)
     result = ListCommunityListings(access, listings).execute(user, query)
     return Page.build(result, page, [ListingResponse.from_domain(item) for item in result.items])
 

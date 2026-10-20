@@ -2,7 +2,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 
-from sqlalchemy import ColumnElement, Select, delete, func, select, update
+from sqlalchemy import ColumnElement, Select, delete, false, func, select, update
 from sqlalchemy.orm import Session
 
 from entrevecinos.application.listings.ports import ListingQuery
@@ -16,7 +16,9 @@ from entrevecinos.domain.listings.entities import (
     ListingType,
     NewListing,
 )
+from entrevecinos.domain.listings.search import prefix_tsquery
 from entrevecinos.infrastructure.db.models import ListingImageModel, ListingModel, UserModel
+from entrevecinos.infrastructure.db.models.listing import SEARCH_CONFIG
 
 
 def listing_with_owner() -> Select[tuple[ListingModel, UserModel]]:
@@ -113,8 +115,10 @@ class SqlAlchemyListingRepository:
         return found[0] if found else None
 
     def search(self, query: ListingQuery) -> PageResult[Listing]:
-        # Misma consulta base para la página y el total (incluido el filtro del autor).
-        visible = listing_with_owner().where(*self._visible_in_community(query))
+        # Misma consulta base para la página y el total (visibilidad y criterios de búsqueda).
+        visible = listing_with_owner().where(
+            *self._visible_in_community(query), *self._criteria(query)
+        )
         total = self._session.scalar(select(func.count()).select_from(visible.subquery()))
         rows = self._session.execute(
             visible.order_by(ListingModel.published_at.desc(), ListingModel.id.desc())
@@ -131,6 +135,20 @@ class SqlAlchemyListingRepository:
             ListingModel.status.in_(LISTED_STATUSES),
             ListingModel.deleted_at.is_(None),
         ]
+        return conditions
+
+    @staticmethod
+    def _criteria(query: ListingQuery) -> list[ColumnElement[bool]]:
+        """Búsqueda y filtros elegidos por el usuario, combinados con AND."""
+        conditions: list[ColumnElement[bool]] = []
+        if query.text is not None:
+            tsquery = prefix_tsquery(query.text)
+            # Sin palabras válidas (p. ej. «a b»), no hay coincidencias.
+            conditions.append(
+                ListingModel.search_vector.bool_op("@@")(func.to_tsquery(SEARCH_CONFIG, tsquery))
+                if tsquery
+                else false()
+            )
         return conditions
 
     def update(self, listing_id: uuid.UUID, values: Mapping[str, object]) -> Listing:

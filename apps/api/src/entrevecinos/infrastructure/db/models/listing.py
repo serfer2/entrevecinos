@@ -7,6 +7,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Computed,
     DateTime,
     Enum,
     ForeignKey,
@@ -19,9 +20,17 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from entrevecinos.infrastructure.db.base import Base
+
+# Configuración de búsqueda en español sin tildes (migración 0005).
+SEARCH_CONFIG = "es_unaccent"
+SEARCH_VECTOR = (
+    f"setweight(to_tsvector('{SEARCH_CONFIG}', coalesce(title, '')), 'A') || "
+    f"setweight(to_tsvector('{SEARCH_CONFIG}', coalesce(description, '')), 'B')"
+)
 
 LISTING_TYPE = Enum(
     "sell", "wanted", "offer_service", "need_service", "free", "other", name="listing_type"
@@ -75,6 +84,10 @@ class ListingModel(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.statement_timestamp()
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Columna generada por PostgreSQL: el ORM nunca la escribe.
+    search_vector: Mapped[str] = mapped_column(
+        TSVECTOR, Computed(SEARCH_VECTOR, persisted=True), deferred=True
+    )
 
 
 # Índices del modelo de datos (nombres explícitos: la convención no admite expresiones DESC).
@@ -96,6 +109,7 @@ Index(
     ListingModel.published_at.desc(),
 )
 Index("ix_listing_price", ListingModel.price)
+Index("ix_listing_search_vector", ListingModel.search_vector, postgresql_using="gin")
 Index("ix_listing_owner_id", ListingModel.owner_id)
 
 
