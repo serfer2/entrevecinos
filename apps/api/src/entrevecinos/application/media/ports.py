@@ -17,8 +17,11 @@ class MediaRepository(Protocol):
 
     def get(self, asset_id: uuid.UUID) -> MediaAsset | None: ...
 
-    def owned_unattached(self, asset_ids: list[uuid.UUID], user_id: uuid.UUID) -> bool:
-        """Si todas las imágenes existen, las subió `user_id` y no están en ningún anuncio."""
+    def owned_available(
+        self, asset_ids: list[uuid.UUID], user_id: uuid.UUID, listing_id: uuid.UUID | None = None
+    ) -> bool:
+        """Si todas las imágenes existen, las subió `user_id` y no están en ningún anuncio
+        (salvo, si se indica, en `listing_id`)."""
         ...
 
     def listing_using(self, asset_id: uuid.UUID) -> uuid.UUID | None:

@@ -1,4 +1,4 @@
-from entrevecinos.domain.errors import NotFoundError
+from entrevecinos.domain.errors import NotFoundError, PermissionDenied
 
 
 class ListingNotFound(NotFoundError):
@@ -15,3 +15,13 @@ class InvalidImages(Exception):
 
 class CurrencyWithoutPrice(Exception):
     """Se indicó una moneda sin precio."""
+
+
+class ListingLocked(PermissionDenied):
+    """El autor no puede modificar el anuncio en su estado actual (retirado, finalizado…)."""
+
+    RETIRED = "Este anuncio ha sido retirado por la administración de la comunidad."
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail)
+        self.detail = detail

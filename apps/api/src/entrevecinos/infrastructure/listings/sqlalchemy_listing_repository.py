@@ -1,8 +1,8 @@
 import uuid
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
-from sqlalchemy import ColumnElement, Select, func, select, update
+from sqlalchemy import ColumnElement, Select, delete, func, select, update
 from sqlalchemy.orm import Session
 
 from entrevecinos.application.listings.ports import ListingQuery
@@ -132,6 +132,39 @@ class SqlAlchemyListingRepository:
             ListingModel.deleted_at.is_(None),
         ]
         return conditions
+
+    def update(self, listing_id: uuid.UUID, values: Mapping[str, object]) -> Listing:
+        model = self._session.get_one(ListingModel, listing_id)
+        for field, value in values.items():
+            setattr(model, field, value)
+        self._session.flush()
+        found = self.get(listing_id)
+        assert found is not None
+        return found
+
+    def replace_images(self, listing_id: uuid.UUID, images: list[ListingImage]) -> Listing:
+        self._session.execute(
+            delete(ListingImageModel).where(ListingImageModel.listing_id == listing_id)
+        )
+        self._session.add_all(
+            ListingImageModel(
+                listing_id=listing_id,
+                asset_id=image.asset_id,
+                position=image.position,
+                is_cover=image.is_cover,
+            )
+            for image in images
+        )
+        # La edición de las imágenes cuenta como actualización del anuncio.
+        self._session.execute(
+            update(ListingModel)
+            .where(ListingModel.id == listing_id)
+            .values(updated_at=func.statement_timestamp())
+        )
+        self._session.flush()
+        found = self.get(listing_id)
+        assert found is not None
+        return found
 
     def soft_delete(self, listing_id: uuid.UUID) -> None:
         self._session.execute(

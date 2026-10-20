@@ -3,7 +3,14 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    field_validator,
+    model_validator,
+)
 
 from entrevecinos.domain.listings.entities import (
     MAX_IMAGES,
@@ -68,6 +75,57 @@ class ListingCreateRequest(BaseModel):
     def images_are_distinct(cls, value: list[uuid.UUID]) -> list[uuid.UUID]:
         if len(set(value)) != len(value):
             raise ValueError("image_asset_ids must be distinct")
+        return value
+
+
+class ListingUpdateRequest(BaseModel):
+    """Esquema `ListingUpdate` del contrato (actualización parcial)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # `None` solo como «no enviado» en los campos obligatorios: un `null` explícito → 422.
+    category_id: uuid.UUID | None = None
+    title: RequiredText(160) | None = None
+    description: RequiredText(5000) | None = None
+    type: ListingType | None = None
+    price: Price | None = None
+    currency: Currency | None = None
+
+    @field_validator("category_id", "title", "description", "type", mode="before")
+    @classmethod
+    def not_null(cls, value: object) -> object:
+        if value is None:
+            raise ValueError("cannot be null")
+        return value
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> Self:
+        if not self.model_fields_set:
+            raise ValueError("At least one field is required")
+        return self
+
+
+class ListingImageSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_id: uuid.UUID
+    is_cover: bool = False
+
+
+class ListingImagesUpdateRequest(BaseModel):
+    """Esquema `ListingImagesUpdate` del contrato."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    images: Annotated[list[ListingImageSelection], Field(max_length=MAX_IMAGES)]
+
+    @field_validator("images")
+    @classmethod
+    def valid_selection(cls, value: list[ListingImageSelection]) -> list[ListingImageSelection]:
+        if sum(image.is_cover for image in value) > 1:
+            raise ValueError("At most one cover image")
+        if len({image.asset_id for image in value}) != len(value):
+            raise ValueError("asset_id must be distinct")
         return value
 
 

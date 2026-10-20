@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -6,6 +7,7 @@ from entrevecinos.application.pagination import PageRequest, PageResult
 from entrevecinos.domain.listings.entities import (
     Category,
     Listing,
+    ListingImage,
     ListingSort,
     ListingType,
     NewListing,
@@ -45,6 +47,14 @@ class ListingRepository(Protocol):
 
     def search(self, query: ListingQuery) -> PageResult[Listing]:
         """Anuncios visibles en la comunidad que cumplen `query`."""
+        ...
+
+    def update(self, listing_id: uuid.UUID, values: Mapping[str, object]) -> Listing:
+        """Actualiza solo los campos de `values` y devuelve el anuncio actualizado."""
+        ...
+
+    def replace_images(self, listing_id: uuid.UUID, images: list[ListingImage]) -> Listing:
+        """Sustituye el conjunto de imágenes en la misma transacción."""
         ...
 
     def soft_delete(self, listing_id: uuid.UUID) -> None:

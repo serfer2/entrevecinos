@@ -41,7 +41,7 @@ class PublishListing:
         if not self._categories.is_active(command.category_id):
             raise InvalidCategory
         images = list(command.image_asset_ids)
-        if images and not self._media.owned_unattached(images, user.id):
+        if images and not self._media.owned_available(images, user.id):
             raise InvalidImages
         price, currency = normalize_price(command.price, command.currency)
         return self._listings.add(

@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, select, true
 from sqlalchemy.orm import Session
 
 from entrevecinos.domain.media.entities import MediaAsset, NewMediaAsset
@@ -39,13 +39,19 @@ class SqlAlchemyMediaRepository:
         model = self._session.get(MediaAssetModel, asset_id)
         return to_domain(model) if model else None
 
-    def owned_unattached(self, asset_ids: list[uuid.UUID], user_id: uuid.UUID) -> bool:
+    def owned_available(
+        self, asset_ids: list[uuid.UUID], user_id: uuid.UUID, listing_id: uuid.UUID | None = None
+    ) -> bool:
         ids = set(asset_ids)
+        in_other_listing = exists().where(
+            ListingImageModel.asset_id == MediaAssetModel.id,
+            ListingImageModel.listing_id != listing_id if listing_id else true(),
+        )
         valid = self._session.scalars(
             select(MediaAssetModel.id).where(
                 MediaAssetModel.id.in_(ids),
                 MediaAssetModel.uploaded_by == user_id,
-                ~exists().where(ListingImageModel.asset_id == MediaAssetModel.id),
+                ~in_other_listing,
             )
         ).all()
         return set(valid) == ids

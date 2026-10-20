@@ -1,18 +1,12 @@
 import uuid
 from dataclasses import dataclass
-from enum import Enum
-from typing import Final
 
+from entrevecinos.application.unset import UNSET
+from entrevecinos.application.unset import Unset as _Unset
 from entrevecinos.application.users.ports import UserRepository
 from entrevecinos.domain.users.entities import User
 
-
-class _Unset(Enum):
-    TOKEN = "UNSET"
-
-
-UNSET: Final = _Unset.TOKEN
-"""Campo no enviado: no se modifica (a diferencia de `None`, que borra el valor)."""
+__all__ = ["UNSET", "ProfileChanges", "UpdateProfile"]
 
 
 @dataclass(frozen=True, slots=True)

@@ -34,7 +34,7 @@ class Media:
         self.valid = valid
         self.calls: list = []
 
-    def owned_unattached(self, asset_ids, user_id):
+    def owned_available(self, asset_ids, user_id, listing_id=None):
         self.calls.append(asset_ids)
         return self.valid
 
