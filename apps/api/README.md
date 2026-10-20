@@ -86,6 +86,21 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 - `POST /v1/communities` crea la comunidad; el creador queda como `community_admin` con membresía `approved` (misma transacción).
 - `GET /v1/communities/{community_id}` devuelve una comunidad activa a cualquier usuario autenticado.
 
+- `GET /v1/communities` busca comunidades activas: `q` (nombre o descripción), `city` y `postal_code` (prefijo), sin distinguir mayúsculas ni tildes (`f_unaccent`, migración `0003`; helpers en `infrastructure/db/text_search.py`).
+- `POST /v1/communities/{id}/memberships` crea una solicitud `pending`. Si ya existe una membresía en cualquier estado responde `409 {"detail": …, "status": "<estado>"}`.
+- `GET /v1/users/me/memberships` lista las membresías propias con la comunidad embebida (filtro `status`).
+
+## Paginación
+
+Todos los listados paginados usan `PageParams` (`page ≥ 1`, por defecto 1; `page_size` de 1 a 100, por defecto 20) y responden `Page[T]` (`items`, `page`, `page_size`, `total`), definidos en `presentation/v1/pagination.py`. En aplicación, los repositorios reciben `PageRequest` y devuelven `PageResult[T]` (`application/pagination.py`). Una página posterior a la última devuelve `items: []` con el `total` real.
+
+```python
+@router.get("")
+def list_things(page: PageParams, ...) -> Page[ThingResponse]:
+    result = ListThings(repo).execute(page)
+    return Page.build(result, page, [ThingResponse.from_domain(t) for t in result.items])
+```
+
 ## Errores comunes
 
 - Los errores «no encontrado» de cualquier área heredan de `domain.errors.NotFoundError` y responden `404 {"detail": "Recurso no encontrado."}`.

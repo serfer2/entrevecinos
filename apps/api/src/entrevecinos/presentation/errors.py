@@ -3,6 +3,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from entrevecinos.domain.communities.errors import MembershipAlreadyExists
 from entrevecinos.domain.errors import NotFoundError
 from entrevecinos.domain.users.errors import (
     EmailAlreadyRegistered,
@@ -50,9 +51,20 @@ async def not_found_handler(request: Request, exc: NotFoundError) -> JSONRespons
     )
 
 
+async def membership_already_exists_handler(
+    request: Request, exc: MembershipAlreadyExists
+) -> JSONResponse:
+    # `status` permite al frontend mostrar el estado actual (TK-017 §3.4, `MembershipConflict`).
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={"detail": "Ya tienes una membresía en esta comunidad.", "status": exc.status},
+    )
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(EmailAlreadyRegistered, email_already_registered_handler)
     app.add_exception_handler(InvalidCredentials, invalid_credentials_handler)
     app.add_exception_handler(NotAuthenticated, not_authenticated_handler)
     app.add_exception_handler(NotFoundError, not_found_handler)
+    app.add_exception_handler(MembershipAlreadyExists, membership_already_exists_handler)

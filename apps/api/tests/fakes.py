@@ -9,10 +9,14 @@ from entrevecinos.application.users.ports import AccessToken
 from entrevecinos.domain.communities.entities import (
     Community,
     Membership,
+    MembershipDetail,
     MembershipRole,
     MembershipStatus,
+    MemberSummary,
+    MyMembership,
     NewCommunity,
 )
+from entrevecinos.domain.communities.errors import MembershipAlreadyExists
 from entrevecinos.domain.users.entities import NewUser, PlatformRole, User
 from entrevecinos.domain.users.errors import EmailAlreadyRegistered, NotAuthenticated
 
@@ -117,3 +121,36 @@ class InMemoryCommunityRepository:
     def get(self, community_id: uuid.UUID) -> Community | None:
         community = self.communities.get(community_id)
         return community if community and community.is_active else None
+
+
+class InMemoryMembershipRepository:
+    """Comparte las membresías con un `InMemoryCommunityRepository`."""
+
+    def __init__(self, communities: InMemoryCommunityRepository) -> None:
+        self.communities = communities
+        self.memberships = communities.memberships
+
+    def get(self, community_id: uuid.UUID, user_id: uuid.UUID) -> Membership | None:
+        return self.memberships.get((community_id, user_id))
+
+    def add_request(self, community_id: uuid.UUID, user_id: uuid.UUID) -> MembershipDetail:
+        if existing := self.get(community_id, user_id):
+            raise MembershipAlreadyExists(existing.status)
+        membership = Membership(
+            community_id=community_id,
+            user_id=user_id,
+            role=MembershipRole.MEMBER,
+            status=MembershipStatus.PENDING,
+            requested_at=datetime.now(UTC),
+        )
+        self.memberships[(community_id, user_id)] = membership
+        return MembershipDetail(membership, MemberSummary(id=user_id, full_name="Vecino"))
+
+    def list_for_user(
+        self, user_id: uuid.UUID, status: MembershipStatus | None = None
+    ) -> list[MyMembership]:
+        return [
+            MyMembership(m, self.communities.communities[m.community_id])
+            for m in sorted(self.memberships.values(), key=lambda m: m.requested_at, reverse=True)
+            if m.user_id == user_id and (status is None or m.status == status)
+        ]
