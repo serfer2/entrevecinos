@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.exceptions import RequestValidationError
 
 from entrevecinos.application.listings.delete_listing import DeleteListing
@@ -18,7 +18,7 @@ from entrevecinos.application.listings.ports import ListingQuery
 from entrevecinos.application.listings.publish_listing import PublishListing, PublishListingCommand
 from entrevecinos.application.listings.visibility import ListingVisibility
 from entrevecinos.application.unset import UNSET
-from entrevecinos.domain.listings.entities import ListingType
+from entrevecinos.domain.listings.entities import ListingSort, ListingType, SortOrder
 from entrevecinos.domain.listings.search import MAX_QUERY_LENGTH, MIN_QUERY_LENGTH
 from entrevecinos.presentation.dependencies import (
     CategoryRepositoryDep,
@@ -43,9 +43,6 @@ from entrevecinos.presentation.v1.schemas.listings import (
 )
 
 router = APIRouter(tags=["Anuncios"])
-
-# Parámetros del contrato que todavía no se implementan: mejor 422 que ignorarlos en silencio.
-UNSUPPORTED_LISTING_PARAMS = ("sort", "order")
 
 
 def search_text(
@@ -81,33 +78,17 @@ def search_text(
 SearchTextDep = Annotated[str | None, Depends(search_text)]
 
 
-def reject_unsupported_params(request: Request) -> None:
-    sent = [name for name in UNSUPPORTED_LISTING_PARAMS if name in request.query_params]
-    if sent:
-        raise RequestValidationError(
-            [
-                {
-                    "loc": ("query", name),
-                    "msg": "Parámetro aún no disponible",
-                    "type": "unsupported",
-                }
-                for name in sent
-            ]
-        )
-
-
 @router.get(
     "/communities/{community_id}/listings",
     operation_id="listCommunityListings",
     summary="Buscar anuncios de una comunidad",
     description=(
-        "Anuncios `active` y `reserved` de la comunidad, del más reciente al más antiguo, con "
-        "búsqueda por palabras clave (`q`) y filtros por tipo y categoría, combinados con AND. "
-        "Requiere una membresía aprobada (si no, 403; con `status` si la membresía existe). "
-        "**Pendiente:** `sort` y `order` responden 422."
+        "Anuncios `active` y `reserved` de la comunidad con búsqueda por palabras clave (`q`) y "
+        "filtros por tipo y categoría, combinados con AND. Orden por fecha de publicación o por "
+        "precio (sin precio, siempre al final), por defecto del más reciente al más antiguo. "
+        "Requiere una membresía aprobada (si no, 403; con `status` si la membresía existe)."
     ),
     responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **VALIDATION_ERROR},
-    dependencies=[Depends(reject_unsupported_params)],
 )
 def list_community_listings(
     community_id: uuid.UUID,
@@ -120,9 +101,19 @@ def list_community_listings(
         ListingType | None, Query(description="Filtra por modalidad de anuncio.")
     ] = None,
     category_id: Annotated[uuid.UUID | None, Query(description="Filtra por categoría.")] = None,
+    sort: Annotated[ListingSort, Query(description="Campo de ordenación.")] = (
+        ListingSort.PUBLISHED_AT
+    ),
+    order: Annotated[SortOrder, Query(description="Dirección de ordenación.")] = SortOrder.DESC,
 ) -> Page[ListingResponse]:
     query = ListingQuery(
-        community_id=community_id, page=page, text=text, type=type, category_id=category_id
+        community_id=community_id,
+        page=page,
+        text=text,
+        type=type,
+        category_id=category_id,
+        sort=sort,
+        order=order,
     )
     result = ListCommunityListings(access, listings).execute(user, query)
     return Page.build(result, page, [ListingResponse.from_domain(item) for item in result.items])

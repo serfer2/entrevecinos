@@ -12,9 +12,11 @@ from entrevecinos.domain.listings.entities import (
     Listing,
     ListingImage,
     ListingOwner,
+    ListingSort,
     ListingStatus,
     ListingType,
     NewListing,
+    SortOrder,
 )
 from entrevecinos.domain.listings.search import prefix_tsquery
 from entrevecinos.infrastructure.db.models import ListingImageModel, ListingModel, UserModel
@@ -121,7 +123,7 @@ class SqlAlchemyListingRepository:
         )
         total = self._session.scalar(select(func.count()).select_from(visible.subquery()))
         rows = self._session.execute(
-            visible.order_by(ListingModel.published_at.desc(), ListingModel.id.desc())
+            visible.order_by(*self._ordering(query))
             .offset(query.page.offset)
             .limit(query.page.page_size)
         )
@@ -136,6 +138,22 @@ class SqlAlchemyListingRepository:
             ListingModel.deleted_at.is_(None),
         ]
         return conditions
+
+    @staticmethod
+    def _ordering(query: ListingQuery) -> list[ColumnElement[object]]:
+        """Orden del listado con desempate estable (la paginación no repite ni pierde anuncios)."""
+        newest = [ListingModel.published_at.desc(), ListingModel.id.desc()]
+        if query.sort is ListingSort.PRICE:
+            # Sin conversión de moneda: en el MVP todo está en EUR. Sin precio, siempre al final.
+            price = (
+                ListingModel.price.asc()
+                if query.order is SortOrder.ASC
+                else ListingModel.price.desc()
+            )
+            return [price.nulls_last(), *newest]
+        if query.order is SortOrder.ASC:
+            return [ListingModel.published_at.asc(), ListingModel.id.asc()]
+        return newest
 
     @staticmethod
     def _criteria(query: ListingQuery) -> list[ColumnElement[bool]]:

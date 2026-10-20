@@ -127,11 +127,11 @@ def test_access_is_restricted(client: TestClient, community: dict) -> None:
     assert client.get(f"/v1/communities/{community['id']}/listings").status_code == 401
 
 
-@pytest.mark.parametrize("param", ["sort", "order"])
-def test_pending_parameters_are_rejected(
-    client: TestClient, member: dict, community: dict, param: str
+@pytest.mark.parametrize(("param", "value"), [("sort", "title"), ("order", "x")])
+def test_invalid_sort_values_are_rejected(
+    client: TestClient, member: dict, community: dict, param: str, value: str
 ) -> None:
-    response = listings(client, member, community["id"], **{param: "x"})
+    response = listings(client, member, community["id"], **{param: value})
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["query", param]
