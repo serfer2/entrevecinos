@@ -14,6 +14,8 @@ dependencies = [
     "pwdlib[argon2]>=0.2",
     "pyjwt>=2.9",
     "pydantic[email]>=2.9",
+    "boto3>=1.43.115",
+    "python-multipart>=0.0.32",
 ]
 
 [dependency-groups]
@@ -32,7 +34,10 @@ packages = ["src/entrevecinos"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["db: pruebas de integración contra la base de datos de pruebas"]
+markers = [
+    "db: pruebas de integración contra la base de datos de pruebas",
+    "storage: pruebas contra el almacenamiento de objetos real (MinIO)",
+]
 
 [tool.ruff]
 target-version = "py312"

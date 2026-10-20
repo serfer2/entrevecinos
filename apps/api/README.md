@@ -14,7 +14,7 @@ src/entrevecinos/
 
 Reglas de dependencias (comprobadas por `tests/test_architecture.py`):
 
-- `domain` no importa frameworks (`fastapi`, `starlette`, `pydantic_settings`, `uvicorn`) ni otras capas.
+- `domain` no importa frameworks (`fastapi`, `starlette`, `pydantic_settings`, `uvicorn`, `sqlalchemy`, `boto3`…) ni otras capas.
 - `application` solo depende de `domain`.
 - `infrastructure` y `presentation` pueden depender de `application` y `domain`.
 
@@ -69,6 +69,12 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 | `ENVIRONMENT` | `development` o `production` | `development` |
 | `JWT_SECRET` | Clave de firma de los JWT (HS256, mínimo 32 caracteres) | obligatoria |
 | `JWT_TTL_SECONDS` | Duración del token de acceso en segundos | `86400` |
+| `STORAGE_ENDPOINT` | Endpoint S3 para subir (red interna) | obligatoria |
+| `STORAGE_PUBLIC_ENDPOINT` | Endpoint S3 con el que se firman las URL que abre el navegador | obligatoria |
+| `STORAGE_BUCKET` | Bucket privado de las imágenes | obligatoria |
+| `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` | Credenciales S3 propias de la API | obligatorias |
+| `MEDIA_MAX_BYTES` | Tamaño máximo de una imagen | `5242880` (5 MB) |
+| `MEDIA_URL_TTL_SECONDS` | Validez de las URL prefirmadas | `300` |
 
 ## Autenticación
 
@@ -111,6 +117,13 @@ class DoSomething:
 ```
 
 En los routers, la política se inyecta con `CommunityAccessDep`.
+
+## Imágenes
+
+- `POST /v1/media` (multipart, campo `file`) guarda una imagen en el almacenamiento de objetos. El tipo se decide por los *magic bytes* (JPEG, PNG o WebP; otro → `415`), máximo `MEDIA_MAX_BYTES` (→ `413`, comprobado antes de leer el cuerpo cuando hay `Content-Length`); vacío → `422`. La clave del objeto es `media/<usuario>/<uuid>.<ext>`.
+- `GET /v1/media/{id}` responde `302` a una URL prefirmada (`MEDIA_URL_TTL_SECONDS`) si el usuario la subió o pertenece a un anuncio visible para él; si no, `403`.
+- `S3ObjectStorage` sube por `STORAGE_ENDPOINT` y firma con `STORAGE_PUBLIC_ENDPOINT`, porque la firma incluye el host que abre el navegador.
+- En las pruebas, la fixture `object_storage` sustituye el almacenamiento por uno en memoria; `pytest -m storage` prueba contra el MinIO real.
 
 ## Paginación
 

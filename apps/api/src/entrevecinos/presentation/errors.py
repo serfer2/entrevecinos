@@ -9,6 +9,7 @@ from entrevecinos.domain.communities.errors import (
     MembershipNotApproved,
 )
 from entrevecinos.domain.errors import NotFoundError, PermissionDenied
+from entrevecinos.domain.media.errors import EmptyImage, ImageTooLarge, UnsupportedImageType
 from entrevecinos.domain.users.errors import (
     EmailAlreadyRegistered,
     InvalidCredentials,
@@ -93,6 +94,33 @@ async def membership_already_reviewed_handler(
     )
 
 
+async def image_too_large_handler(request: Request, exc: ImageTooLarge) -> JSONResponse:
+    megabytes = exc.max_bytes // (1024 * 1024)
+    return JSONResponse(
+        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+        content={"detail": f"La imagen supera el tamaño máximo de {megabytes} MB."},
+    )
+
+
+async def unsupported_image_type_handler(
+    request: Request, exc: UnsupportedImageType
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        content={"detail": "Formato no permitido. Usa JPEG, PNG o WebP."},
+    )
+
+
+async def empty_image_handler(request: Request, exc: EmptyImage) -> JSONResponse:
+    # Mismo formato que los 422 de validación, señalando el campo `file`.
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content={
+            "detail": [{"loc": ["body", "file"], "msg": "El fichero está vacío.", "type": "empty"}]
+        },
+    )
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(EmailAlreadyRegistered, email_already_registered_handler)
@@ -101,5 +129,8 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(NotFoundError, not_found_handler)
     app.add_exception_handler(MembershipAlreadyExists, membership_already_exists_handler)
     app.add_exception_handler(PermissionDenied, permission_denied_handler)
+    app.add_exception_handler(ImageTooLarge, image_too_large_handler)
+    app.add_exception_handler(UnsupportedImageType, unsupported_image_type_handler)
+    app.add_exception_handler(EmptyImage, empty_image_handler)
     app.add_exception_handler(MembershipNotApproved, membership_not_approved_handler)
     app.add_exception_handler(MembershipAlreadyReviewed, membership_already_reviewed_handler)

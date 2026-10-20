@@ -18,9 +18,13 @@ from entrevecinos.infrastructure.communities.sqlalchemy_membership_repository im
     SqlAlchemyMembershipRepository,
 )
 from entrevecinos.infrastructure.db.session import get_session
+from entrevecinos.infrastructure.media.sqlalchemy_media_repository import (
+    SqlAlchemyMediaRepository,
+)
 from entrevecinos.infrastructure.security.jwt_tokens import JwtTokenService
 from entrevecinos.infrastructure.security.password_hasher import Argon2PasswordHasher
 from entrevecinos.infrastructure.settings import Settings, get_settings
+from entrevecinos.infrastructure.storage.s3_object_storage import S3ObjectStorage
 from entrevecinos.infrastructure.users.sqlalchemy_user_repository import SqlAlchemyUserRepository
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -94,3 +98,29 @@ def get_community_access(
 
 
 CommunityAccessDep = Annotated[CommunityAccess, Depends(get_community_access)]
+
+
+def get_media_repository(session: SessionDep) -> SqlAlchemyMediaRepository:
+    return SqlAlchemyMediaRepository(session)
+
+
+@lru_cache
+def _object_storage(
+    endpoint: str, public_endpoint: str, bucket: str, access_key: str, secret_key: str
+) -> S3ObjectStorage:
+    # Los clientes de boto3 son costosos de crear y seguros entre hilos: uno por configuración.
+    return S3ObjectStorage(endpoint, public_endpoint, bucket, access_key, secret_key)
+
+
+def get_object_storage(settings: SettingsDep) -> S3ObjectStorage:
+    return _object_storage(
+        settings.storage_endpoint,
+        settings.storage_public_endpoint,
+        settings.storage_bucket,
+        settings.storage_access_key,
+        settings.storage_secret_key,
+    )
+
+
+MediaRepositoryDep = Annotated[SqlAlchemyMediaRepository, Depends(get_media_repository)]
+ObjectStorageDep = Annotated[S3ObjectStorage, Depends(get_object_storage)]

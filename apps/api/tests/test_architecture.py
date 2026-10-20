@@ -17,6 +17,9 @@ FRAMEWORKS = {
     "pwdlib",
     "jwt",
     "email_validator",
+    "boto3",
+    "botocore",
+    "multipart",
 }
 
 FORBIDDEN = {

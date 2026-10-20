@@ -15,6 +15,14 @@ class Settings(BaseSettings):
     environment: Literal["development", "production"] = "development"
     jwt_secret: str = Field(min_length=32)
     jwt_ttl_seconds: int = Field(default=86400, gt=0)
+    storage_endpoint: str
+    # Base de las URL prefirmadas: el host que abre el navegador (la firma lo incluye).
+    storage_public_endpoint: str
+    storage_bucket: str
+    storage_access_key: str
+    storage_secret_key: str
+    media_max_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
+    media_url_ttl_seconds: int = Field(default=300, gt=30)
 
     @property
     def cors_origins_list(self) -> list[str]:

@@ -12,6 +12,14 @@ from sqlalchemy.orm import Session
 # `presentation.main` crea la app al importarse; las pruebas necesitan una configuración mínima.
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/test")
 os.environ.setdefault("JWT_SECRET", "test-secret-with-at-least-32-characters")
+for _name, _value in {
+    "STORAGE_ENDPOINT": "http://storage:9000",
+    "STORAGE_PUBLIC_ENDPOINT": "http://localhost:9000",
+    "STORAGE_BUCKET": "test-bucket",
+    "STORAGE_ACCESS_KEY": "test-access-key",
+    "STORAGE_SECRET_KEY": "test-secret-key",
+}.items():
+    os.environ.setdefault(_name, _value)
 
 TEST_JWT_SECRET = "test-secret-with-at-least-32-characters-!!"
 
@@ -72,11 +80,21 @@ def make_settings(**overrides: object):
 
 
 @pytest.fixture
-def client(db_session: Session) -> TestClient:
+def object_storage():
+    """Almacenamiento de objetos en memoria (la prueba `storage` usa MinIO real)."""
+    from tests.fakes import InMemoryObjectStorage
+
+    return InMemoryObjectStorage()
+
+
+@pytest.fixture
+def client(db_session: Session, object_storage) -> TestClient:
     """Cliente HTTP cuya sesión de base de datos es la transacción de la prueba."""
     from entrevecinos.infrastructure.db.session import get_session
+    from entrevecinos.presentation.dependencies import get_object_storage
     from entrevecinos.presentation.main import create_app
 
     app = create_app(make_settings())
     app.dependency_overrides[get_session] = lambda: db_session
+    app.dependency_overrides[get_object_storage] = lambda: object_storage
     return TestClient(app)

@@ -154,3 +154,15 @@ class InMemoryMembershipRepository:
             for m in sorted(self.memberships.values(), key=lambda m: m.requested_at, reverse=True)
             if m.user_id == user_id and (status is None or m.status == status)
         ]
+
+
+class InMemoryObjectStorage:
+    def __init__(self, public_endpoint: str = "http://localhost:9000") -> None:
+        self.public_endpoint = public_endpoint
+        self.objects: dict[str, tuple[bytes, str]] = {}
+
+    def put(self, key: str, data: bytes, content_type: str) -> None:
+        self.objects[key] = (data, content_type)
+
+    def presigned_get_url(self, key: str, expires_in: int) -> str:
+        return f"{self.public_endpoint}/bucket/{key}?X-Amz-Expires={expires_in}&X-Amz-Signature=x"
