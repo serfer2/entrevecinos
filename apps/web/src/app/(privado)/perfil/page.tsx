@@ -11,7 +11,7 @@ export default async function ProfilePage() {
   const user = await requireUser();
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-8 px-4 py-12">
+    <main className="mx-auto flex w-full max-w-md flex-col gap-8 px-4 py-10">
       <div>
         <Link href="/inicio" className="text-sm font-medium text-emerald-800 underline">
           Volver al inicio

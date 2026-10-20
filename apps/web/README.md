@@ -67,6 +67,10 @@ Las variables `NEXT_PUBLIC_*` se incorporan al compilar y llegan al navegador: n
 - `src/lib/api/server.ts` (`apiFetch`) y `src/features/auth/session.ts` solo se pueden importar en el servidor (`server-only`): importarlos desde un componente de cliente rompe la compilación.
 - `apiFetch` nunca lanza excepciones: devuelve `{ ok: true, data }` o `{ ok: false, error }` (`status: 0` si la API no responde).
 - `src/components/ui/TextField.tsx`: campo con etiqueta, ayuda y error accesibles, compartido por los formularios.
+- `src/features/auth/api.ts` (`userApiFetch`): llamada a la API con el token de la sesión; ante un `401` redirige al inicio de sesión. Úsala en las páginas y acciones privadas.
+- `src/components/ui/TextAreaField.tsx`: igual que `TextField` para textos largos.
+- `src/lib/forms.ts`: `formText()` (valor de un campo) e `isUuid()` (validar ids de la URL antes de llamar a la API).
+- `src/app/(privado)/layout.tsx`: cabecera de la zona privada; `NavLink` marca la sección actual con `aria-current="page"`. El *layout* no comprueba la sesión: cada página llama a `requireUser()`.
 
 ## Rutas privadas
 

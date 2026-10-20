@@ -1,0 +1,78 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { userApiFetch, requireUser, redirect } = vi.hoisted(() => ({
+  userApiFetch: vi.fn(),
+  requireUser: vi.fn(),
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT:${url}`);
+  }),
+}));
+
+vi.mock("@/features/auth/api", () => ({ userApiFetch }));
+vi.mock("@/features/auth/dal", () => ({ requireUser }));
+vi.mock("next/navigation", () => ({ redirect }));
+
+import { createCommunity } from "./actions";
+
+function form(values: Record<string, string>) {
+  const data = new FormData();
+  for (const [key, value] of Object.entries(values)) data.set(key, value);
+  return data;
+}
+
+const filled = { name: "Los Olivos", description: "", city: "Majadahonda", postal_code: "28220" };
+
+describe("createCommunity", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireUser.mockResolvedValue({ id: "u1" });
+  });
+
+  it("crea la comunidad y redirige a su página", async () => {
+    userApiFetch.mockResolvedValue({ ok: true, status: 201, data: { id: "c1" } });
+
+    await expect(createCommunity(undefined, form(filled))).rejects.toThrow(
+      "NEXT_REDIRECT:/comunidades/c1",
+    );
+    expect(userApiFetch).toHaveBeenCalledWith("/communities", {
+      method: "POST",
+      body: { name: "Los Olivos", description: null, city: "Majadahonda", postal_code: "28220" },
+    });
+  });
+
+  it("comprueba la sesión antes de hacer nada", async () => {
+    requireUser.mockRejectedValue(new Error("NEXT_REDIRECT:/iniciar-sesion?motivo=sesion-caducada"));
+
+    await expect(createCommunity(undefined, form(filled))).rejects.toThrow("NEXT_REDIRECT");
+    expect(userApiFetch).not.toHaveBeenCalled();
+  });
+
+  it("no llama a la API sin nombre y conserva lo escrito", async () => {
+    const state = await createCommunity(undefined, form({ ...filled, name: "  " }));
+
+    expect(userApiFetch).not.toHaveBeenCalled();
+    expect(state).toEqual({
+      fieldErrors: { name: "El nombre de la comunidad es obligatorio." },
+      values: { ...filled, name: "  " },
+    });
+  });
+
+  it("traduce los campos de un 422", async () => {
+    userApiFetch.mockResolvedValue({
+      ok: false,
+      error: { status: 422, detail: [{ loc: ["body", "city"], msg: "x", type: "x" }] },
+    });
+
+    const state = await createCommunity(undefined, form(filled));
+
+    expect(state?.fieldErrors).toEqual({ city: "Máximo 120 caracteres." });
+  });
+
+  it("muestra un error general si la API falla", async () => {
+    userApiFetch.mockResolvedValue({ ok: false, error: { status: 0, detail: null } });
+
+    const state = await createCommunity(undefined, form(filled));
+
+    expect(state?.formError).toBe("No se pudo crear la comunidad. Inténtalo de nuevo.");
+  });
+});
