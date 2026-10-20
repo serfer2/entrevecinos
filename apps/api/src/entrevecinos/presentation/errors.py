@@ -3,6 +3,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from entrevecinos.domain.errors import NotFoundError
 from entrevecinos.domain.users.errors import (
     EmailAlreadyRegistered,
     InvalidCredentials,
@@ -43,8 +44,15 @@ async def not_authenticated_handler(request: Request, exc: NotAuthenticated) -> 
     )
 
 
+async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND, content={"detail": "Recurso no encontrado."}
+    )
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(EmailAlreadyRegistered, email_already_registered_handler)
     app.add_exception_handler(InvalidCredentials, invalid_credentials_handler)
     app.add_exception_handler(NotAuthenticated, not_authenticated_handler)
+    app.add_exception_handler(NotFoundError, not_found_handler)

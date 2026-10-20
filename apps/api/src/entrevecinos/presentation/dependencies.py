@@ -10,6 +10,9 @@ from entrevecinos.application.users.get_current_user import GetCurrentUser
 from entrevecinos.application.users.register_user import RegisterUser
 from entrevecinos.domain.users.entities import User
 from entrevecinos.domain.users.errors import NotAuthenticated
+from entrevecinos.infrastructure.communities.sqlalchemy_community_repository import (
+    SqlAlchemyCommunityRepository,
+)
 from entrevecinos.infrastructure.db.session import get_session
 from entrevecinos.infrastructure.security.jwt_tokens import JwtTokenService
 from entrevecinos.infrastructure.security.password_hasher import Argon2PasswordHasher
@@ -33,7 +36,12 @@ def get_token_service(settings: SettingsDep) -> JwtTokenService:
     return JwtTokenService(settings.jwt_secret, settings.jwt_ttl_seconds)
 
 
+def get_community_repository(session: SessionDep) -> SqlAlchemyCommunityRepository:
+    return SqlAlchemyCommunityRepository(session)
+
+
 UserRepositoryDep = Annotated[SqlAlchemyUserRepository, Depends(get_user_repository)]
+CommunityRepositoryDep = Annotated[SqlAlchemyCommunityRepository, Depends(get_community_repository)]
 PasswordHasherDep = Annotated[Argon2PasswordHasher, Depends(get_password_hasher)]
 TokenServiceDep = Annotated[JwtTokenService, Depends(get_token_service)]
 

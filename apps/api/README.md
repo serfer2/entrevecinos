@@ -81,6 +81,16 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 - Los errores `422` solo devuelven `loc`, `msg` y `type` (nunca los valores enviados).
 - Los errores de dominio se traducen a HTTP en `presentation/errors.py`.
 
+## Comunidades
+
+- `POST /v1/communities` crea la comunidad; el creador queda como `community_admin` con membresía `approved` (misma transacción).
+- `GET /v1/communities/{community_id}` devuelve una comunidad activa a cualquier usuario autenticado.
+
+## Errores comunes
+
+- Los errores «no encontrado» de cualquier área heredan de `domain.errors.NotFoundError` y responden `404 {"detail": "Recurso no encontrado."}`.
+- Textos de entrada: `RequiredText(n)` y `OptionalText(n)` (`presentation/v1/schemas/common.py`) recortan espacios; en los opcionales `""` equivale a `null`.
+
 ### Proteger un endpoint
 
 Usa siempre la dependencia `CurrentUserDep` (`presentation/dependencies.py`); valida el token (firma, `exp`, algoritmo HS256) y que el usuario siga activo y no eliminado. Si falla, responde `401` con `WWW-Authenticate: Bearer`:

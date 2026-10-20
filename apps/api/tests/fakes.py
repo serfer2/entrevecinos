@@ -6,6 +6,13 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 
 from entrevecinos.application.users.ports import AccessToken
+from entrevecinos.domain.communities.entities import (
+    Community,
+    Membership,
+    MembershipRole,
+    MembershipStatus,
+    NewCommunity,
+)
 from entrevecinos.domain.users.entities import NewUser, PlatformRole, User
 from entrevecinos.domain.users.errors import EmailAlreadyRegistered, NotAuthenticated
 
@@ -75,3 +82,38 @@ class FakeTokenIssuer:
         if not token.startswith("token-for:"):
             raise NotAuthenticated
         return uuid.UUID(token.removeprefix("token-for:"))
+
+
+class InMemoryCommunityRepository:
+    def __init__(self) -> None:
+        self.communities: dict[uuid.UUID, Community] = {}
+        self.memberships: dict[tuple[uuid.UUID, uuid.UUID], Membership] = {}
+
+    def add(self, community: NewCommunity, admin_id: uuid.UUID) -> Community:
+        now = datetime.now(UTC)
+        stored = Community(
+            id=uuid.uuid4(),
+            name=community.name,
+            description=community.description,
+            postal_code=community.postal_code,
+            city=community.city,
+            created_by=admin_id,
+            is_active=True,
+            created_at=now,
+        )
+        self.communities[stored.id] = stored
+        self.memberships[(stored.id, admin_id)] = Membership(
+            community_id=stored.id,
+            user_id=admin_id,
+            role=MembershipRole.COMMUNITY_ADMIN,
+            status=MembershipStatus.APPROVED,
+            requested_at=now,
+            reviewed_by=admin_id,
+            reviewed_at=now,
+            joined_at=now,
+        )
+        return stored
+
+    def get(self, community_id: uuid.UUID) -> Community | None:
+        community = self.communities.get(community_id)
+        return community if community and community.is_active else None
