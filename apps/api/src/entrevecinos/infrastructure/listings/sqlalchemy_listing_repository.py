@@ -2,10 +2,13 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterable
 
-from sqlalchemy import Select, func, select, update
+from sqlalchemy import ColumnElement, Select, func, select, update
 from sqlalchemy.orm import Session
 
+from entrevecinos.application.listings.ports import ListingQuery
+from entrevecinos.application.pagination import PageResult
 from entrevecinos.domain.listings.entities import (
+    LISTED_STATUSES,
     Listing,
     ListingImage,
     ListingOwner,
@@ -107,6 +110,30 @@ class SqlAlchemyListingRepository:
         rows = self._session.execute(listing_with_owner().where(ListingModel.id == listing_id))
         found = self._loader.load(rows)
         return found[0] if found else None
+
+    def search(self, query: ListingQuery) -> PageResult[Listing]:
+        conditions = self._visible_in_community(query)
+        total = self._session.scalar(
+            select(func.count()).select_from(ListingModel).where(*conditions)
+        )
+        rows = self._session.execute(
+            listing_with_owner()
+            .where(*conditions)
+            .order_by(ListingModel.published_at.desc(), ListingModel.id.desc())
+            .offset(query.page.offset)
+            .limit(query.page.page_size)
+        )
+        return PageResult(items=self._loader.load(rows), total=total or 0)
+
+    @staticmethod
+    def _visible_in_community(query: ListingQuery) -> list[ColumnElement[bool]]:
+        """Filtro común del listado y de su `total`: lo que un miembro ve en la comunidad."""
+        conditions = [
+            ListingModel.community_id == query.community_id,
+            ListingModel.status.in_(LISTED_STATUSES),
+            ListingModel.deleted_at.is_(None),
+        ]
+        return conditions
 
     def soft_delete(self, listing_id: uuid.UUID) -> None:
         self._session.execute(

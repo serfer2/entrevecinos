@@ -76,3 +76,26 @@ def test_others_are_denied_and_missing_is_not_found() -> None:
     with pytest.raises(ListingNotFound):
         DeleteListing(Access(manager=True), listings).execute(make_user(), uuid.uuid4())
     assert listings.deleted == []
+
+
+def test_list_community_listings_requires_membership_first() -> None:
+    from entrevecinos.application.listings.list_community_listings import ListCommunityListings
+    from entrevecinos.application.listings.ports import ListingQuery
+    from entrevecinos.application.pagination import PageRequest, PageResult
+
+    calls: list[str] = []
+
+    class Gate:
+        def require_member(self, user, community_id):
+            calls.append("access")
+            raise PermissionDenied
+
+    class Repo:
+        def search(self, query):
+            calls.append("search")
+            return PageResult(items=[], total=0)
+
+    query = ListingQuery(community_id=uuid.uuid4(), page=PageRequest())
+    with pytest.raises(PermissionDenied):
+        ListCommunityListings(Gate(), Repo()).execute(make_user(), query)
+    assert calls == ["access"]

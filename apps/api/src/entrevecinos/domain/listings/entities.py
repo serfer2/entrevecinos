@@ -93,3 +93,17 @@ class Listing:
     updated_at: datetime
     images: tuple[ListingImage, ...] = field(default=())
     deleted_at: datetime | None = None
+
+
+class ListingSort(StrEnum):
+    PUBLISHED_AT = "published_at"
+    PRICE = "price"
+
+
+class SortOrder(StrEnum):
+    ASC = "asc"
+    DESC = "desc"
+
+
+# Estados que se muestran en los listados de una comunidad.
+LISTED_STATUSES = frozenset({ListingStatus.ACTIVE, ListingStatus.RESERVED})

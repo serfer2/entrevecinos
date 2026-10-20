@@ -124,6 +124,7 @@ En los routers, la política se inyecta con `CommunityAccessDep`.
 - `POST /v1/communities/{id}/listings`: solo miembros aprobados (`require_member`). Hasta 10 imágenes propias no usadas en otro anuncio (la primera es la portada); con precio y sin moneda se usa `EUR`; moneda sin precio → `422`.
 - `Listing` incluye `owner` (leído siempre de `users`) e `images` ordenadas. Los precios son `Decimal` de extremo a extremo y se serializan como número JSON.
 - `DELETE /v1/listings/{id}`: borrado lógico (`deleted_at`, `status = deleted`) por el autor, un gestor de la comunidad o `platform_admin`. Las lecturas parten de `listing_with_owner()`, que ya excluye los eliminados.
+- `GET /v1/communities/{id}/listings`: anuncios `active` y `reserved` de la comunidad para miembros aprobados, del más reciente al más antiguo (`published_at DESC, id DESC`). Los criterios llegan en `ListingQuery`; el filtro de visibilidad común está en `SqlAlchemyListingRepository._visible_in_community` (lo comparten la página y el `total`).
 - `ListingLoader` (`infrastructure/listings/sqlalchemy_listing_repository.py`) carga anuncios con su autor y todas sus imágenes en dos consultas: úsalo en cualquier lectura de anuncios para evitar N+1.
 
 ## Imágenes
