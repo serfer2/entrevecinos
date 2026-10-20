@@ -1,0 +1,145 @@
+name: entrevecinos
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-entrevecinos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-entrevecinos}
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  storage:
+    # MinIO ya no publica imágenes oficiales: compilación comunitaria con versión fija (AGPLv3).
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Define MINIO_ROOT_PASSWORD en .env}
+    volumes:
+      - storage_data:/data
+    # `data` para la API; `edge` solo para poder publicar el puerto S3 (la red `data` es interna).
+    networks:
+      - data
+      - edge
+    ports:
+      # El navegador abre las URL prefirmadas: solo en 127.0.0.1. La consola (9001) no se publica.
+      - "127.0.0.1:${STORAGE_HOST_PORT:-9000}:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  storage-init:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    restart: "no"
+    entrypoint: ["sh", "/init/init.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Define MINIO_ROOT_PASSWORD en .env}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:?Define STORAGE_BUCKET en .env}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Define STORAGE_ACCESS_KEY en .env}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Define STORAGE_SECRET_KEY en .env}
+    volumes:
+      - ./storage/init.sh:/init/init.sh:ro
+    depends_on:
+      storage:
+        condition: service_healthy
+    networks:
+      - data
+
+  api:
+    build:
+      context: ../apps/api
+      target: dev
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-entrevecinos}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}@db:5432/${POSTGRES_DB:-entrevecinos}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-86400}
+      STORAGE_ENDPOINT: http://storage:9000
+      # Base de las URL prefirmadas: la que ve el navegador (la firma incluye el host).
+      STORAGE_PUBLIC_ENDPOINT: http://localhost:${STORAGE_HOST_PORT:-9000}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:?Define STORAGE_BUCKET en .env}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Define STORAGE_ACCESS_KEY en .env}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Define STORAGE_SECRET_KEY en .env}
+    depends_on:
+      db:
+        condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ../apps/api/src:/app/src            # recarga en desarrollo
+      - ../apps/api/migrations:/app/migrations
+      - ../apps/api/alembic.ini:/app/alembic.ini:ro
+      - ../docs/api:/docs/api:ro                # contrato, para las pruebas de contrato
+    networks:
+      - data
+      - edge
+    healthcheck:
+      # /v1/health responde 200 solo si la API está en marcha y llega a la base de datos.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build:
+      context: ../apps/web
+      target: dev
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/v1}
+      API_INTERNAL_URL: http://api:8000/v1
+      # Origen de las URL prefirmadas de las imágenes: se permite en `img-src` de la CSP.
+      STORAGE_PUBLIC_URL: http://localhost:${STORAGE_HOST_PORT:-9000}
+      WATCHPACK_POLLING: "true"          # recarga fiable en Docker
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - ../apps/web:/app
+      - web_node_modules:/app/node_modules   # evita pisar las dependencias del contenedor
+      - web_next_cache:/app/.next
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  db_data:
+  storage_data:
+  web_node_modules:
+  web_next_cache:
+
+networks:
+  data:
+    internal: true
+  edge:

@@ -1,6 +1,8 @@
 type: object
-description: Anunciante. `phone` se muestra a miembros aprobados de la comunidad y es el canal de contacto del MVP.
-required: [id, full_name]
+description: >-
+  Anunciante. `phone` y `email` son el canal de contacto del MVP y solo se muestran a miembros
+  aprobados de la comunidad del anuncio.
+required: [id, full_name, email]
 properties:
   id:
     type: string
@@ -9,6 +11,9 @@ properties:
     type: string
   phone:
     type: [string, "null"]
+  email:
+    type: string
+    format: email
   avatar_url:
     type: [string, "null"]
     format: uri-reference

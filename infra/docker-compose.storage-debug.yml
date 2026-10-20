@@ -1,0 +1,8 @@
+# Override opcional para abrir la consola de MinIO desde el host.
+# Uso: docker compose --env-file .env -f infra/docker-compose.yml -f infra/docker-compose.storage-debug.yml up -d storage
+# Publica la consola solo en 127.0.0.1 (acceso con MINIO_ROOT_USER / MINIO_ROOT_PASSWORD).
+services:
+  storage:
+    ports:
+      - "127.0.0.1:${STORAGE_HOST_PORT:-9000}:9000"
+      - "127.0.0.1:${STORAGE_CONSOLE_PORT:-9001}:9001"

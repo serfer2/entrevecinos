@@ -5,8 +5,10 @@ patch:
   operationId: updateListingStatus
   summary: Cambiar el estado de un anuncio
   description: >-
-    El autor puede pasar entre `active`, `reserved` y `completed`. Solo un `community_admin`/`moderator`
+    El autor puede marcar su anuncio como reservado o finalizado: `active` ↔ `reserved` y
+    `active`/`reserved` → `completed`. `completed` es un estado final. Solo un `community_admin`/`moderator`
     o `platform_admin` puede establecer o levantar `hidden` (retirada de anuncios problemáticos).
+    Una transición no permitida responde 409.
   x-mvp: true
   requestBody:
     required: true
@@ -29,5 +31,7 @@ patch:
       $ref: ../components/responses/Forbidden.yaml
     "404":
       $ref: ../components/responses/NotFound.yaml
+    "409":
+      $ref: ../components/responses/Conflict.yaml
     "422":
       $ref: ../components/responses/ValidationError.yaml

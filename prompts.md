@@ -275,6 +275,114 @@ Genera los siguientes tres tickets de desarrollo. Da todo el detalle requerido p
 - Ticket 3 - Frontend : Añade las configuraciones para el frontend, incluye lo necesario en docker y docker compose pero sin implementar todavía el código del frontend
 ```
 
+**Prompt 2:** Dev Makefile
+
+**Agente:** Claude Code (Sonnet 5) - **Contexto:** Facilitamos las pruebas y el desarollo
+
+```
+Genera un ticket de desarrollo. Da todo el detalle requerido para desarrollar la tarea de inicio a fin teniendo en cuenta las buenas prácticas al respecto.
+El ticklet es para crear un Makefile con comandos:
+ - build-frontend: construye las imágenes de docker necesarias para lanzar el servidor de desarrollo del frontend.
+ - build-backend: construye las imágenes de docker necesarias para lanzar el servidor de desarrollo del backend.
+ - build: build-frontend y build-backend.
+ - dev: genera las imágenes de frontend y backend necesarias y levanta los servidores de desarollo de frontend y backend.
+ - clean: tumba los servidores dedesarrollo de frontendy backend y elimina las imágenes de docker creadas.
+```
+
+**Prompt 3:** Organización de tickets
+
+**Agente:** Claude Code (Sonnet 5) - **Contexto:** Facilitamos las pruebas y el desarollo
+
+```
+Los tickets de cada historia de usuario deben estar agrupados en carpetas con nombre "HU-xxx-<nombre-de-la-historia-de-usuario>" donde xxx es la secuencia o número de historia de usuario. Los 4 tickets existentes deben ser movidos a docs/product/tickets/00-infra/. Actualiza el README.
+```
+
+**Prompt 4:** Crear tickets para Épica 1 — Registro y perfil básico
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets de infra están listos e implementados
+
+```
+Crea los tickets para `Épica 1 — Registro y perfil básico`. Un fichero por cada ticket. Siguiendo la estructura de carpetas: crea una carpeta para la épica en docs/product/tickets y una subcarpeta por cada historia de usuario, numeradas en el orden en que han sido definidas en user-stories.md
+```
+
+**Prompt 4.1:** Refinement tickets Épica 01
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets de Épica 1 han sidpo creados, los refinamos
+
+```
+- En Tk-05, el nombre de la tabla de usuarios será users.
+- Renombra los ficheros de ticket siguiendo el siguiente patrón Tk-05 -> Tk-005
+```
+
+**Prompt 5:** Crear tickets para resto de épicas
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets de épica 1 están listos.
+
+```
+Crea los tickets para el resto de épicas.
+```
+
+**NOTA**
+
+La IA crea los tíckets de las Epica 02 a Épica 06 (historias de usuario de la 04 a la 16). Es decir, el resto de tickets del MPV. Procedo a refinarlos.
+
+**Prompt 5.1:** Refinement tickets Épicas 02 a 06
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Resto de tickets del MVP han sidpo creados, los refinamos
+
+```
+Esto es el refinement de los tickets creados para las épicas 02 a 06.
+- TK-012: Los nombres de las tablas son en singular. La de `users` es una excepción por coincidir con una palabra reservada de PostgreSQL. Añade esta aclaración en el README, donde corresponda. Corrige el resto de tickets si es necesario.
+- TK-013: Añade el Límite de `description` de comunidades a CommunityCreate.yaml.
+- TK-017: Debe añadir **Campo `status` en el `403`:** extensión del contrato (`Error` solo tiene `detail`) en `docs/api`.
+- TK-019: Añade Licencia y versiones de MinIO. Documéntalo si es necesario.
+- TK-023: CSP, al servir imágenes desde `localhost:9000` (y S3 en producción), la futura `Content-Security-Policy` (TK-003 §8) debe permitir ese origen en `img-src`. Añade o modifica uno o varios tickets para ello.
+- TK-030: búsqueda mínima con 2 caracteres. Inclúyelo en la doc.
+- TK-040: los anuncios de los miembros bloqueados deben quedar ocultos al bloquear al miembro.
+- TK-042: Transiciones de estado de los anuncios. Añade dentro del MVP, en una historia nueva (por ejemplo, HU-09b «Marcar mi anuncio como reservado o finalizado»):
+   - Añádelo a la documentación como parte del MVP.
+   - Un ticket de backend que amplíe TK-042 con active ↔ reserved, active | reserved → completed, y completed como estado final (asumido).
+   - Un ticket de frontend con los botones «Marcar como reservado», «Quitar reserva» y «Marcar como finalizado» en el detalle, visibles solo para el autor.
+```
+
+**Prompt 5.1:** Refinement tickets Épicas 02 a 06
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets han sido refinados y documentación actualizada
+
+```
+Haz commit de los tickets y la documentación
+```
+
+#### 6.1 Implementación de tickets de trabajo
+
+**Prompt 1:** Implementar infra de desarrollo
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets de infra están listos
+
+```
+Implement infra tickets TK-01..TK-04  
+```
+
+**Prompt 2:** Implementar tickets de Epica 1
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets de Épica 1 están listos
+
+```
+Los tickets de la Épica1 ya están revisados, impleméntalos
+```
+
+**NOTA**
+
+Claude propone ir creando las specs en openspec a partir de los ficheros de tickets que hay en la carpeta `docs/product/tickets/00-infra`.
+
+**Prompt 3:** Implementar los tickets de las Épicas 02 a 06 y los tickets adicionales
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Todos los tickets del MVP han sido generados, revisados y refinados
+
+```
+Implementa los tickets que falten por implementar. Revisa los que ya han sido implementados y asegúrate de que todos queden hechos
+```
+
 ---
 
 ### 7. Pull Requests

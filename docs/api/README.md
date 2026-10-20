@@ -53,6 +53,19 @@ npx @redocly/cli bundle openapi.yaml -o dist/openapi.bundled.yaml
 npx @redocly/cli preview-docs openapi.yaml
 ```
 
+## Cambios
+
+Cambios compatibles del contrato durante el desarrollo del MVP:
+
+| Ticket | Cambio |
+|---|---|
+| TK-013 | `CommunityCreate`/`CommunityUpdate.description`: `maxLength: 2000`. |
+| TK-017 | `MembershipError` (`Error` + `status`); respuestas `MembershipForbidden` (403) en las operaciones que exigen membresía aprobada y `MembershipConflict` (409) en `requestMembership`. |
+| TK-022 | `ListingCreate`/`ListingUpdate.description`: `maxLength: 5000`; con precio y sin moneda se usa `EUR`. |
+| TK-030 | `q` del listado: vacío equivale a no enviarlo; menos de 2 caracteres → 422; se ignoran las palabras de un carácter. |
+| TK-038 | `ListingOwner.email` (obligatorio): canal de contacto del MVP junto con `phone`. |
+| TK-044 | `updateListingStatus`: transiciones del autor (`active` ↔ `reserved`, → `completed` final) y 409 para transiciones no permitidas. |
+
 ## Resumen de endpoints
 
 | Grupo | Operaciones | MVP |

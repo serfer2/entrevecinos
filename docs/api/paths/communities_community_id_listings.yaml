@@ -6,13 +6,16 @@ get:
   summary: Buscar anuncios de una comunidad
   description: >-
     Permite explorar anuncios y aplicar búsqueda, filtros y ordenación. Solo devuelve anuncios
-    `active` y `reserved`. Requiere una membresía aprobada en la comunidad.
+    `active` y `reserved` cuyo autor tiene una membresía aprobada en la comunidad (los de miembros
+    bloqueados o expulsados quedan ocultos). Requiere una membresía aprobada en la comunidad.
   x-mvp: true
   parameters:
     - name: q
       in: query
       required: false
-      description: Busca palabras clave en el título y la descripción.
+      description: >-
+        Busca palabras clave en el título y la descripción. Se recortan los espacios: vacío equivale a
+        no enviarlo; con menos de 2 caracteres responde 422. Las palabras de un solo carácter se ignoran.
       schema:
         type: string
         maxLength: 160
@@ -65,11 +68,7 @@ get:
     "401":
       $ref: ../components/responses/Unauthorized.yaml
     "403":
-      description: El usuario no pertenece a la comunidad o su membresía no está aprobada.
-      content:
-        application/json:
-          schema:
-            $ref: ../components/schemas/Error.yaml
+      $ref: ../components/responses/MembershipForbidden.yaml
     "404":
       $ref: ../components/responses/NotFound.yaml
     "422":
@@ -105,11 +104,7 @@ post:
     "401":
       $ref: ../components/responses/Unauthorized.yaml
     "403":
-      description: El usuario no tiene una membresía aprobada en la comunidad.
-      content:
-        application/json:
-          schema:
-            $ref: ../components/schemas/Error.yaml
+      $ref: ../components/responses/MembershipForbidden.yaml
     "404":
       $ref: ../components/responses/NotFound.yaml
     "422":

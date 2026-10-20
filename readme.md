@@ -163,6 +163,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Incluir una gestión sencilla de acceso, por ejemplo, aprobación por parte de un administrador.
 3. **Gestión de anuncios**
    - Crear, editar y eliminar anuncios propios.
+   - Marcar los anuncios propios como reservados o finalizados.
    - Incluir título, descripción, categoría, tipo de publicación, precio opcional, fotografías y fecha.
    - Ofrecer los tipos principales: Vendo, Busco, Ofrezco, Necesito y Regalo. «Otros» puede servir como categoría general.
 4. **Explorar y encontrar anuncios**
@@ -394,7 +395,7 @@ flowchart LR
 
 #### Desarrollo local
 
-Docker Compose levanta los componentes necesarios en el equipo del desarrollador: frontend Next.js, API FastAPI, PostgreSQL y MinIO. Los servicios se comunican por una red de Docker y los datos sobreviven a reinicios mediante volúmenes persistentes.
+Docker Compose levanta los componentes necesarios en el equipo del desarrollador: frontend Next.js, API FastAPI, PostgreSQL y MinIO. Como MinIO ya no publica imágenes Docker oficiales, se usa la compilación comunitaria `pgsty/minio` con versión fija (licencia AGPLv3, usada sin modificar como servicio independiente); el detalle está en TK-019. Los servicios se comunican por una red de Docker y los datos sobreviven a reinicios mediante volúmenes persistentes.
 
 Esta configuración facilita arrancar el proyecto con un entorno reproducible y probar la integración entre componentes. Las credenciales locales deben ser de desarrollo y no reutilizarse en producción.
 
@@ -634,7 +635,7 @@ erDiagram
 
 ### **3.2. Descripción de entidades principales:**
 
-El modelo cubre las funciones descritas en el README: usuarios, comunidades, anuncios, imágenes, mensajería, notificaciones, perfiles profesionales y moderación. Se propone para **PostgreSQL 16**. Los campos marcados `NOT NULL` no admiten valores nulos; `NULL` indica que el dato es opcional.
+El modelo cubre las funciones descritas en el README: usuarios, comunidades, anuncios, imágenes, mensajería, notificaciones, perfiles profesionales y moderación. Se propone para **PostgreSQL 16**. Las tablas se nombran en singular, igual que las entidades (`community`, `listing`…), salvo la de usuarios, que se llama `users` porque `user` es una palabra reservada de PostgreSQL. Los campos marcados `NOT NULL` no admiten valores nulos; `NULL` indica que el dato es opcional.
 
 #### 1. `user` — Usuario
 
@@ -882,7 +883,9 @@ paths:
         - name: q
           in: query
           required: false
-          description: Busca palabras clave en el título y la descripción.
+          description: >-
+            Busca palabras clave en el título y la descripción. Se recortan los espacios: vacío equivale a
+            no enviarlo; con menos de 2 caracteres responde 422. Las palabras de un solo carácter se ignoran.
           schema:
             type: string
             maxLength: 160
@@ -1224,7 +1227,7 @@ components:
 
 He utilizado `openspec` junto con Claude para elaborar las historias de usuario
 
-Las historias completas del MVP (17 historias en 6 épicas) están en [`docs/product/user-stories.md`](docs/product/user-stories.md). Se seleccionan tres que cubren el recorrido principal del MVP: publicar, encontrar y contactar.
+Las historias completas del MVP (18 historias en 6 épicas) están en [`docs/product/user-stories.md`](docs/product/user-stories.md). Se seleccionan tres que cubren el recorrido principal del MVP: publicar, encontrar y contactar.
 
 ### **Historia de Usuario 1** — HU-07 Publicar un anuncio
 
@@ -1282,6 +1285,12 @@ Las historias completas del MVP (17 historias en 6 épicas) están en [`docs/pro
 - **When** la borro
 - **Then** vuelvo a ver todos los anuncios de la comunidad
 
+**AC4 — Búsqueda demasiado corta**
+
+- **Given** que estoy en el listado de mi comunidad
+- **When** busco un texto de menos de 2 caracteres
+- **Then** veo un mensaje que indica que la búsqueda debe tener al menos 2 caracteres y el listado no cambia
+
 ### **Historia de Usuario 3** — HU-15 Contactar con el anunciante
 
 **Como** miembro interesado en un anuncio, **quiero** contactar directamente con quien lo publicó, **para** acordar la compra, el servicio o el intercambio.
@@ -1310,13 +1319,13 @@ Las historias completas del MVP (17 historias en 6 épicas) están en [`docs/pro
 
 Los tickets completos están en [`docs/product/tickets/`](docs/product/tickets/). Los tres primeros tickets del desarrollo preparan el entorno: base de datos (Docker Compose con PostgreSQL 16), esqueleto del backend (FastAPI) y configuración del frontend (Next.js).
 
-**Ticket 1** — TK-01 · Infraestructura: Docker Compose con PostgreSQL 16
+**Ticket 1** — TK-001 · Infraestructura: Docker Compose con PostgreSQL 16
 
 | Campo | Valor |
 |---|---|
 | **Tipo** | Infraestructura / DevOps |
 | **Componente** | `infra/` |
-| **Prioridad** | Alta (bloquea TK-02 y TK-03) |
+| **Prioridad** | Alta (bloquea TK-002 y TK-003) |
 | **Depende de** | — |
 | **Referencias** | `readme.md` §2.1 (arquitectura), §2.3 (estructura de ficheros), §2.4 (desarrollo local), §2.5 (seguridad) |
 
@@ -1326,7 +1335,7 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 
 El README define que el entorno local se levanta con Docker Compose y que PostgreSQL 16 se ejecuta en un contenedor con volumen persistente, dentro de una red interna y sin exponerse a Internet. El repositorio aún no contiene ninguna configuración de Docker.
 
-**Objetivo:** crear la base de la configuración de Docker Compose del proyecto con un primer servicio, `db` (PostgreSQL 16), con datos persistentes, credenciales fuera del repositorio y comprobación de salud, de forma que TK-02 y TK-03 puedan añadir sus servicios sobre esta base.
+**Objetivo:** crear la base de la configuración de Docker Compose del proyecto con un primer servicio, `db` (PostgreSQL 16), con datos persistentes, credenciales fuera del repositorio y comprobación de salud, de forma que TK-002 y TK-003 puedan añadir sus servicios sobre esta base.
 
 #### 2. Alcance
 
@@ -1339,7 +1348,7 @@ El README define que el entorno local se levanta con Docker Compose y que Postgr
 
 **No incluye**
 - Esquema, tablas, enums, migraciones ni datos semilla (tickets posteriores de base de datos).
-- Servicios `api` y `web` (TK-02 y TK-03).
+- Servicios `api` y `web` (TK-002 y TK-003).
 - Almacenamiento de imágenes, copias de seguridad automáticas y configuración de producción.
 
 #### 3. Requisitos técnicos
@@ -1357,7 +1366,7 @@ El README define que el entorno local se levanta con Docker Compose y que Postgr
 ##### 3.2 Redes
 
 - `data`: red interna (`internal: true`) para `db` y, más adelante, `api`. Impide que la base de datos sea accesible desde fuera de Docker.
-- `edge`: red normal donde se conectarán `web` y `api` (se usa en TK-02 y TK-03; se declara ya para no reescribir el fichero).
+- `edge`: red normal donde se conectarán `web` y `api` (se usa en TK-002 y TK-003; se declara ya para no reescribir el fichero).
 
 ##### 3.3 Acceso desde el host
 
@@ -1498,14 +1507,14 @@ docker compose --env-file .env -f infra/docker-compose.yml down -v          # li
 - **Scripts de `initdb` no se reejecutan** si el volumen ya existe; documentado en `infra/README.md`.
 - **Copias de seguridad de `db_data`:** el README las exige en producción; quedan fuera de este ticket.
 
-**Ticket 2** — TK-02 · Backend: esqueleto de FastAPI y su contenedor
+**Ticket 2** — TK-002 · Backend: esqueleto de FastAPI y su contenedor
 
 | Campo | Valor |
 |---|---|
 | **Tipo** | Backend / estructura |
 | **Componente** | `apps/api/` e `infra/` |
 | **Prioridad** | Alta (bloquea toda la implementación del backend) |
-| **Depende de** | TK-01 |
+| **Depende de** | TK-001 |
 | **Referencias** | `readme.md` §2.2 (componentes), §2.3 (estructura y arquitectura limpia), §2.5 (seguridad), §4 (API); `docs/api/openapi.yaml` |
 
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.
@@ -1731,14 +1740,14 @@ docker compose --env-file .env -f infra/docker-compose.yml run --rm api ruff che
 - **Cadena de conexión:** se define `DATABASE_URL` sin usarla todavía; si el driver elegido más adelante requiere otro esquema (por ejemplo `postgresql+psycopg://`), se ajusta en el ticket de persistencia.
 - **`/health`:** aparece en `docs/api/` pero no se implementa aquí por la restricción del ticket; el healthcheck de Compose usa TCP hasta entonces.
 
-**Ticket 3** — TK-03 · Frontend: configuración de Next.js y su contenedor
+**Ticket 3** — TK-003 · Frontend: configuración de Next.js y su contenedor
 
 | Campo | Valor |
 |---|---|
 | **Tipo** | Frontend / configuración |
 | **Componente** | `apps/web/` e `infra/` |
 | **Prioridad** | Alta (bloquea toda la implementación del frontend) |
-| **Depende de** | TK-01 y TK-02 (comparte `infra/docker-compose.yml` y la red `edge`) |
+| **Depende de** | TK-001 y TK-002 (comparte `infra/docker-compose.yml` y la red `edge`) |
 | **Referencias** | `readme.md` §2.1, §2.2 (frontend), §2.3 (estructura), §2.5 (Helmet y cabeceras) |
 
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.

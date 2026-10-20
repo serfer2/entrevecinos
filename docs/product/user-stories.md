@@ -19,7 +19,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 |---|---|
 | 1. Registro y perfil básico | HU-01, HU-02, HU-03 |
 | 2. Comunidades | HU-04, HU-05, HU-06 |
-| 3. Gestión de anuncios | HU-07, HU-08, HU-09 |
+| 3. Gestión de anuncios | HU-07, HU-08, HU-09, HU-09b |
 | 4. Explorar y encontrar anuncios | HU-10, HU-11, HU-12, HU-13 |
 | 5. Detalle y contacto | HU-14, HU-15 |
 | 6. Administración mínima | HU-16, HU-17 |
@@ -258,6 +258,34 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 - **When** intento eliminarlo
 - **Then** no se me ofrece la opción y no puedo eliminarlo (salvo que sea administrador, ver HU-17)
 
+### HU-09b Marcar mi anuncio como reservado o finalizado
+
+**Como** miembro, **quiero** marcar mi anuncio como reservado o finalizado, **para** que los vecinos sepan que ya no está disponible.
+
+**AC1 — Reservar**
+
+- **Given** que soy el autor de un anuncio activo
+- **When** lo marco como reservado
+- **Then** el anuncio se muestra con la etiqueta «Reservado» en el listado y en el detalle
+
+**AC2 — Quitar la reserva**
+
+- **Given** que soy el autor de un anuncio reservado
+- **When** quito la reserva
+- **Then** el anuncio vuelve a mostrarse como disponible
+
+**AC3 — Finalizar**
+
+- **Given** que soy el autor de un anuncio activo o reservado
+- **When** lo marco como finalizado y confirmo la acción
+- **Then** deja de aparecer en el listado y en las búsquedas, y ya no puedo cambiar su estado ni editarlo (asumido)
+
+**AC4 — Solo el autor**
+
+- **Given** que un anuncio pertenece a otro vecino
+- **When** consulto su detalle
+- **Then** no se me ofrecen estas opciones y no puedo cambiar su estado
+
 ---
 
 ## Épica 4 — Explorar y encontrar anuncios
@@ -311,6 +339,12 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 - **Given** que he aplicado una búsqueda
 - **When** la borro
 - **Then** vuelvo a ver todos los anuncios de la comunidad
+
+**AC4 — Búsqueda demasiado corta**
+
+- **Given** que estoy en el listado de mi comunidad
+- **When** busco un texto de menos de 2 caracteres
+- **Then** veo un mensaje que indica que la búsqueda debe tener al menos 2 caracteres y el listado no cambia
 
 ### HU-12 Filtrar anuncios por comunidad y tipo
 
@@ -422,7 +456,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 
 - **Given** que un miembro incumple las normas de la comunidad
 - **When** lo expulso o lo bloqueo (asumido)
-- **Then** pierde el acceso a los anuncios de la comunidad y no puede publicar en ella
+- **Then** pierde el acceso a los anuncios de la comunidad, no puede publicar en ella y sus anuncios dejan de mostrarse a los demás miembros
 
 **AC3 — Restricción a administradores**
 

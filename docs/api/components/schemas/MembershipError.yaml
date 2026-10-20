@@ -1,0 +1,10 @@
+description: >-
+  Error de una operación sobre la membresía del usuario autenticado, con su estado actual
+  (extensión de `Error`). Permite mostrar «Solicitud pendiente» o «Sin acceso».
+allOf:
+  - $ref: ./Error.yaml
+  - type: object
+    required: [status]
+    properties:
+      status:
+        $ref: ./MembershipStatus.yaml

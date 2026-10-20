@@ -1,0 +1,58 @@
+# Convención de organización de tickets
+
+```
+docs/product/tickets/
+├── 00-infra/                                  # tickets técnicos y transversales
+└── EP-xx-<nombre-de-la-epica>/                # una carpeta por épica de user-stories.md
+    └── HU-xx-<nombre-de-la-historia>/         # una subcarpeta por historia de usuario
+        └── TK-yyy-<capa>-<descripcion>.md     # un fichero por ticket
+```
+
+- **Épicas:** `EP-xx-<nombre-de-la-epica>/`, donde `xx` es el número de la épica en `docs/product/user-stories.md` (p. ej. `EP-01-registro-y-perfil-basico/`).
+- **Historias:** dentro de su épica, `HU-xx-<nombre-de-la-historia>/`, donde `xx` es el número de la HU en `docs/product/user-stories.md` (p. ej. `EP-03-gestion-de-anuncios/HU-07-publicar-un-anuncio/`). La numeración de las HU sigue el orden en que se definen; una historia añadida después entre dos existentes lleva sufijo de letra para no renumerar (p. ej. `HU-09b`).
+- **Tickets:** `TK-yyy-<capa>-<descripcion>.md`, con numeración global de tres dígitos (`TK-001`, `TK-012`…) y correlativa en todo el proyecto (no se reinicia por épica ni por historia). `<capa>` indica el componente principal: `bd`, `backend`, `frontend`, `infra`…
+- **Tickets técnicos y transversales** que no pertenecen a una sola HU (infraestructura, herramientas de desarrollo, etc.) viven en `00-infra/`.
+
+## Índice
+
+| Carpeta | Tickets |
+|---|---|
+| `00-infra/` | TK-001 PostgreSQL · TK-002 esqueleto FastAPI · TK-003 esqueleto Next.js · TK-004 Makefile · TK-046 `Content-Security-Policy` |
+| `EP-01-registro-y-perfil-basico/HU-01-registrarme-con-mi-correo-electronico/` | TK-005 persistencia y tabla `users` · TK-006 backend de registro · TK-007 formulario de registro |
+| `EP-01-registro-y-perfil-basico/HU-02-iniciar-sesion/` | TK-008 backend de inicio de sesión y usuario actual · TK-009 inicio de sesión y rutas protegidas |
+| `EP-01-registro-y-perfil-basico/HU-03-gestionar-mi-perfil-y-datos-de-contacto/` | TK-010 backend de actualización del perfil · TK-011 página de perfil |
+| `EP-02-comunidades/HU-04-crear-una-comunidad/` | TK-012 tablas de comunidades y membresías · TK-013 backend crear comunidad · TK-014 crear comunidad y navegación |
+| `EP-02-comunidades/HU-05-seleccionar-una-comunidad-y-solicitar-el-acceso/` | TK-015 backend buscar comunidades y solicitar acceso · TK-016 búsqueda, solicitud y mis comunidades |
+| `EP-02-comunidades/HU-06-aprobar-o-rechazar-solicitudes-de-acceso/` | TK-017 autorización por comunidad y revisión de solicitudes · TK-018 gestión de solicitudes |
+| `EP-03-gestion-de-anuncios/HU-07-publicar-un-anuncio/` | TK-019 almacenamiento MinIO · TK-020 tablas de anuncios e imágenes · TK-021 subida y lectura de imágenes · TK-022 categorías y publicar anuncio · TK-023 formulario de publicación |
+| `EP-03-gestion-de-anuncios/HU-08-editar-mis-anuncios/` | TK-024 backend editar anuncio e imágenes · TK-025 editar anuncio |
+| `EP-03-gestion-de-anuncios/HU-09-eliminar-mis-anuncios/` | TK-026 backend eliminar anuncio · TK-027 eliminar con confirmación |
+| `EP-03-gestion-de-anuncios/HU-09b-marcar-mi-anuncio-como-reservado-o-finalizado/` | TK-044 backend reservar y finalizar · TK-045 reservar y finalizar desde el detalle |
+| `EP-04-explorar-y-encontrar-anuncios/HU-10-ver-los-anuncios-de-mi-comunidad/` | TK-028 backend listado · TK-029 listado de la comunidad |
+| `EP-04-explorar-y-encontrar-anuncios/HU-11-buscar-anuncios-por-palabras-clave/` | TK-030 búsqueda de texto completo · TK-031 buscador |
+| `EP-04-explorar-y-encontrar-anuncios/HU-12-filtrar-anuncios-por-comunidad-y-tipo/` | TK-032 backend filtros · TK-033 filtros y selector de comunidad |
+| `EP-04-explorar-y-encontrar-anuncios/HU-13-ordenar-anuncios-por-fecha-o-precio/` | TK-034 backend ordenación · TK-035 selector de orden |
+| `EP-05-detalle-y-contacto/HU-14-consultar-el-detalle-de-un-anuncio/` | TK-036 backend detalle · TK-037 página de detalle |
+| `EP-05-detalle-y-contacto/HU-15-contactar-con-el-anunciante/` | TK-038 datos de contacto (contrato `ListingOwner.email`) · TK-039 contactar con el anunciante |
+| `EP-06-administracion-minima/HU-16-gestionar-los-miembros-de-mi-comunidad/` | TK-040 backend bloquear y expulsar · TK-041 gestión de miembros |
+| `EP-06-administracion-minima/HU-17-retirar-anuncios-problematicos/` | TK-042 backend retirar y restaurar anuncios · TK-043 retirar desde el detalle |
+
+## Orden de implementación recomendado
+
+Respeta las dependencias de cada ticket (campo **Depende de**). Los números de migración (`0002`…`0006`) asumen este orden.
+
+**Estado:** todos los tickets (TK-001 a TK-046) están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket.
+
+| Bloque | Orden |
+|---|---|
+| Épica 1 | TK-005 → TK-011 |
+| Épica 2 — Comunidades | TK-012 → TK-013 → TK-014 → TK-015 → TK-016 → TK-017 → TK-018 |
+| Épica 3 — Publicar | TK-019 → TK-020 → TK-021 → TK-022 → TK-023 → TK-046 |
+| Listado, detalle y borrado | TK-026 → TK-028 → TK-029 → TK-036 → TK-037 |
+| Edición y eliminación (interfaz) | TK-024 → TK-025 → TK-027 |
+| Búsqueda, filtros y orden | TK-030 → TK-031 → TK-032 → TK-033 → TK-034 → TK-035 |
+| Contacto | TK-038 → TK-039 |
+| Administración | TK-040 → TK-041 → TK-042 → TK-043 |
+| Reservar y finalizar | TK-044 → TK-045 |
+
+El detalle del anuncio (TK-036/TK-037) se adelanta a la edición y la eliminación de la interfaz porque es su punto de entrada. La CSP (TK-046) va justo después de TK-023, en cuanto se sirven imágenes desde el almacenamiento. Reservar y finalizar (TK-044/TK-045) va al final porque amplía el endpoint de estado de TK-042.

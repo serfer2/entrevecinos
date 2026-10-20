@@ -1,0 +1,11 @@
+# Override opcional para depurar la base de datos desde el host.
+# Uso: docker compose --env-file .env -f infra/docker-compose.yml -f infra/docker-compose.db-debug.yml up -d db
+# Publica PostgreSQL solo en 127.0.0.1. La red `data` es interna y no admite
+# publicar puertos, por eso `db` se une también a `edge` mientras se depura.
+services:
+  db:
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+    networks:
+      - data
+      - edge

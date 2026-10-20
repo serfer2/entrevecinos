@@ -1,0 +1,19 @@
+description: >-
+  El usuario no pertenece a la comunidad (o no tiene permisos), o su membresía no está aprobada;
+  en este último caso el cuerpo incluye `status`.
+content:
+  application/json:
+    schema:
+      oneOf:
+        - $ref: ../schemas/MembershipError.yaml
+        - $ref: ../schemas/Error.yaml
+    examples:
+      notApproved:
+        summary: Membresía no aprobada
+        value:
+          detail: "Tu membresía en esta comunidad no está aprobada."
+          status: pending
+      forbidden:
+        summary: Sin membresía o sin permisos
+        value:
+          detail: "No tienes permisos para realizar esta acción."
