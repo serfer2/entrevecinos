@@ -92,7 +92,7 @@ $COMPOSE logs -f api              # logs
 
 - http://localhost:8000/docs — documentación interactiva.
 - `apps/api/src` se monta en el contenedor y uvicorn recarga al guardar.
-- El healthcheck comprueba el puerto TCP hasta que exista el endpoint `/v1/health`.
+- El healthcheck llama a `GET /v1/health`, que responde 200 solo si la API llega a la base de datos (503 si no).
 
 Más detalles en `apps/api/README.md`.
 

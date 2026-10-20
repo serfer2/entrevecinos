@@ -76,6 +76,10 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 | `MEDIA_MAX_BYTES` | Tamaño máximo de una imagen | `5242880` (5 MB) |
 | `MEDIA_URL_TTL_SECONDS` | Validez de las URL prefirmadas | `300` |
 
+## Salud
+
+`GET /v1/health` (público) responde `{"status": "ok"}` si la API llega a la base de datos y `503` si no. Lo usa el healthcheck de Compose.
+
 ## Autenticación
 
 - `POST /v1/auth/register` crea la cuenta y devuelve un JWT (`AuthResponse`).
