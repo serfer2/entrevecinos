@@ -10,7 +10,7 @@ import { getSessionToken } from "./session";
 import type { ApiUser } from "./types";
 
 /** Datos del usuario que necesita la interfaz (nunca el token). */
-export type CurrentUser = Pick<ApiUser, "id" | "full_name" | "email" | "phone">;
+export type CurrentUser = Pick<ApiUser, "id" | "full_name" | "email" | "phone" | "platform_role">;
 
 /**
  * Usuario de la sesión, validado por la API. `null` si no hay sesión o el token ya no es válido.
@@ -22,8 +22,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
   const result = await apiFetch<ApiUser>("/users/me", { token });
   if (result.ok) {
-    const { id, full_name, email, phone } = result.data;
-    return { id, full_name, email, phone };
+    const { id, full_name, email, phone, platform_role } = result.data;
+    return { id, full_name, email, phone, platform_role };
   }
   if (result.error.status === 401) return null;
   throw new Error(`No se pudo comprobar la sesión (estado ${result.error.status})`);

@@ -49,6 +49,7 @@ describe("getCurrentUser", () => {
       email: "vecino@example.com",
       full_name: "Alex Vecino",
       phone: null,
+      platform_role: "user",
     });
     expect(apiFetch).toHaveBeenCalledWith("/users/me", { token: "jwt" });
   });
