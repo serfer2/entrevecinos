@@ -73,6 +73,7 @@ def test_publish(client: TestClient, member: dict, community: dict) -> None:
         "id": member["user"]["id"],
         "full_name": "Vera Vecina",
         "phone": "600111222",
+        "email": "vecina@example.com",
         "avatar_url": None,
     }
     assert body["published_at"] and body["updated_at"]

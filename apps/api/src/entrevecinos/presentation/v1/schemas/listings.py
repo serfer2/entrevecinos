@@ -130,11 +130,15 @@ class ListingImagesUpdateRequest(BaseModel):
 
 
 class ListingOwnerResponse(BaseModel):
-    """Esquema `ListingOwner` del contrato."""
+    """Esquema `ListingOwner` del contrato: el canal de contacto del MVP (teléfono y correo).
+
+    Solo forma parte de `Listing`, que solo se entrega a miembros aprobados de la comunidad.
+    """
 
     id: uuid.UUID
     full_name: str
     phone: str | None
+    email: str
     avatar_url: str | None = None
 
 
@@ -170,7 +174,10 @@ class ListingResponse(BaseModel):
             id=listing.id,
             community_id=listing.community_id,
             owner=ListingOwnerResponse(
-                id=listing.owner.id, full_name=listing.owner.full_name, phone=listing.owner.phone
+                id=listing.owner.id,
+                full_name=listing.owner.full_name,
+                phone=listing.owner.phone,
+                email=listing.owner.email,
             ),
             category_id=listing.category_id,
             title=listing.title,

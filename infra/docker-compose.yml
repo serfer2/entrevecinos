@@ -92,6 +92,7 @@ services:
       - ../apps/api/src:/app/src            # recarga en desarrollo
       - ../apps/api/migrations:/app/migrations
       - ../apps/api/alembic.ini:/app/alembic.ini:ro
+      - ../docs/api:/docs/api:ro                # contrato, para las pruebas de contrato
     networks:
       - data
       - edge
