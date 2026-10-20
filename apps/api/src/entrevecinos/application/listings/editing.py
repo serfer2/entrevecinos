@@ -25,7 +25,8 @@ from entrevecinos.domain.users.entities import User
 
 
 class EditableListing:
-    """Regla común de edición: solo el autor, todavía miembro aprobado, y anuncio no retirado."""
+    """Regla común de edición: solo el autor, todavía miembro aprobado, y anuncio no retirado ni
+    finalizado."""
 
     def __init__(self, access: CommunityAccess, listings: ListingRepository) -> None:
         self._access = access
@@ -41,6 +42,8 @@ class EditableListing:
         self._access.require_member(user, listing.community_id)
         if listing.status is ListingStatus.HIDDEN:
             raise ListingLocked(ListingLocked.RETIRED)
+        if listing.status is ListingStatus.COMPLETED:
+            raise ListingLocked(ListingLocked.COMPLETED)
         return listing
 
 

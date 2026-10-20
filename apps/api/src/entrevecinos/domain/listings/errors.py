@@ -22,6 +22,7 @@ class ListingStatusConflict(Exception):
 
     SAME = "El anuncio ya está en ese estado."
     NOT_ALLOWED = "Transición de estado no permitida."
+    COMPLETED_FINAL = "Un anuncio finalizado no puede cambiar de estado."
 
     def __init__(self, detail: str) -> None:
         super().__init__(detail)
@@ -32,6 +33,7 @@ class ListingLocked(PermissionDenied):
     """El autor no puede modificar el anuncio en su estado actual (retirado, finalizado…)."""
 
     RETIRED = "Este anuncio ha sido retirado por la administración de la comunidad."
+    COMPLETED = "Este anuncio está finalizado y no se puede editar."
 
     def __init__(self, detail: str) -> None:
         super().__init__(detail)

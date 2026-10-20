@@ -262,10 +262,12 @@ def delete_listing(
     operation_id="updateListingStatus",
     summary="Cambiar el estado de un anuncio",
     description=(
-        "Retirar (`hidden`) un anuncio visible o restaurarlo (`active`). Solo `community_admin` "
-        "o `moderator` de la comunidad, o `platform_admin`; se registra quién y cuándo lo "
-        "retiró. Un anuncio retirado deja de aparecer en el listado y en las búsquedas y su "
-        "detalle responde 404 a quien no es su autor ni gestor. Transición no permitida → 409."
+        "El autor marca su anuncio como reservado o finalizado: `active` ↔ `reserved` y "
+        "`active`/`reserved` → `completed` (estado final; deja de listarse y ya no se puede "
+        "editar). La gestión de la comunidad (`community_admin`, `moderator`, `platform_admin`) "
+        "retira (`hidden`, se registra quién y cuándo) y restaura (`active`) anuncios. Un "
+        "anuncio retirado deja de aparecer en el listado y las búsquedas. Transición no "
+        "permitida → 409."
     ),
     responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **CONFLICT, **VALIDATION_ERROR},
 )

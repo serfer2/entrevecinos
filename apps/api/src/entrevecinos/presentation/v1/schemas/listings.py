@@ -106,11 +106,13 @@ class ListingUpdateRequest(BaseModel):
 
 
 class ListingStatusUpdateRequest(BaseModel):
-    """Esquema `ListingStatusUpdate` del contrato (subconjunto implementado: moderación)."""
+    """Esquema `ListingStatusUpdate` del contrato."""
 
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal[ListingStatus.HIDDEN, ListingStatus.ACTIVE]
+    status: Literal[
+        ListingStatus.ACTIVE, ListingStatus.RESERVED, ListingStatus.COMPLETED, ListingStatus.HIDDEN
+    ]
 
 
 class ListingImageSelection(BaseModel):
