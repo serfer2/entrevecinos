@@ -18,6 +18,12 @@ from entrevecinos.infrastructure.communities.sqlalchemy_membership_repository im
     SqlAlchemyMembershipRepository,
 )
 from entrevecinos.infrastructure.db.session import get_session
+from entrevecinos.infrastructure.listings.sqlalchemy_category_repository import (
+    SqlAlchemyCategoryRepository,
+)
+from entrevecinos.infrastructure.listings.sqlalchemy_listing_repository import (
+    SqlAlchemyListingRepository,
+)
 from entrevecinos.infrastructure.media.sqlalchemy_media_repository import (
     SqlAlchemyMediaRepository,
 )
@@ -124,3 +130,15 @@ def get_object_storage(settings: SettingsDep) -> S3ObjectStorage:
 
 MediaRepositoryDep = Annotated[SqlAlchemyMediaRepository, Depends(get_media_repository)]
 ObjectStorageDep = Annotated[S3ObjectStorage, Depends(get_object_storage)]
+
+
+def get_category_repository(session: SessionDep) -> SqlAlchemyCategoryRepository:
+    return SqlAlchemyCategoryRepository(session)
+
+
+def get_listing_repository(session: SessionDep) -> SqlAlchemyListingRepository:
+    return SqlAlchemyListingRepository(session)
+
+
+CategoryRepositoryDep = Annotated[SqlAlchemyCategoryRepository, Depends(get_category_repository)]
+ListingRepositoryDep = Annotated[SqlAlchemyListingRepository, Depends(get_listing_repository)]

@@ -47,6 +47,17 @@ class SqlAlchemyMediaRepository:
         model = self._session.get(MediaAssetModel, asset_id)
         return to_domain(model) if model else None
 
+    def owned_unattached(self, asset_ids: list[uuid.UUID], user_id: uuid.UUID) -> bool:
+        ids = set(asset_ids)
+        valid = self._session.scalars(
+            select(MediaAssetModel.id).where(
+                MediaAssetModel.id.in_(ids),
+                MediaAssetModel.uploaded_by == user_id,
+                ~exists().where(ListingImageModel.asset_id == MediaAssetModel.id),
+            )
+        ).all()
+        return set(valid) == ids
+
     def is_readable_by(self, asset_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         membership = CommunityMembershipModel
         query = (

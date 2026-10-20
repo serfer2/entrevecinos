@@ -9,6 +9,11 @@ from entrevecinos.domain.communities.errors import (
     MembershipNotApproved,
 )
 from entrevecinos.domain.errors import NotFoundError, PermissionDenied
+from entrevecinos.domain.listings.errors import (
+    CurrencyWithoutPrice,
+    InvalidCategory,
+    InvalidImages,
+)
 from entrevecinos.domain.media.errors import EmptyImage, ImageTooLarge, UnsupportedImageType
 from entrevecinos.domain.users.errors import (
     EmailAlreadyRegistered,
@@ -23,6 +28,14 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content=jsonable_encoder({"detail": detail}),
+    )
+
+
+def field_error(field: str, message: str, error_type: str) -> JSONResponse:
+    """422 con el mismo formato que los errores de validación de FastAPI."""
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content={"detail": [{"loc": ["body", field], "msg": message, "type": error_type}]},
     )
 
 
@@ -112,12 +125,26 @@ async def unsupported_image_type_handler(
 
 
 async def empty_image_handler(request: Request, exc: EmptyImage) -> JSONResponse:
-    # Mismo formato que los 422 de validación, señalando el campo `file`.
+    return field_error("file", "El fichero está vacío.", "empty")
+
+
+async def invalid_category_handler(request: Request, exc: InvalidCategory) -> JSONResponse:
+    return field_error(
+        "category_id", "La categoría no existe o no está activa.", "invalid_category"
+    )
+
+
+async def currency_without_price_handler(
+    request: Request, exc: CurrencyWithoutPrice
+) -> JSONResponse:
+    return field_error(
+        "currency", "No se puede indicar moneda sin precio.", "currency_without_price"
+    )
+
+
+async def invalid_images_handler(request: Request, exc: InvalidImages) -> JSONResponse:
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-        content={
-            "detail": [{"loc": ["body", "file"], "msg": "El fichero está vacío.", "type": "empty"}]
-        },
+        status_code=status.HTTP_400_BAD_REQUEST, content={"detail": "Alguna imagen no es válida."}
     )
 
 
@@ -132,5 +159,8 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(ImageTooLarge, image_too_large_handler)
     app.add_exception_handler(UnsupportedImageType, unsupported_image_type_handler)
     app.add_exception_handler(EmptyImage, empty_image_handler)
+    app.add_exception_handler(InvalidCategory, invalid_category_handler)
+    app.add_exception_handler(CurrencyWithoutPrice, currency_without_price_handler)
+    app.add_exception_handler(InvalidImages, invalid_images_handler)
     app.add_exception_handler(MembershipNotApproved, membership_not_approved_handler)
     app.add_exception_handler(MembershipAlreadyReviewed, membership_already_reviewed_handler)

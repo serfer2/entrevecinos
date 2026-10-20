@@ -18,6 +18,7 @@ class ValidationErrorResponse(BaseModel):
 
 
 # Respuestas de error documentadas en OpenAPI, reutilizables por los routers.
+BAD_REQUEST: dict[int | str, dict[str, Any]] = {400: {"model": ErrorResponse}}
 CONFLICT: dict[int | str, dict[str, Any]] = {409: {"model": ErrorResponse}}
 FORBIDDEN: dict[int | str, dict[str, Any]] = {403: {"model": ErrorResponse}}
 NOT_FOUND: dict[int | str, dict[str, Any]] = {404: {"model": ErrorResponse}}

@@ -118,6 +118,13 @@ class DoSomething:
 
 En los routers, la política se inyecta con `CommunityAccessDep`.
 
+## Anuncios
+
+- `GET /v1/categories`: categorías activas («Otros» al final).
+- `POST /v1/communities/{id}/listings`: solo miembros aprobados (`require_member`). Hasta 10 imágenes propias no usadas en otro anuncio (la primera es la portada); con precio y sin moneda se usa `EUR`; moneda sin precio → `422`.
+- `Listing` incluye `owner` (leído siempre de `users`) e `images` ordenadas. Los precios son `Decimal` de extremo a extremo y se serializan como número JSON.
+- `ListingLoader` (`infrastructure/listings/sqlalchemy_listing_repository.py`) carga anuncios con su autor y todas sus imágenes en dos consultas: úsalo en cualquier lectura de anuncios para evitar N+1.
+
 ## Imágenes
 
 - `POST /v1/media` (multipart, campo `file`) guarda una imagen en el almacenamiento de objetos. El tipo se decide por los *magic bytes* (JPEG, PNG o WebP; otro → `415`), máximo `MEDIA_MAX_BYTES` (→ `413`, comprobado antes de leer el cuerpo cuando hay `Content-Length`); vacío → `422`. La clave del objeto es `media/<usuario>/<uuid>.<ext>`.
