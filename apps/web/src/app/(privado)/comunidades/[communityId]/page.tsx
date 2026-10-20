@@ -4,6 +4,8 @@ import Link from "next/link";
 import { requireUser } from "@/features/auth/dal";
 import { AccessNotice } from "@/features/communities/components/AccessNotice";
 import { getCommunity, getMyMembership } from "@/features/communities/data";
+import { CommunityListings } from "@/features/listings/components/CommunityListings";
+import { parseListingSearch } from "@/features/listings/search-params";
 import { firstParam, type SearchParams } from "@/lib/search-params";
 
 type CommunityPageProps = {
@@ -16,6 +18,11 @@ export async function generateMetadata({ params }: CommunityPageProps): Promise<
   const community = await getCommunity(communityId);
   return { title: `${community.name} · EntreVecinos` };
 }
+
+const URL_MESSAGES = {
+  publicado: "Anuncio publicado.",
+  eliminado: "Anuncio eliminado.",
+} as const;
 
 export default async function CommunityPage({ params, searchParams }: CommunityPageProps) {
   await requireUser();
@@ -59,13 +66,21 @@ export default async function CommunityPage({ params, searchParams }: CommunityP
         <p className="whitespace-pre-line text-gray-800">{community.description}</p>
       )}
 
-      {approved && firstParam(query, "publicado") === "1" && (
-        <p role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-          Anuncio publicado.
-        </p>
-      )}
+      {approved &&
+        Object.entries(URL_MESSAGES).map(
+          ([param, message]) =>
+            firstParam(query, param) === "1" && (
+              <p key={param} role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                {message}
+              </p>
+            ),
+        )}
 
-      {!approved && <AccessNotice communityId={community.id} membership={membership} />}
+      {approved ? (
+        <CommunityListings communityId={community.id} search={parseListingSearch(query)} />
+      ) : (
+        <AccessNotice communityId={community.id} membership={membership} />
+      )}
     </main>
   );
 }
