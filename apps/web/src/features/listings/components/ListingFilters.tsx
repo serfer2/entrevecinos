@@ -1,12 +1,15 @@
 import Link from "next/link";
 
 import { AutoSubmitSelect } from "@/components/ui/AutoSubmitSelect";
+import { GetForm } from "@/components/ui/GetForm";
 
 import { LISTING_TYPE_LABELS, LISTING_TYPES } from "../labels";
 import {
   clearFiltersHref,
   clearSearchHref,
   hasFilters,
+  isPriceOrder,
+  LISTING_ORDERS,
   type ListingSearchParams,
   MAX_QUERY_LENGTH,
   MIN_QUERY_LENGTH,
@@ -30,8 +33,8 @@ export function ListingFilters({ communityId, search, categories }: ListingFilte
   const categoryLabel = categories.find((c) => c.id === search.categoryId)?.name ?? null;
 
   return (
-    <form method="get" role="search" action={`/comunidades/${communityId}`} className="flex flex-col gap-3">
-      <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end">
+    <GetForm role="search" action={`/comunidades/${communityId}`} className="flex flex-col gap-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] lg:items-end">
         <div className="flex min-w-0 flex-col gap-1">
           <label htmlFor="listing-search" className="text-sm font-medium text-gray-900">
             Buscar anuncios
@@ -62,6 +65,13 @@ export function ListingFilters({ communityId, search, categories }: ListingFilte
           options={categories.map((c) => ({ value: c.id, label: c.name }))}
           defaultValue={search.categoryId}
         />
+        <AutoSubmitSelect
+          name="orden"
+          label="Ordenar por"
+          options={Object.entries(LISTING_ORDERS).map(([value, { label }]) => ({ value, label }))}
+          defaultValue={search.order}
+          aria-describedby={isPriceOrder(search.order) ? "listing-order-note" : undefined}
+        />
         <button type="submit" className="rounded-md bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800">
           Aplicar
         </button>
@@ -69,6 +79,11 @@ export function ListingFilters({ communityId, search, categories }: ListingFilte
       {search.qTooShort && (
         <p id={errorId} className="text-sm text-red-700">
           {SHORT_QUERY_MESSAGE}
+        </p>
+      )}
+      {isPriceOrder(search.order) && (
+        <p id="listing-order-note" className="text-sm text-gray-600">
+          Los anuncios sin precio aparecen al final.
         </p>
       )}
       {(search.qInput || hasFilters(search)) && (
@@ -90,6 +105,6 @@ export function ListingFilters({ communityId, search, categories }: ListingFilte
           )}
         </div>
       )}
-    </form>
+    </GetForm>
   );
 }

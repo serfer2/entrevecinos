@@ -41,13 +41,39 @@ describe("ListingSearchParams", () => {
   it("construye la consulta a la API y los enlaces conservando los parámetros", () => {
     const search = parseListingSearch({ q: "bici roja", type: "sell", category_id: category, page: "2" });
 
-    expect(listingApiQuery(search, 24)).toBe(`q=bici+roja&type=sell&category_id=${category}&page=2&page_size=24`);
+    expect(listingApiQuery(search, 24)).toBe(
+      `q=bici+roja&type=sell&category_id=${category}&sort=published_at&order=desc&page=2&page_size=24`,
+    );
     expect(listingSearchHref("c1", search, 3)).toBe(`/comunidades/c1?q=bici+roja&type=sell&category_id=${category}&page=3`);
     expect(clearSearchHref("c1", search)).toBe(`/comunidades/c1?type=sell&category_id=${category}`);
     expect(clearFiltersHref("c1", search)).toBe("/comunidades/c1?q=bici+roja");
   });
 
   it("una búsqueda demasiado corta no llega a la API", () => {
-    expect(listingApiQuery(parseListingSearch({ q: "a" }), 24)).toBe("page=1&page_size=24");
+    expect(listingApiQuery(parseListingSearch({ q: "a" }), 24)).toBe(
+      "sort=published_at&order=desc&page=1&page_size=24",
+    );
+  });
+
+  it.each([
+    [undefined, "recientes", "sort=published_at&order=desc"],
+    ["antiguos", "antiguos", "sort=published_at&order=asc"],
+    ["precio-asc", "precio-asc", "sort=price&order=asc"],
+    ["precio-desc", "precio-desc", "sort=price&order=desc"],
+    ["barato", "recientes", "sort=published_at&order=desc"],
+  ])("orden %s → %s (%s)", (orden, order, api) => {
+    const search = parseListingSearch(orden ? { orden } : {});
+
+    expect(search.order).toBe(order);
+    expect(listingApiQuery(search, 24)).toBe(`${api}&page=1&page_size=24`);
+  });
+
+  it("conserva el orden en la paginación y al limpiar; el valor por defecto no va en la URL", () => {
+    const search = parseListingSearch({ q: "bici", type: "free", orden: "precio-asc" });
+
+    expect(listingSearchHref("c1", search, 2)).toBe("/comunidades/c1?q=bici&type=free&orden=precio-asc&page=2");
+    expect(clearSearchHref("c1", search)).toBe("/comunidades/c1?type=free&orden=precio-asc");
+    expect(clearFiltersHref("c1", search)).toBe("/comunidades/c1?q=bici&orden=precio-asc");
+    expect(listingSearchHref("c1", parseListingSearch({ orden: "recientes" }), 1)).toBe("/comunidades/c1");
   });
 });

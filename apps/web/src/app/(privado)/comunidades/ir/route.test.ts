@@ -20,6 +20,10 @@ describe("GET /comunidades/ir", () => {
     });
   });
 
+  it("conserva el orden elegido", () => {
+    expect(go(`id=${id}&orden=precio-asc`).location).toBe(`/comunidades/${id}?orden=precio-asc`);
+  });
+
   it("descarta los filtros vacíos o no válidos", () => {
     expect(go(`id=${id}&type=rent&category_id=`).location).toBe(`/comunidades/${id}`);
   });

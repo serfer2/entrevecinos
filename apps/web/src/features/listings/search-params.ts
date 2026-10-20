@@ -7,7 +7,22 @@ export const MIN_QUERY_LENGTH = 2;
 export const MAX_QUERY_LENGTH = 160;
 export const SHORT_QUERY_MESSAGE = "La búsqueda debe tener al menos 2 caracteres.";
 
-/** Parámetros del listado de una comunidad leídos de la URL (el orden lo amplía). */
+/** Órdenes del listado: un único parámetro legible `orden` en la URL, `sort` y `order` en la API. */
+export const LISTING_ORDERS = {
+  recientes: { label: "Más recientes", sort: "published_at", order: "desc" },
+  antiguos: { label: "Más antiguos", sort: "published_at", order: "asc" },
+  "precio-asc": { label: "Precio: de menor a mayor", sort: "price", order: "asc" },
+  "precio-desc": { label: "Precio: de mayor a menor", sort: "price", order: "desc" },
+} as const;
+
+export type ListingOrder = keyof typeof LISTING_ORDERS;
+export const DEFAULT_ORDER: ListingOrder = "recientes";
+
+export function isPriceOrder(order: ListingOrder): boolean {
+  return LISTING_ORDERS[order].sort === "price";
+}
+
+/** Parámetros del listado de una comunidad leídos de la URL. */
 export type ListingSearchParams = {
   page: number;
   /** Búsqueda válida (≥ 2 caracteres) o `""`. */
@@ -18,6 +33,7 @@ export type ListingSearchParams = {
   qTooShort: boolean;
   type: ListingType | "";
   categoryId: string;
+  order: ListingOrder;
 };
 
 export function parseListingSearch(params: SearchParams): ListingSearchParams {
@@ -25,6 +41,7 @@ export function parseListingSearch(params: SearchParams): ListingSearchParams {
   const qTooShort = qInput.length > 0 && qInput.length < MIN_QUERY_LENGTH;
   const type = firstParam(params, "type");
   const categoryId = firstParam(params, "category_id");
+  const order = firstParam(params, "orden");
   return {
     page: pageParam(params),
     q: qTooShort ? "" : qInput,
@@ -33,6 +50,7 @@ export function parseListingSearch(params: SearchParams): ListingSearchParams {
     // Los valores no válidos se ignoran en lugar de provocar un error de la API.
     type: (LISTING_TYPES as readonly string[]).includes(type) ? (type as ListingType) : "",
     categoryId: isUuid(categoryId) ? categoryId : "",
+    order: order in LISTING_ORDERS ? (order as ListingOrder) : DEFAULT_ORDER,
   };
 }
 
@@ -41,8 +59,7 @@ export function hasFilters(search: ListingSearchParams): boolean {
   return search.type !== "" || search.categoryId !== "";
 }
 
-/** Parámetros que definen el resultado (sin la página), con los nombres de la URL y de la API. */
-export function listingCriteria(search: ListingSearchParams): URLSearchParams {
+function filterParams(search: ListingSearchParams): URLSearchParams {
   const query = new URLSearchParams();
   if (search.q) query.set("q", search.q);
   if (search.type) query.set("type", search.type);
@@ -50,9 +67,18 @@ export function listingCriteria(search: ListingSearchParams): URLSearchParams {
   return query;
 }
 
+/** Parámetros de la URL que definen el resultado (sin la página): búsqueda, filtros y orden. */
+export function listingCriteria(search: ListingSearchParams): URLSearchParams {
+  const query = filterParams(search);
+  if (search.order !== DEFAULT_ORDER) query.set("orden", search.order);
+  return query;
+}
+
 /** Query string para la API (`page_size` fijo de la interfaz). */
 export function listingApiQuery(search: ListingSearchParams, pageSize: number): string {
-  const query = listingCriteria(search);
+  const query = filterParams(search);
+  query.set("sort", LISTING_ORDERS[search.order].sort);
+  query.set("order", LISTING_ORDERS[search.order].order);
   query.set("page", String(search.page));
   query.set("page_size", String(pageSize));
   return query.toString();
