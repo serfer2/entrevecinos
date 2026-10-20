@@ -163,6 +163,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Incluir una gestión sencilla de acceso, por ejemplo, aprobación por parte de un administrador.
 3. **Gestión de anuncios**
    - Crear, editar y eliminar anuncios propios.
+   - Marcar los anuncios propios como reservados o finalizados.
    - Incluir título, descripción, categoría, tipo de publicación, precio opcional, fotografías y fecha.
    - Ofrecer los tipos principales: Vendo, Busco, Ofrezco, Necesito y Regalo. «Otros» puede servir como categoría general.
 4. **Explorar y encontrar anuncios**
@@ -394,7 +395,7 @@ flowchart LR
 
 #### Desarrollo local
 
-Docker Compose levanta los componentes necesarios en el equipo del desarrollador: frontend Next.js, API FastAPI, PostgreSQL y MinIO. Los servicios se comunican por una red de Docker y los datos sobreviven a reinicios mediante volúmenes persistentes.
+Docker Compose levanta los componentes necesarios en el equipo del desarrollador: frontend Next.js, API FastAPI, PostgreSQL y MinIO. Como MinIO ya no publica imágenes Docker oficiales, se usa la compilación comunitaria `pgsty/minio` con versión fija (licencia AGPLv3, usada sin modificar como servicio independiente); el detalle está en TK-019. Los servicios se comunican por una red de Docker y los datos sobreviven a reinicios mediante volúmenes persistentes.
 
 Esta configuración facilita arrancar el proyecto con un entorno reproducible y probar la integración entre componentes. Las credenciales locales deben ser de desarrollo y no reutilizarse en producción.
 
@@ -634,7 +635,7 @@ erDiagram
 
 ### **3.2. Descripción de entidades principales:**
 
-El modelo cubre las funciones descritas en el README: usuarios, comunidades, anuncios, imágenes, mensajería, notificaciones, perfiles profesionales y moderación. Se propone para **PostgreSQL 16**. Los campos marcados `NOT NULL` no admiten valores nulos; `NULL` indica que el dato es opcional.
+El modelo cubre las funciones descritas en el README: usuarios, comunidades, anuncios, imágenes, mensajería, notificaciones, perfiles profesionales y moderación. Se propone para **PostgreSQL 16**. Las tablas se nombran en singular, igual que las entidades (`community`, `listing`…), salvo la de usuarios, que se llama `users` porque `user` es una palabra reservada de PostgreSQL. Los campos marcados `NOT NULL` no admiten valores nulos; `NULL` indica que el dato es opcional.
 
 #### 1. `user` — Usuario
 
@@ -882,7 +883,9 @@ paths:
         - name: q
           in: query
           required: false
-          description: Busca palabras clave en el título y la descripción.
+          description: >-
+            Busca palabras clave en el título y la descripción. Se recortan los espacios: vacío equivale a
+            no enviarlo; con menos de 2 caracteres responde 422. Las palabras de un solo carácter se ignoran.
           schema:
             type: string
             maxLength: 160
@@ -1224,7 +1227,7 @@ components:
 
 He utilizado `openspec` junto con Claude para elaborar las historias de usuario
 
-Las historias completas del MVP (17 historias en 6 épicas) están en [`docs/product/user-stories.md`](docs/product/user-stories.md). Se seleccionan tres que cubren el recorrido principal del MVP: publicar, encontrar y contactar.
+Las historias completas del MVP (18 historias en 6 épicas) están en [`docs/product/user-stories.md`](docs/product/user-stories.md). Se seleccionan tres que cubren el recorrido principal del MVP: publicar, encontrar y contactar.
 
 ### **Historia de Usuario 1** — HU-07 Publicar un anuncio
 
@@ -1281,6 +1284,12 @@ Las historias completas del MVP (17 historias en 6 épicas) están en [`docs/pro
 - **Given** que he aplicado una búsqueda
 - **When** la borro
 - **Then** vuelvo a ver todos los anuncios de la comunidad
+
+**AC4 — Búsqueda demasiado corta**
+
+- **Given** que estoy en el listado de mi comunidad
+- **When** busco un texto de menos de 2 caracteres
+- **Then** veo un mensaje que indica que la búsqueda debe tener al menos 2 caracteres y el listado no cambia
 
 ### **Historia de Usuario 3** — HU-15 Contactar con el anunciante
 

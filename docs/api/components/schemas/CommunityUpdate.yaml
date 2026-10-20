@@ -8,6 +8,7 @@ properties:
     maxLength: 120
   description:
     type: [string, "null"]
+    maxLength: 2000
   postal_code:
     type: [string, "null"]
     maxLength: 16
