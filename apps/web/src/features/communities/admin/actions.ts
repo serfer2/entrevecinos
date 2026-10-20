@@ -8,6 +8,7 @@ import { requireUser } from "@/features/auth/dal";
 import { formText, isUuid } from "@/lib/forms";
 
 import type { ApiMembership } from "../types";
+import { conflictCode, MEMBER_ACTIONS, type MemberAction, membersPath } from "./members";
 import { requestsPath } from "./paths";
 
 const DECISIONS = { approved: "aprobada", rejected: "rechazada" } as const;
@@ -34,4 +35,37 @@ export async function reviewRequest(formData: FormData): Promise<void> {
   // 403: la página vuelve a pedir la lista y muestra el aviso de permisos.
   if (result.error.status === 403) redirect(requestsPath(communityId));
   redirect(requestsPath(communityId, "error"));
+}
+
+/**
+ * Bloquea, desbloquea o expulsa a un miembro y vuelve a la lista con el resultado en la URL
+ * (`resultado` + `nombre`, o `error` con un código del 409).
+ */
+export async function manageMember(formData: FormData): Promise<void> {
+  await requireUser();
+
+  const communityId = formText(formData, "community_id");
+  const userId = formText(formData, "user_id");
+  const action = formText(formData, "action");
+  const name = formText(formData, "name").slice(0, 120);
+  if (!isUuid(communityId)) redirect("/inicio");
+  if (!isUuid(userId) || !(action in MEMBER_ACTIONS)) {
+    redirect(membersPath(communityId, { error: "error" }));
+  }
+
+  const { status, done } = MEMBER_ACTIONS[action as MemberAction];
+  const path = `/communities/${communityId}/memberships/${userId}`;
+  const result =
+    status === null
+      ? await userApiFetch<null>(path, { method: "DELETE" })
+      : await userApiFetch<ApiMembership>(path, { method: "PATCH", body: { status } });
+
+  revalidatePath(membersPath(communityId));
+  if (result.ok) redirect(membersPath(communityId, { resultado: done, nombre: name }));
+  if (result.error.status === 409) {
+    redirect(membersPath(communityId, { error: conflictCode(result.error.detail) }));
+  }
+  // 403: la página vuelve a pedir la lista y muestra el aviso de permisos.
+  if (result.error.status === 403) redirect(membersPath(communityId));
+  redirect(membersPath(communityId, { error: "error" }));
 }

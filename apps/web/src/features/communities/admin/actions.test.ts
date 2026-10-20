@@ -14,7 +14,7 @@ vi.mock("@/features/auth/dal", () => ({ requireUser }));
 vi.mock("next/navigation", () => ({ redirect }));
 vi.mock("next/cache", () => ({ revalidatePath }));
 
-import { reviewRequest } from "./actions";
+import { manageMember, reviewRequest } from "./actions";
 
 const communityId = "0b5c4a7e-1d2f-4c3b-9a8e-7f6d5c4b3a21";
 const userId = "1c6d5b8f-2e3a-4d4c-8b9f-8a7e6d5c4b32";
@@ -73,4 +73,57 @@ describe("reviewRequest", () => {
       expect(userApiFetch).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("manageMember", () => {
+  const members = `/comunidades/${communityId}/gestion/miembros`;
+
+  function memberForm(action: string, overrides: Record<string, string> = {}) {
+    const data = new FormData();
+    const values = { community_id: communityId, user_id: userId, action, name: "Mario", ...overrides };
+    for (const [k, v] of Object.entries(values)) data.set(k, v);
+    return data;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireUser.mockResolvedValue({ id: "admin" });
+  });
+
+  it.each([
+    ["bloquear", "PATCH", { status: "blocked" }, "bloqueado"],
+    ["desbloquear", "PATCH", { status: "approved" }, "desbloqueado"],
+    ["expulsar", "DELETE", undefined, "expulsado"],
+  ])("%s", async (action, method, body, done) => {
+    userApiFetch.mockResolvedValue({ ok: true, status: 200, data: null });
+
+    await expect(manageMember(memberForm(action))).rejects.toThrow(
+      `NEXT_REDIRECT:${members}?resultado=${done}&nombre=Mario`,
+    );
+    expect(userApiFetch).toHaveBeenCalledWith(
+      `/communities/${communityId}/memberships/${userId}`,
+      body ? { method, body } : { method },
+    );
+  });
+
+  it("409: código del conflicto en la URL", async () => {
+    userApiFetch.mockResolvedValue({
+      ok: false,
+      error: { status: 409, detail: "La comunidad debe tener al menos un administrador." },
+    });
+
+    await expect(manageMember(memberForm("expulsar"))).rejects.toThrow(`${members}?error=ultimo-admin`);
+  });
+
+  it("403: vuelve a la página (aviso de permisos)", async () => {
+    userApiFetch.mockResolvedValue({ ok: false, error: { status: 403, detail: "x" } });
+
+    await expect(manageMember(memberForm("bloquear"))).rejects.toThrow(`NEXT_REDIRECT:${members}`);
+  });
+
+  it("acción o id no válidos: no llama a la API", async () => {
+    await expect(manageMember(memberForm("borrar"))).rejects.toThrow(`${members}?error=error`);
+    await expect(manageMember(memberForm("bloquear", { user_id: "x" }))).rejects.toThrow("error=error");
+    expect(userApiFetch).not.toHaveBeenCalled();
+  });
 });
