@@ -3,28 +3,33 @@ import Link from "next/link";
 import { Pagination } from "@/components/ui/Pagination";
 
 import { getCommunityListings } from "../data";
-import { type ListingSearchParams, listingSearchHref } from "../search-params";
+import { clearSearchHref, type ListingSearchParams, listingSearchHref } from "../search-params";
 import { ListingCard } from "./ListingCard";
+import { ListingFilters } from "./ListingFilters";
 
 type CommunityListingsProps = {
   communityId: string;
   search: ListingSearchParams;
 };
 
-/** Anuncios visibles de la comunidad (solo para miembros aprobados). */
+/** Anuncios visibles de la comunidad (solo para miembros aprobados), con búsqueda. */
 export async function CommunityListings({ communityId, search }: CommunityListingsProps) {
   const listings = await getCommunityListings(communityId, search);
+  const searching = search.q !== "";
 
-  if (listings.total === 0) {
+  if (listings.total === 0 && !searching) {
     return (
-      <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-gray-300 p-6">
-        <p className="text-gray-700">Todavía no hay anuncios en esta comunidad.</p>
-        <Link
-          href={`/comunidades/${communityId}/anuncios/nuevo`}
-          className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800"
-        >
-          Publica el primero
-        </Link>
+      <div className="flex flex-col gap-4">
+        <ListingFilters communityId={communityId} search={search} />
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-gray-300 p-6">
+          <p className="text-gray-700">Todavía no hay anuncios en esta comunidad.</p>
+          <Link
+            href={`/comunidades/${communityId}/anuncios/nuevo`}
+            className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800"
+          >
+            Publica el primero
+          </Link>
+        </div>
       </div>
     );
   }
@@ -34,6 +39,18 @@ export async function CommunityListings({ communityId, search }: CommunityListin
       <h2 id="listings-title" className="sr-only">
         Anuncios
       </h2>
+      <ListingFilters communityId={communityId} search={search} />
+      <p aria-live="polite" className={searching ? "text-sm text-gray-700" : "sr-only"}>
+        {searching &&
+          (listings.total === 0
+            ? `No hay anuncios que coincidan con "${search.q}".`
+            : `${listings.total} ${listings.total === 1 ? "resultado" : "resultados"} para "${search.q}"`)}
+      </p>
+      {searching && listings.total === 0 && (
+        <Link href={clearSearchHref(communityId, search)} className="self-start font-medium text-emerald-800 underline">
+          Ver todos los anuncios
+        </Link>
+      )}
       <ul className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {listings.items.map((listing) => (
           <li key={listing.id}>
