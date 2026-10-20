@@ -20,3 +20,7 @@ class ListingRepository(Protocol):
     def get(self, listing_id: uuid.UUID) -> Listing | None:
         """Anuncio no eliminado, con su autor y sus imágenes."""
         ...
+
+    def soft_delete(self, listing_id: uuid.UUID) -> None:
+        """Marca el anuncio como eliminado (`deleted_at`, `status = deleted`)."""
+        ...

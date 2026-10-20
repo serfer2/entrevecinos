@@ -1,7 +1,8 @@
 import uuid
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 
+from entrevecinos.application.listings.delete_listing import DeleteListing
 from entrevecinos.application.listings.publish_listing import PublishListing, PublishListingCommand
 from entrevecinos.presentation.dependencies import (
     CategoryRepositoryDep,
@@ -57,3 +58,25 @@ def create_listing(
         user, community_id, command
     )
     return ListingResponse.from_domain(listing)
+
+
+@router.delete(
+    "/listings/{listing_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    operation_id="deleteListing",
+    summary="Eliminar un anuncio",
+    description=(
+        "Borrado lógico (`deleted_at`, `status = deleted`). Puede hacerlo el autor, un "
+        "`community_admin`/`moderator` de la comunidad o un `platform_admin`. Un anuncio ya "
+        "eliminado responde 404."
+    ),
+    responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **VALIDATION_ERROR},
+)
+def delete_listing(
+    listing_id: uuid.UUID,
+    user: CurrentUserDep,
+    access: CommunityAccessDep,
+    listings: ListingRepositoryDep,
+) -> Response:
+    DeleteListing(access, listings).execute(user, listing_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

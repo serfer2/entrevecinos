@@ -2,7 +2,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterable
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.orm import Session
 
 from entrevecinos.domain.listings.entities import (
@@ -17,8 +17,15 @@ from entrevecinos.infrastructure.db.models import ListingImageModel, ListingMode
 
 
 def listing_with_owner() -> Select[tuple[ListingModel, UserModel]]:
-    """Consulta base de anuncios con su autor (los datos del autor se leen de `users`)."""
-    return select(ListingModel, UserModel).join(UserModel, UserModel.id == ListingModel.owner_id)
+    """Consulta base de anuncios no eliminados con su autor (datos leídos de `users`).
+
+    Toda lectura de anuncios parte de aquí: un anuncio eliminado no aparece en ninguna.
+    """
+    return (
+        select(ListingModel, UserModel)
+        .join(UserModel, UserModel.id == ListingModel.owner_id)
+        .where(ListingModel.deleted_at.is_(None))
+    )
 
 
 class ListingLoader:
@@ -97,10 +104,13 @@ class SqlAlchemyListingRepository:
 
     def get(self, listing_id: uuid.UUID) -> Listing | None:
         self._session.expire_all()
-        rows = self._session.execute(
-            listing_with_owner().where(
-                ListingModel.id == listing_id, ListingModel.deleted_at.is_(None)
-            )
-        )
+        rows = self._session.execute(listing_with_owner().where(ListingModel.id == listing_id))
         found = self._loader.load(rows)
         return found[0] if found else None
+
+    def soft_delete(self, listing_id: uuid.UUID) -> None:
+        self._session.execute(
+            update(ListingModel)
+            .where(ListingModel.id == listing_id)
+            .values(deleted_at=func.statement_timestamp(), status=ListingStatus.DELETED)
+        )
