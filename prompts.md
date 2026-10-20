@@ -345,6 +345,14 @@ Esto es el refinement de los tickets creados para las épicas 02 a 06.
    - Un ticket de frontend con los botones «Marcar como reservado», «Quitar reserva» y «Marcar como finalizado» en el detalle, visibles solo para el autor.
 ```
 
+**Prompt 5.1:** Refinement tickets Épicas 02 a 06
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets han sido refinados y documentación actualizada
+
+```
+Haz commit de los tickets y la documentación
+```
+
 #### 6.1 Implementación de tickets de trabajo
 
 **Prompt 1:** Implementar infra de desarrollo
@@ -366,6 +374,14 @@ Los tickets de la Épica1 ya están revisados, impleméntalos
 **NOTA**
 
 Claude propone ir creando las specs en openspec a partir de los ficheros de tickets que hay en la carpeta `docs/product/tickets/00-infra`.
+
+**Prompt 3:** Implementar los tickets de las Épicas 02 a 06 y los tickets adicionales
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Todos los tickets del MVP han sido generados, revisados y refinados
+
+```
+Implementa los tickets que falten por implementar. Revisa los que ya han sido implementados y asegúrate de que todos queden hechos
+```
 
 ---
 
