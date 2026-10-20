@@ -1,7 +1,17 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, String, Uuid, func, text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    String,
+    Uuid,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from entrevecinos.infrastructure.db.base import Base
@@ -23,8 +33,9 @@ class UserModel(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     full_name: Mapped[str] = mapped_column(String(120))
     phone: Mapped[str | None] = mapped_column(String(32))
-    # FK a media_asset.id pendiente hasta que exista la tabla (TK-005 §2).
-    avatar_asset_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    avatar_asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("media_asset.id", ondelete="SET NULL", use_alter=True)
+    )
     platform_role: Mapped[str] = mapped_column(USER_ROLE, server_default="user")
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

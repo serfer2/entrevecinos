@@ -3,6 +3,20 @@ from entrevecinos.infrastructure.db.models.community import (
     CommunityMembershipModel,
     CommunityModel,
 )
+from entrevecinos.infrastructure.db.models.listing import (
+    CategoryModel,
+    ListingImageModel,
+    ListingModel,
+    MediaAssetModel,
+)
 from entrevecinos.infrastructure.db.models.user import UserModel
 
-__all__ = ["CommunityMembershipModel", "CommunityModel", "UserModel"]
+__all__ = [
+    "CategoryModel",
+    "CommunityMembershipModel",
+    "CommunityModel",
+    "ListingImageModel",
+    "ListingModel",
+    "MediaAssetModel",
+    "UserModel",
+]
