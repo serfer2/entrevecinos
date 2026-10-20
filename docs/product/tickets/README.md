@@ -41,9 +41,11 @@ docs/product/tickets/
 
 Respeta las dependencias de cada ticket (campo **Depende de**). Los números de migración (`0002`…`0006`) asumen este orden.
 
+**Estado:** todos los tickets (TK-001 a TK-046) están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket.
+
 | Bloque | Orden |
 |---|---|
-| Épica 1 (implementada) | TK-005 → TK-011 |
+| Épica 1 | TK-005 → TK-011 |
 | Épica 2 — Comunidades | TK-012 → TK-013 → TK-014 → TK-015 → TK-016 → TK-017 → TK-018 |
 | Épica 3 — Publicar | TK-019 → TK-020 → TK-021 → TK-022 → TK-023 → TK-046 |
 | Listado, detalle y borrado | TK-026 → TK-028 → TK-029 → TK-036 → TK-037 |
