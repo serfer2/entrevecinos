@@ -58,6 +58,7 @@ npm run build && npm run start
 |---|---|---|---|
 | `NEXT_PUBLIC_API_BASE_URL` | Navegador | URL de la API que usa el navegador | `http://localhost:8000/v1` |
 | `API_INTERNAL_URL` | Servidor (Next) | URL de la API dentro de la red de Docker | `http://api:8000/v1` |
+| `STORAGE_PUBLIC_URL` | Servidor (Next) | Origen de las URL prefirmadas de las imágenes; se permite en `img-src` de la CSP. Obligatoria: sin ella el servidor no arranca. En producción, la URL del servicio S3 o de su CDN | `http://localhost:9000` |
 
 Las variables `NEXT_PUBLIC_*` se incorporan al compilar y llegan al navegador: nunca guardes secretos en ellas.
 
@@ -116,3 +117,12 @@ docker run --rm -p 3001:3000 entrevecinos-web:prod
 ```
 
 Usa la salida `standalone` de Next y se ejecuta con el usuario `node` (no root).
+
+## Content-Security-Policy
+
+`src/proxy.ts` genera en cada petición un *nonce* y la cabecera `Content-Security-Policy` (construida por `buildCsp()` en `src/lib/security/csp.ts`), y la pone en la petición (Next la lee para aplicar el *nonce* a sus scripts) y en la respuesta. Por eso el *layout* raíz llama a `connection()`: todas las páginas se renderizan por petición.
+
+- Producción: `script-src 'self' 'nonce-…' 'strict-dynamic'`, estilos con *nonce*, sin `unsafe-*`; `upgrade-insecure-requests` solo si `STORAGE_PUBLIC_URL` es HTTPS (así la imagen de producción se puede probar en local con `http://localhost:9000`).
+- Desarrollo: además `'unsafe-eval'`, `'unsafe-inline'` en estilos y `ws:` (recarga en caliente).
+- `img-src 'self' data: <origen de STORAGE_PUBLIC_URL>`: las imágenes llegan por `/media/<id>`, que redirige a la URL prefirmada del almacenamiento.
+- Al añadir un origen externo (fuentes, analítica…), amplía la política en el mismo cambio.

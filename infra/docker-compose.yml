@@ -110,6 +110,8 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/v1}
       API_INTERNAL_URL: http://api:8000/v1
+      # Origen de las URL prefirmadas de las imágenes: se permite en `img-src` de la CSP.
+      STORAGE_PUBLIC_URL: http://localhost:${STORAGE_HOST_PORT:-9000}
       WATCHPACK_POLLING: "true"          # recarga fiable en Docker
     depends_on:
       api:

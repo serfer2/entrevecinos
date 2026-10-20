@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
-// Cabeceras de seguridad equivalentes a Helmet (readme §2.5). La CSP se
-// definirá cuando existan pantallas y se conozcan los orígenes de API e imágenes.
+// Cabeceras de seguridad equivalentes a Helmet (readme §2.5). La Content-Security-Policy
+// lleva un nonce por petición, así que se genera en src/proxy.ts (TK-046).
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
