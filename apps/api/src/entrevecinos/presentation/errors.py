@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from entrevecinos.domain.communities.errors import (
     MembershipAlreadyExists,
     MembershipAlreadyReviewed,
+    MembershipChangeRejected,
     MembershipNotApproved,
 )
 from entrevecinos.domain.errors import NotFoundError, PermissionDenied
@@ -108,6 +109,12 @@ async def membership_already_reviewed_handler(
     )
 
 
+async def membership_change_rejected_handler(
+    request: Request, exc: MembershipChangeRejected
+) -> JSONResponse:
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": exc.detail})
+
+
 async def image_too_large_handler(request: Request, exc: ImageTooLarge) -> JSONResponse:
     megabytes = exc.max_bytes // (1024 * 1024)
     return JSONResponse(
@@ -170,3 +177,4 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(ListingLocked, listing_locked_handler)
     app.add_exception_handler(MembershipNotApproved, membership_not_approved_handler)
     app.add_exception_handler(MembershipAlreadyReviewed, membership_already_reviewed_handler)
+    app.add_exception_handler(MembershipChangeRejected, membership_change_rejected_handler)

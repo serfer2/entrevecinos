@@ -132,11 +132,11 @@ class MembershipErrorResponse(BaseModel):
 
 
 class MembershipUpdateRequest(BaseModel):
-    """Subconjunto implementado de `MembershipUpdate`: revisar una solicitud pendiente.
+    """Subconjunto implementado de `MembershipUpdate`: revisar, bloquear y desbloquear.
 
-    `blocked` y `role` llegarán con la gestión de miembros (TK-040).
+    El cambio de rol (`role`) no tiene historia en el MVP y se rechaza con 422.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal[MembershipStatus.APPROVED, MembershipStatus.REJECTED]
+    status: Literal[MembershipStatus.APPROVED, MembershipStatus.REJECTED, MembershipStatus.BLOCKED]

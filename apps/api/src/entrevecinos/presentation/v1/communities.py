@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
 
 from entrevecinos.application.communities.create_community import CreateCommunity
 from entrevecinos.application.communities.get_community import GetCommunity
@@ -9,7 +9,10 @@ from entrevecinos.application.communities.list_community_memberships import (
     ListCommunityMemberships,
 )
 from entrevecinos.application.communities.request_membership import RequestMembership
-from entrevecinos.application.communities.review_membership import ReviewMembership
+from entrevecinos.application.communities.review_membership import (
+    ChangeMembershipStatus,
+    RemoveMembership,
+)
 from entrevecinos.application.communities.search_communities import SearchCommunities
 from entrevecinos.domain.communities.entities import CommunitySearch, MembershipStatus
 from entrevecinos.presentation.dependencies import (
@@ -153,12 +156,13 @@ def list_community_memberships(
 @router.patch(
     "/{community_id}/memberships/{user_id}",
     operation_id="updateMembership",
-    summary="Revisar una solicitud de acceso",
+    summary="Revisar una solicitud o bloquear a un miembro",
     description=(
-        "Aprueba o rechaza una solicitud `pending`. Solo `community_admin` de la comunidad o "
-        "`platform_admin`. Al aprobar se fijan `reviewed_by`, `reviewed_at` y `joined_at`. Una "
-        "solicitud ya revisada responde 409. **Pendiente:** `blocked` y `role` (TK-040) se "
-        "rechazan con 422."
+        "Solo `community_admin` de la comunidad o `platform_admin`. Aprueba o rechaza una "
+        "solicitud `pending` (al aprobar se fija `joined_at`), bloquea a un miembro aprobado "
+        "(`blocked`: pierde el acceso, sus anuncios dejan de mostrarse y no puede volver a "
+        "solicitarlo) o lo desbloquea (`approved`). Otras transiciones, bloquear a un "
+        "administrador o a uno mismo responden 409. **Pendiente:** `role` se rechaza con 422."
     ),
     responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **CONFLICT, **VALIDATION_ERROR},
 )
@@ -170,5 +174,31 @@ def update_membership(
     access: CommunityAccessDep,
     memberships: MembershipRepositoryDep,
 ) -> MembershipResponse:
-    detail = ReviewMembership(access, memberships).execute(user, community_id, user_id, body.status)
-    return MembershipResponse.from_domain(detail)
+    use_case = ChangeMembershipStatus(access, memberships)
+    return MembershipResponse.from_domain(
+        use_case.execute(user, community_id, user_id, body.status)
+    )
+
+
+@router.delete(
+    "/{community_id}/memberships/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    operation_id="deleteMembership",
+    summary="Salir de una comunidad o expulsar a un miembro",
+    description=(
+        "Un usuario puede eliminar su propia membresía; un `community_admin` (o "
+        "`platform_admin`) la de otros, salvo la de otro administrador (403). No se puede "
+        "eliminar al último administrador (409). Tras la expulsión, el vecino puede volver a "
+        "solicitar el acceso."
+    ),
+    responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **CONFLICT, **VALIDATION_ERROR},
+)
+def delete_membership(
+    community_id: uuid.UUID,
+    user_id: uuid.UUID,
+    user: CurrentUserDep,
+    access: CommunityAccessDep,
+    memberships: MembershipRepositoryDep,
+) -> Response:
+    RemoveMembership(access, memberships).execute(user, community_id, user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

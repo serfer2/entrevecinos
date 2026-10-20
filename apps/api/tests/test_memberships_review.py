@@ -61,14 +61,27 @@ def test_admin_lists_pending_requests_without_contact_data(
     assert "email" not in str(body) and "600111222" not in str(body)
 
 
-def test_list_without_filter_orders_oldest_first(
+def test_list_without_filter_orders_by_status_then_name(
     client: TestClient, admin: dict, applicant: dict, community: dict
 ) -> None:
     request_access(client, applicant, community["id"])
 
     items = memberships(client, admin, community["id"]).json()["items"]
 
-    assert [i["user"]["id"] for i in items] == [admin["user"]["id"], applicant["user"]["id"]]
+    # Pendientes primero, después los miembros (TK-040).
+    assert [i["user"]["id"] for i in items] == [applicant["user"]["id"], admin["user"]["id"]]
+
+
+def test_filtered_list_orders_oldest_first(
+    client: TestClient, admin: dict, applicant: dict, community: dict
+) -> None:
+    other = register(client, "otra@example.com", full_name="Aaron Antes")
+    request_access(client, applicant, community["id"])
+    request_access(client, other, community["id"])
+
+    items = memberships(client, admin, community["id"], status="pending").json()["items"]
+
+    assert [i["user"]["id"] for i in items] == [applicant["user"]["id"], other["user"]["id"]]
 
 
 def test_approve(client: TestClient, admin: dict, applicant: dict, community: dict) -> None:
@@ -116,9 +129,7 @@ def test_unknown_membership_or_community(client: TestClient, admin: dict, commun
     assert memberships(client, admin, str(uuid.uuid4())).status_code == 404
 
 
-@pytest.mark.parametrize(
-    "body", [{"status": "blocked"}, {"status": "pending"}, {"role": "moderator"}, {}]
-)
+@pytest.mark.parametrize("body", [{"status": "pending"}, {"role": "moderator"}, {}])
 def test_unsupported_changes_are_rejected(
     client: TestClient, admin: dict, applicant: dict, community: dict, body: dict
 ) -> None:

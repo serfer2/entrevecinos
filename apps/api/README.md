@@ -97,6 +97,9 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 
 - `GET /v1/communities/{id}/memberships` (gestores: `community_admin`, `moderator`, `platform_admin`) y `PATCH /v1/communities/{id}/memberships/{user_id}` (`community_admin`, `platform_admin`) revisan las solicitudes: solo `pending → approved | rejected`; otra transición → `409`.
 
+- Gestión de miembros (`ChangeMembershipStatus`, `RemoveMembership`): bloquear (`approved → blocked`) y desbloquear (`blocked → approved`, conserva `joined_at`); no se puede bloquear a un administrador ni a uno mismo (`409`). `DELETE …/memberships/{user_id}` expulsa (o sale, si es la propia); nunca deja la comunidad sin administrador (`409`). El bloqueado no puede volver a solicitar el acceso; el expulsado sí.
+- Los anuncios de autores sin membresía aprobada (bloqueados o expulsados) no se muestran: `OWNER_IS_MEMBER` en el filtro del listado y `Listing.owner_is_member` en `ListingVisibility` (solo los ven el autor y los gestores). Se calcula al consultar, sin cambiar el estado del anuncio.
+
 ## Autorización por comunidad
 
 Todas las comprobaciones de permisos por comunidad pasan por `CommunityAccess` (`application/authorization/community_access.py`); ningún endpoint compara roles por su cuenta.

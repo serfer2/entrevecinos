@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,16 @@ from entrevecinos.infrastructure.db.models import (
     CommunityMembershipModel,
     CommunityModel,
     UserModel,
+)
+
+STATUS_ORDER = case(
+    {
+        MembershipStatus.PENDING: 0,
+        MembershipStatus.APPROVED: 1,
+        MembershipStatus.BLOCKED: 2,
+        MembershipStatus.REJECTED: 3,
+    },
+    value=CommunityMembershipModel.status,
 )
 
 
@@ -90,15 +100,44 @@ class SqlAlchemyMembershipRepository:
         total = self._session.scalar(
             select(func.count()).select_from(CommunityMembershipModel).where(*conditions)
         )
+        # Con filtro: de la solicitud más antigua a la más reciente. Sin filtro (gestión de
+        # miembros): por estado (pendientes primero) y nombre.
+        order = (
+            [CommunityMembershipModel.requested_at, CommunityMembershipModel.user_id]
+            if status is not None
+            else [STATUS_ORDER, UserModel.full_name, CommunityMembershipModel.user_id]
+        )
         rows = self._session.execute(
             select(CommunityMembershipModel, UserModel)
             .join(UserModel, UserModel.id == CommunityMembershipModel.user_id)
             .where(*conditions)
-            .order_by(CommunityMembershipModel.requested_at, CommunityMembershipModel.user_id)
+            .order_by(*order)
             .offset(page.offset)
             .limit(page.page_size)
         )
         return PageResult(items=[detail_to_domain(m, u) for m, u in rows], total=total or 0)
+
+    def count_admins(self, community_id: uuid.UUID) -> int:
+        return (
+            self._session.scalar(
+                select(func.count())
+                .select_from(CommunityMembershipModel)
+                .where(
+                    CommunityMembershipModel.community_id == community_id,
+                    CommunityMembershipModel.role == MembershipRole.COMMUNITY_ADMIN,
+                    CommunityMembershipModel.status == MembershipStatus.APPROVED,
+                )
+            )
+            or 0
+        )
+
+    def delete(self, community_id: uuid.UUID, user_id: uuid.UUID) -> None:
+        self._session.execute(
+            delete(CommunityMembershipModel).where(
+                CommunityMembershipModel.community_id == community_id,
+                CommunityMembershipModel.user_id == user_id,
+            )
+        )
 
     def review(
         self,
@@ -112,7 +151,8 @@ class SqlAlchemyMembershipRepository:
         model.status = status
         model.reviewed_by = reviewer_id
         model.reviewed_at = now
-        if status is MembershipStatus.APPROVED:
+        # Al desbloquear se conserva la fecha de entrada original.
+        if status is MembershipStatus.APPROVED and model.joined_at is None:
             model.joined_at = now
         self._session.flush()
         self._session.refresh(model)

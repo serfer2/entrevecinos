@@ -44,8 +44,15 @@ class MembershipRepository(Protocol):
     def list_for_community(
         self, community_id: uuid.UUID, status: MembershipStatus | None, page: PageRequest
     ) -> PageResult[MembershipDetail]:
-        """Membresías de la comunidad, de la solicitud más antigua a la más reciente."""
+        """Con `status`, de la solicitud más antigua a la más reciente; sin él, por estado
+        (pendientes, miembros, bloqueados, rechazados) y nombre."""
         ...
+
+    def count_admins(self, community_id: uuid.UUID) -> int:
+        """Administradores de la comunidad con membresía aprobada."""
+        ...
+
+    def delete(self, community_id: uuid.UUID, user_id: uuid.UUID) -> None: ...
 
     def review(
         self,
@@ -54,7 +61,7 @@ class MembershipRepository(Protocol):
         status: MembershipStatus,
         reviewer_id: uuid.UUID,
     ) -> MembershipDetail:
-        """Fija el estado y `reviewed_by`/`reviewed_at` (y `joined_at` al aprobar)."""
+        """Fija el estado y `reviewed_by`/`reviewed_at` (y `joined_at` la primera aprobación)."""
         ...
 
     def list_for_user(

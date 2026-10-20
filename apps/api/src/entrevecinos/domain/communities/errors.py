@@ -28,3 +28,16 @@ class MembershipNotApproved(PermissionDenied):
 
 class MembershipAlreadyReviewed(Exception):
     """La solicitud ya se aprobó o rechazó: no admite otra revisión."""
+
+
+class MembershipChangeRejected(Exception):
+    """El cambio de la membresía choca con su estado o con las reglas de la comunidad (409)."""
+
+    CANNOT_BLOCK_ADMIN = "No se puede bloquear a un administrador de la comunidad."
+    CANNOT_CHANGE_SELF = "No puedes cambiar el estado de tu propia membresía."
+    NOT_ALLOWED = "Cambio de estado no permitido."
+    LAST_ADMIN = "La comunidad debe tener al menos un administrador."
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail)
+        self.detail = detail

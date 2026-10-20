@@ -2,11 +2,12 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 
-from sqlalchemy import ColumnElement, Select, delete, false, func, select, update
+from sqlalchemy import ColumnElement, Select, delete, exists, false, func, select, update
 from sqlalchemy.orm import Session
 
 from entrevecinos.application.listings.ports import ListingQuery
 from entrevecinos.application.pagination import PageResult
+from entrevecinos.domain.communities.entities import MembershipStatus
 from entrevecinos.domain.listings.entities import (
     LISTED_STATUSES,
     Listing,
@@ -19,17 +20,30 @@ from entrevecinos.domain.listings.entities import (
     SortOrder,
 )
 from entrevecinos.domain.listings.search import prefix_tsquery
-from entrevecinos.infrastructure.db.models import ListingImageModel, ListingModel, UserModel
+from entrevecinos.infrastructure.db.models import (
+    CommunityMembershipModel,
+    ListingImageModel,
+    ListingModel,
+    UserModel,
+)
 from entrevecinos.infrastructure.db.models.listing import SEARCH_CONFIG
 
+# El autor tiene una membresía aprobada en la comunidad del anuncio. Si lo bloquean o lo
+# expulsan, sus anuncios dejan de mostrarse sin cambiar su estado (TK-040).
+OWNER_IS_MEMBER = exists().where(
+    CommunityMembershipModel.community_id == ListingModel.community_id,
+    CommunityMembershipModel.user_id == ListingModel.owner_id,
+    CommunityMembershipModel.status == MembershipStatus.APPROVED,
+)
 
-def listing_with_owner() -> Select[tuple[ListingModel, UserModel]]:
+
+def listing_with_owner() -> Select[tuple[ListingModel, UserModel, bool]]:
     """Consulta base de anuncios no eliminados con su autor (datos leídos de `users`).
 
     Toda lectura de anuncios parte de aquí: un anuncio eliminado no aparece en ninguna.
     """
     return (
-        select(ListingModel, UserModel)
+        select(ListingModel, UserModel, OWNER_IS_MEMBER.label("owner_is_member"))
         .join(UserModel, UserModel.id == ListingModel.owner_id)
         # Los anuncios de cuentas eliminadas tampoco se muestran (contrato, `users_me.yaml`).
         .where(ListingModel.deleted_at.is_(None), UserModel.deleted_at.is_(None))
@@ -37,18 +51,19 @@ def listing_with_owner() -> Select[tuple[ListingModel, UserModel]]:
 
 
 class ListingLoader:
-    """Convierte filas (anuncio, autor) en entidades cargando todas sus imágenes en una consulta."""
+    """Convierte filas (anuncio, autor, ¿miembro?) en entidades cargando todas sus imágenes en
+    una consulta."""
 
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def load(self, rows: Iterable[tuple[ListingModel, UserModel]]) -> list[Listing]:
+    def load(self, rows: Iterable[tuple[ListingModel, UserModel, bool]]) -> list[Listing]:
         rows = list(rows)
         images: dict[uuid.UUID, list[ListingImage]] = defaultdict(list)
         if rows:
             for image in self._session.scalars(
                 select(ListingImageModel)
-                .where(ListingImageModel.listing_id.in_([listing.id for listing, _ in rows]))
+                .where(ListingImageModel.listing_id.in_([row[0].id for row in rows]))
                 .order_by(ListingImageModel.listing_id, ListingImageModel.position)
             ):
                 images[image.listing_id].append(
@@ -56,10 +71,15 @@ class ListingLoader:
                         asset_id=image.asset_id, position=image.position, is_cover=image.is_cover
                     )
                 )
-        return [self._to_domain(listing, owner, images[listing.id]) for listing, owner in rows]
+        return [
+            self._to_domain(listing, owner, member, images[listing.id])
+            for listing, owner, member in rows
+        ]
 
     @staticmethod
-    def _to_domain(model: ListingModel, owner: UserModel, images: list[ListingImage]) -> Listing:
+    def _to_domain(
+        model: ListingModel, owner: UserModel, owner_is_member: bool, images: list[ListingImage]
+    ) -> Listing:
         return Listing(
             id=model.id,
             community_id=model.community_id,
@@ -77,6 +97,7 @@ class ListingLoader:
             updated_at=model.updated_at,
             images=tuple(images),
             deleted_at=model.deleted_at,
+            owner_is_member=bool(owner_is_member),
         )
 
 
@@ -136,6 +157,8 @@ class SqlAlchemyListingRepository:
             ListingModel.community_id == query.community_id,
             ListingModel.status.in_(LISTED_STATUSES),
             ListingModel.deleted_at.is_(None),
+            # Los anuncios de miembros bloqueados o expulsados no se muestran (TK-040).
+            OWNER_IS_MEMBER,
         ]
         return conditions
 

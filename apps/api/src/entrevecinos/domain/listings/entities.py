@@ -93,6 +93,8 @@ class Listing:
     updated_at: datetime
     images: tuple[ListingImage, ...] = field(default=())
     deleted_at: datetime | None = None
+    # El autor sigue siendo miembro aprobado de la comunidad (si no, el anuncio se oculta).
+    owner_is_member: bool = True
 
 
 class ListingSort(StrEnum):
