@@ -79,6 +79,17 @@ def make_settings(**overrides: object):
     return Settings(**{**values, **overrides})
 
 
+def _fast_hasher():
+    from pwdlib.hashers.argon2 import Argon2Hasher
+
+    from entrevecinos.infrastructure.security.password_hasher import Argon2PasswordHasher
+
+    return Argon2PasswordHasher(Argon2Hasher(time_cost=1, memory_cost=1024, parallelism=1))
+
+
+FAST_HASHER = _fast_hasher()
+
+
 @pytest.fixture
 def object_storage():
     """Almacenamiento de objetos en memoria (la prueba `storage` usa MinIO real)."""
@@ -91,10 +102,12 @@ def object_storage():
 def client(db_session: Session, object_storage) -> TestClient:
     """Cliente HTTP cuya sesión de base de datos es la transacción de la prueba."""
     from entrevecinos.infrastructure.db.session import get_session
-    from entrevecinos.presentation.dependencies import get_object_storage
+    from entrevecinos.presentation.dependencies import get_object_storage, get_password_hasher
     from entrevecinos.presentation.main import create_app
 
     app = create_app(make_settings())
     app.dependency_overrides[get_session] = lambda: db_session
     app.dependency_overrides[get_object_storage] = lambda: object_storage
+    # Argon2id con un coste mínimo: el algoritmo es el mismo, pero las pruebas no esperan.
+    app.dependency_overrides[get_password_hasher] = lambda: FAST_HASHER
     return TestClient(app)
