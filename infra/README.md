@@ -32,7 +32,7 @@ El `Makefile` de la raíz envuelve los comandos de Compose más habituales:
 | `make build` | Construye las imágenes de `web` y `api` |
 | `make dev` | Construye las imágenes, levanta `db`, `api` y `web` en segundo plano y aplica las migraciones |
 | `make migrate` | Aplica las migraciones pendientes de la base de datos |
-| `make clean` | Elimina contenedores e imágenes construidas localmente; **conserva** los volúmenes (`db_data`, `api_assets`…) |
+| `make clean` | Elimina contenedores e imágenes construidas localmente; **conserva** los volúmenes (`db_data`, `storage_data`…) |
 
 Todos comprueban antes que exista `.env`. Para usar otro fichero: `make dev ENV_FILE=.env.local`. Para borrar también los datos, usa `$COMPOSE down -v` (ver más abajo).
 
@@ -41,6 +41,8 @@ Todos comprueban antes que exista `.env`. Para usar otro fichero: `make dev ENV_
 | Servicio | Imagen | Redes | Puertos en el host |
 |---|---|---|---|
 | `db` | `postgres:16` | `data` (interna) | ninguno por defecto |
+| `storage` | `pgsty/minio:RELEASE.2026-08-04T00-00-00Z` | `data`, `edge` | `127.0.0.1:${STORAGE_HOST_PORT:-9000}` (API S3) |
+| `storage-init` | la misma que `storage` (un solo uso) | `data` | ninguno |
 | `api` | `apps/api/Dockerfile` (etapa `dev`) | `data`, `edge` | `${API_PORT:-8000}` |
 | `web` | `apps/web/Dockerfile` (etapa `dev`) | `edge` | `${WEB_PORT:-3000}` |
 
@@ -90,10 +92,31 @@ $COMPOSE logs -f api              # logs
 
 - http://localhost:8000/docs — documentación interactiva.
 - `apps/api/src` se monta en el contenedor y uvicorn recarga al guardar.
-- Los ficheros de `ASSETS_DIR` viven en el volumen `api_assets` y sobreviven a `down` (no a `down -v`).
 - El healthcheck comprueba el puerto TCP hasta que exista el endpoint `/v1/health`.
 
 Más detalles en `apps/api/README.md`.
+
+## Almacenamiento de imágenes (`storage`)
+
+MinIO, compatible con S3, guarda las imágenes; PostgreSQL solo sus metadatos. Los objetos viven en el volumen `storage_data` y sobreviven a `down` (no a `down -v`).
+
+- `storage-init` se ejecuta antes de `api` (`make dev` lo hace solo) y es idempotente: crea el bucket privado `STORAGE_BUCKET`, el usuario de la API (`STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY`) y la política `entrevecinos-api`, que solo permite `GetObject`, `PutObject` y `DeleteObject` sobre ese bucket. Script: `infra/storage/init.sh`.
+- Solo se publica la API S3 en `127.0.0.1`, porque el navegador abre las URL prefirmadas que genera la API. Sin firma, el bucket responde `403`.
+- Las credenciales de administración (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`) solo las usa `storage-init`; la API usa las suyas.
+
+```bash
+$COMPOSE run --rm storage-init                     # volver a inicializar (idempotente)
+$COMPOSE -f infra/docker-compose.storage-debug.yml up -d storage   # consola en http://127.0.0.1:9001
+```
+
+Si tu `.env` es anterior a este servicio, añade las variables del bloque «Almacenamiento» de `.env.example`; si faltan, Compose falla con un mensaje que las nombra. El volumen `api_assets` de versiones anteriores ya no se usa: `docker volume rm entrevecinos_api_assets`.
+
+### Imagen, versión y licencia
+
+- MinIO, Inc. dejó de publicar imágenes Docker de la edición comunitaria en octubre de 2025 y archivó el proyecto en 2026: `minio/minio` y `minio/mc` ya no están en Docker Hub. Se usa `pgsty/minio`, compilación comunitaria (proyecto Silo, de Pigsty) de la última versión de MinIO, sin cambios en la API S3 y no afiliada a MinIO, Inc. Incluye `mc` y `curl`.
+- Versión fijada: `RELEASE.2026-08-04T00-00-00Z` (nunca `latest`). Para actualizar: cambiar la etiqueta en `storage` y `storage-init`, leer las notas de la versión y repetir la verificación (arranque, `403` anónimo, subida y lectura con las credenciales de la API).
+- Licencia GNU AGPLv3. EntreVecinos usa MinIO sin modificar, como servicio independiente al que la API accede por el protocolo S3, así que la AGPL no se extiende a su código.
+- Solo para desarrollo local: en producción se usa un servicio S3 gestionado. Si la imagen dejara de mantenerse, se puede compilar MinIO desde el código fuente o cambiar a otro servidor compatible con S3 (p. ej. Garage); la API solo depende del protocolo S3.
 
 ## Web (`web`)
 

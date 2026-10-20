@@ -22,6 +22,48 @@ services:
       retries: 5
       start_period: 10s
 
+  storage:
+    # MinIO ya no publica imágenes oficiales: compilación comunitaria con versión fija (AGPLv3).
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Define MINIO_ROOT_PASSWORD en .env}
+    volumes:
+      - storage_data:/data
+    # `data` para la API; `edge` solo para poder publicar el puerto S3 (la red `data` es interna).
+    networks:
+      - data
+      - edge
+    ports:
+      # El navegador abre las URL prefirmadas: solo en 127.0.0.1. La consola (9001) no se publica.
+      - "127.0.0.1:${STORAGE_HOST_PORT:-9000}:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  storage-init:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    restart: "no"
+    entrypoint: ["sh", "/init/init.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Define MINIO_ROOT_PASSWORD en .env}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:?Define STORAGE_BUCKET en .env}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Define STORAGE_ACCESS_KEY en .env}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Define STORAGE_SECRET_KEY en .env}
+    volumes:
+      - ./storage/init.sh:/init/init.sh:ro
+    depends_on:
+      storage:
+        condition: service_healthy
+    networks:
+      - data
+
   api:
     build:
       context: ../apps/api
@@ -30,20 +72,26 @@ services:
     environment:
       ENVIRONMENT: development
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-entrevecinos}:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}@db:5432/${POSTGRES_DB:-entrevecinos}
-      ASSETS_DIR: /var/lib/entrevecinos/assets
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-86400}
+      STORAGE_ENDPOINT: http://storage:9000
+      # Base de las URL prefirmadas: la que ve el navegador (la firma incluye el host).
+      STORAGE_PUBLIC_ENDPOINT: http://localhost:${STORAGE_HOST_PORT:-9000}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:?Define STORAGE_BUCKET en .env}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Define STORAGE_ACCESS_KEY en .env}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Define STORAGE_SECRET_KEY en .env}
     depends_on:
       db:
         condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
       - ../apps/api/src:/app/src            # recarga en desarrollo
       - ../apps/api/migrations:/app/migrations
       - ../apps/api/alembic.ini:/app/alembic.ini:ro
-      - api_assets:/var/lib/entrevecinos/assets
     networks:
       - data
       - edge
@@ -83,7 +131,7 @@ services:
 
 volumes:
   db_data:
-  api_assets:
+  storage_data:
   web_node_modules:
   web_next_cache:
 

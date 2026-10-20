@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
     database_url: str
-    assets_dir: str = "/var/lib/entrevecinos/assets"
     cors_origins: str = "http://localhost:3000"
     environment: Literal["development", "production"] = "development"
     jwt_secret: str = Field(min_length=32)

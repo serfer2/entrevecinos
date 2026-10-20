@@ -65,7 +65,6 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 | Variable | Uso | Valor por defecto |
 |---|---|---|
 | `DATABASE_URL` | Cadena de conexión a PostgreSQL (`postgresql+psycopg://…`) | obligatoria |
-| `ASSETS_DIR` | Directorio de ficheros persistentes (volumen `api_assets`) | `/var/lib/entrevecinos/assets` |
 | `CORS_ORIGINS` | Orígenes permitidos, separados por comas | `http://localhost:3000` |
 | `ENVIRONMENT` | `development` o `production` | `development` |
 | `JWT_SECRET` | Clave de firma de los JWT (HS256, mínimo 32 caracteres) | obligatoria |

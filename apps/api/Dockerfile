@@ -9,15 +9,12 @@ ENV PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_NO_CACHE=1 \
-    PATH=/opt/venv/bin:$PATH \
-    ASSETS_DIR=/var/lib/entrevecinos/assets
+    PATH=/opt/venv/bin:$PATH
 
-# Usuario sin privilegios; el directorio de assets le pertenece para que el
-# volumen con nombre herede los permisos al inicializarse.
+# Usuario sin privilegios. Los ficheros se guardan en el almacenamiento de objetos (storage).
 RUN groupadd --system --gid 1000 app \
     && useradd --system --uid 1000 --gid app --home-dir /app --no-create-home app \
-    && mkdir -p /app "$ASSETS_DIR" \
-    && chown app:app "$ASSETS_DIR"
+    && mkdir -p /app
 
 WORKDIR /app
 EXPOSE 8000

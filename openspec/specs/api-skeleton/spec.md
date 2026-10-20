@@ -11,7 +11,7 @@ El backend SHALL exponer una aplicación FastAPI titulada `API de EntreVecinos`,
 - **THEN** el campo `paths` es un objeto vacío y `/docs` responde 200
 
 ### Requirement: Configuración por entorno
-La configuración SHALL leerse de variables de entorno (`DATABASE_URL`, `ASSETS_DIR`, `CORS_ORIGINS`, `ENVIRONMENT`) y MUST fallar con un error explícito si `DATABASE_URL` no está definida.
+La configuración SHALL leerse de variables de entorno (`DATABASE_URL`, `CORS_ORIGINS`, `ENVIRONMENT` y las de almacenamiento `STORAGE_*`) y MUST fallar con un error explícito si `DATABASE_URL` no está definida.
 
 #### Scenario: Falta DATABASE_URL
 - **WHEN** la aplicación se crea sin `DATABASE_URL` en el entorno
@@ -37,11 +37,4 @@ El servicio `api` de Compose SHALL construirse desde `apps/api/Dockerfile` (etap
 #### Scenario: Arranque en Compose
 - **WHEN** se ejecuta `docker compose --env-file .env -f infra/docker-compose.yml up -d --build api`
 - **THEN** el contenedor `api` queda `healthy` e `id -u` dentro del contenedor es distinto de 0
-
-### Requirement: Persistencia de assets
-El directorio `ASSETS_DIR` (`/var/lib/entrevecinos/assets`) SHALL estar en el volumen con nombre `api_assets`, ser escribible por el usuario no root y sobrevivir a la recreación del contenedor.
-
-#### Scenario: Fichero tras recrear el contenedor
-- **WHEN** se escribe un fichero en `ASSETS_DIR` y se recrea el contenedor `api`
-- **THEN** el fichero sigue existiendo
 
