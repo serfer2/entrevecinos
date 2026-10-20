@@ -13,7 +13,7 @@ export type ApiListing = {
     id: string;
     full_name: string;
     phone: string | null;
-    email?: string | null;
+    email: string;
     avatar_url: string | null;
   };
   category_id: string;

@@ -22,7 +22,7 @@ const [a, b] = ["1c6d5b8f-2e3a-4d4c-8b9f-8a7e6d5c4b32", "2d7e6c9a-3f4b-4e5d-9c0a
 const current: ApiListing = {
   id: listingId,
   community_id: "c1",
-  owner: { id: "u1", full_name: "Ana", phone: null, avatar_url: null },
+  owner: { id: "u1", full_name: "Ana", phone: null, email: "ana@example.com", avatar_url: null },
   category_id: "3e8f7d0b-4a5c-4f6e-8d1b-0c9a8f7e6d54",
   title: "Bicicleta",
   description: "Poco uso",

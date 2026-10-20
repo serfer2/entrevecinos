@@ -16,7 +16,7 @@ const sports = "0b5c4a7e-1d2f-4c3b-9a8e-7f6d5c4b3a21";
 const listing = {
   id: "l1",
   community_id: "c1",
-  owner: { id: "u1", full_name: "Ana", phone: null, avatar_url: null },
+  owner: { id: "u1", full_name: "Ana", phone: null, email: "ana@example.com", avatar_url: null },
   category_id: "cat",
   title: "Lámpara",
   description: "x",

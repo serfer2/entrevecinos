@@ -7,7 +7,7 @@ import { ListingCard } from "./ListingCard";
 const base: ApiListing = {
   id: "l1",
   community_id: "c1",
-  owner: { id: "u1", full_name: "Ana", phone: null, avatar_url: null },
+  owner: { id: "u1", full_name: "Ana", phone: null, email: "ana@example.com", avatar_url: null },
   category_id: "cat",
   title: "Bicicleta infantil",
   description: "Poco uso",

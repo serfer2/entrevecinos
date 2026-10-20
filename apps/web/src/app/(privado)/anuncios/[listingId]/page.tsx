@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Forbidden } from "@/components/ui/Forbidden";
 import { requireUser } from "@/features/auth/dal";
 import { getCommunity, getMyMembership } from "@/features/communities/data";
+import { ContactOwner } from "@/features/listings/components/ContactOwner";
 import { ListingActions } from "@/features/listings/components/ListingActions";
 import { listingPriceLabel } from "@/features/listings/components/ListingCard";
 import { ListingGallery } from "@/features/listings/components/ListingGallery";
@@ -110,6 +111,7 @@ export default async function ListingPage({ params, searchParams }: ListingPageP
               Anunciante
             </h2>
             <p className="mt-1 text-gray-800">{listing.owner.full_name}</p>
+            <ContactOwner owner={listing.owner} listingTitle={listing.title} isOwner={isOwner} />
           </section>
         </div>
       </div>

@@ -46,7 +46,7 @@ export function ProfileForm({ action, initialValues }: ProfileFormProps) {
         type="tel"
         autoComplete="tel"
         maxLength={32}
-        hint="Opcional. Lo verán los vecinos interesados en tus anuncios."
+        hint="Opcional. Tu teléfono y tu correo los verán los vecinos de tus comunidades interesados en tus anuncios."
         defaultValue={values.phone}
         error={errors.phone}
       />
