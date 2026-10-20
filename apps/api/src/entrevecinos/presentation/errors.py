@@ -15,6 +15,7 @@ from entrevecinos.domain.listings.errors import (
     InvalidCategory,
     InvalidImages,
     ListingLocked,
+    ListingStatusConflict,
 )
 from entrevecinos.domain.media.errors import EmptyImage, ImageTooLarge, UnsupportedImageType
 from entrevecinos.domain.users.errors import (
@@ -156,6 +157,12 @@ async def invalid_images_handler(request: Request, exc: InvalidImages) -> JSONRe
     )
 
 
+async def listing_status_conflict_handler(
+    request: Request, exc: ListingStatusConflict
+) -> JSONResponse:
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": exc.detail})
+
+
 async def listing_locked_handler(request: Request, exc: ListingLocked) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": exc.detail})
 
@@ -175,6 +182,7 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(CurrencyWithoutPrice, currency_without_price_handler)
     app.add_exception_handler(InvalidImages, invalid_images_handler)
     app.add_exception_handler(ListingLocked, listing_locked_handler)
+    app.add_exception_handler(ListingStatusConflict, listing_status_conflict_handler)
     app.add_exception_handler(MembershipNotApproved, membership_not_approved_handler)
     app.add_exception_handler(MembershipAlreadyReviewed, membership_already_reviewed_handler)
     app.add_exception_handler(MembershipChangeRejected, membership_change_rejected_handler)

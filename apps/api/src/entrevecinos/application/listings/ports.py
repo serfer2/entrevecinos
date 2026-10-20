@@ -9,6 +9,7 @@ from entrevecinos.domain.listings.entities import (
     Listing,
     ListingImage,
     ListingSort,
+    ListingStatus,
     ListingType,
     NewListing,
     SortOrder,
@@ -55,6 +56,12 @@ class ListingRepository(Protocol):
 
     def replace_images(self, listing_id: uuid.UUID, images: list[ListingImage]) -> Listing:
         """Sustituye el conjunto de imágenes en la misma transacción."""
+        ...
+
+    def set_status(
+        self, listing_id: uuid.UUID, status: ListingStatus, moderator_id: uuid.UUID | None
+    ) -> Listing:
+        """Cambia el estado. Al retirar (`hidden`) registra quién y cuándo; si no, lo vacía."""
         ...
 
     def soft_delete(self, listing_id: uuid.UUID) -> None:

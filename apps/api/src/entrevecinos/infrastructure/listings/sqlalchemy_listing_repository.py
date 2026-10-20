@@ -230,6 +230,24 @@ class SqlAlchemyListingRepository:
         assert found is not None
         return found
 
+    def set_status(
+        self, listing_id: uuid.UUID, status: ListingStatus, moderator_id: uuid.UUID | None
+    ) -> Listing:
+        retired = status is ListingStatus.HIDDEN
+        self._session.execute(
+            update(ListingModel)
+            .where(ListingModel.id == listing_id)
+            .values(
+                status=status,
+                hidden_by=moderator_id if retired else None,
+                hidden_at=func.statement_timestamp() if retired else None,
+                updated_at=func.statement_timestamp(),
+            )
+        )
+        found = self.get(listing_id)
+        assert found is not None
+        return found
+
     def soft_delete(self, listing_id: uuid.UUID) -> None:
         self._session.execute(
             update(ListingModel)

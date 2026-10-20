@@ -84,6 +84,9 @@ class ListingModel(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.statement_timestamp()
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Retirada por moderación: quién y cuándo (se vacían al restaurar).
+    hidden_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Columna generada por PostgreSQL: el ORM nunca la escribe.
     search_vector: Mapped[str] = mapped_column(
         TSVECTOR, Computed(SEARCH_VECTOR, persisted=True), deferred=True

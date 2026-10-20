@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import (
     BaseModel,
@@ -103,6 +103,14 @@ class ListingUpdateRequest(BaseModel):
         if not self.model_fields_set:
             raise ValueError("At least one field is required")
         return self
+
+
+class ListingStatusUpdateRequest(BaseModel):
+    """Esquema `ListingStatusUpdate` del contrato (subconjunto implementado: moderación)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal[ListingStatus.HIDDEN, ListingStatus.ACTIVE]
 
 
 class ListingImageSelection(BaseModel):

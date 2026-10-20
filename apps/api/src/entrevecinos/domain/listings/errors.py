@@ -17,6 +17,17 @@ class CurrencyWithoutPrice(Exception):
     """Se indicó una moneda sin precio."""
 
 
+class ListingStatusConflict(Exception):
+    """El cambio de estado no es una transición permitida desde el estado actual (409)."""
+
+    SAME = "El anuncio ya está en ese estado."
+    NOT_ALLOWED = "Transición de estado no permitida."
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail)
+        self.detail = detail
+
+
 class ListingLocked(PermissionDenied):
     """El autor no puede modificar el anuncio en su estado actual (retirado, finalizado…)."""
 

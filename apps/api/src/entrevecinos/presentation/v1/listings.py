@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.exceptions import RequestValidationError
 
+from entrevecinos.application.listings.change_status import ChangeListingStatus
 from entrevecinos.application.listings.delete_listing import DeleteListing
 from entrevecinos.application.listings.editing import (
     EditableListing,
@@ -30,6 +31,7 @@ from entrevecinos.presentation.dependencies import (
 from entrevecinos.presentation.v1.pagination import Page, PageParams
 from entrevecinos.presentation.v1.schemas.common import (
     BAD_REQUEST,
+    CONFLICT,
     FORBIDDEN,
     NOT_FOUND,
     UNAUTHORIZED,
@@ -39,6 +41,7 @@ from entrevecinos.presentation.v1.schemas.listings import (
     ListingCreateRequest,
     ListingImagesUpdateRequest,
     ListingResponse,
+    ListingStatusUpdateRequest,
     ListingUpdateRequest,
 )
 
@@ -252,3 +255,26 @@ def delete_listing(
 ) -> Response:
     DeleteListing(access, listings).execute(user, listing_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch(
+    "/listings/{listing_id}/status",
+    operation_id="updateListingStatus",
+    summary="Cambiar el estado de un anuncio",
+    description=(
+        "Retirar (`hidden`) un anuncio visible o restaurarlo (`active`). Solo `community_admin` "
+        "o `moderator` de la comunidad, o `platform_admin`; se registra quién y cuándo lo "
+        "retiró. Un anuncio retirado deja de aparecer en el listado y en las búsquedas y su "
+        "detalle responde 404 a quien no es su autor ni gestor. Transición no permitida → 409."
+    ),
+    responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **CONFLICT, **VALIDATION_ERROR},
+)
+def update_listing_status(
+    listing_id: uuid.UUID,
+    body: ListingStatusUpdateRequest,
+    user: CurrentUserDep,
+    access: CommunityAccessDep,
+    listings: ListingRepositoryDep,
+) -> ListingResponse:
+    listing = ChangeListingStatus(access, listings).execute(user, listing_id, body.status)
+    return ListingResponse.from_domain(listing)
