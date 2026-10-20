@@ -18,11 +18,17 @@ type ListingPageProps = {
   searchParams: Promise<SearchParams>;
 };
 
-const URL_MESSAGES = { actualizado: "Anuncio actualizado." } as const;
+const URL_MESSAGES = {
+  actualizado: "Anuncio actualizado.",
+  restaurado: "Anuncio restaurado.",
+} as const;
 
 const URL_ERRORS = {
   "eliminar-permiso": "No puedes eliminar este anuncio.",
   eliminar: "No se pudo eliminar el anuncio. Inténtalo de nuevo.",
+  "moderar-permiso": "No puedes moderar este anuncio.",
+  "moderar-estado": "El anuncio ya estaba en ese estado.",
+  moderar: "No se pudo cambiar el estado del anuncio. Inténtalo de nuevo.",
 } as const;
 
 const NO_ACCESS = "No tienes acceso a los anuncios de esta comunidad.";

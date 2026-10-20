@@ -2,8 +2,11 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-const { deleteListing } = vi.hoisted(() => ({ deleteListing: vi.fn() }));
-vi.mock("../actions", () => ({ deleteListing }));
+const { deleteListing, moderateListing } = vi.hoisted(() => ({
+  deleteListing: vi.fn(),
+  moderateListing: vi.fn(),
+}));
+vi.mock("../actions", () => ({ deleteListing, moderateListing }));
 
 import type { ApiListing } from "../types";
 import { ListingActions } from "./ListingActions";
@@ -50,5 +53,43 @@ describe("ListingActions", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
 
     expect(deleteListing).not.toHaveBeenCalled();
+  });
+
+  it("moderación: «Retirar anuncio» en un anuncio visible, sin acciones de autor", () => {
+    render(<ListingActions listing={listing} isOwner={false} canModerate />);
+
+    expect(screen.getByRole("button", { name: "Retirar anuncio" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Restaurar anuncio" })).toBeNull();
+  });
+
+  it("moderación: anuncio retirado con aviso y «Restaurar anuncio»", () => {
+    render(<ListingActions listing={{ ...listing, status: "hidden" }} isOwner={false} canModerate />);
+
+    expect(screen.getByRole("status").textContent).toBe("Este anuncio está retirado y no se muestra en la comunidad.");
+    expect(screen.getByRole("button", { name: "Restaurar anuncio" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Retirar anuncio" })).toBeNull();
+  });
+
+  it("autor de un anuncio retirado: aviso, sin «Editar» ni moderación", () => {
+    render(<ListingActions listing={{ ...listing, status: "hidden" }} isOwner canModerate={false} />);
+
+    expect(screen.getByRole("status")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Editar anuncio" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Restaurar anuncio" })).toBeNull();
+  });
+
+  it("los roles se suman: autor y administrador", () => {
+    render(<ListingActions listing={listing} isOwner canModerate />);
+
+    for (const name of ["Eliminar anuncio", "Retirar anuncio"]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+    expect(screen.getByRole("link", { name: "Editar anuncio" })).toBeTruthy();
+  });
+
+  it("miembro sin rol en el anuncio de otro: ninguna acción", () => {
+    const { container } = render(<ListingActions listing={listing} isOwner={false} canModerate={false} />);
+
+    expect(container.innerHTML).toBe("");
   });
 });

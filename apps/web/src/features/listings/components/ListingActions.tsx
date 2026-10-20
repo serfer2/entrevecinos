@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
-import { deleteListing } from "../actions";
+import { deleteListing, moderateListing } from "../actions";
 import type { ApiListing } from "../types";
 
 export type ListingActionsProps = {
@@ -17,28 +17,60 @@ const secondary =
   "rounded-md border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50";
 
 /**
- * Acciones del detalle según quién mira. Ocultarlas no protege nada: la API decide los permisos.
+ * Acciones del detalle según quién mira; los roles se suman (un administrador que es el autor ve
+ * las de ambos). Ocultarlas no protege nada: la API decide los permisos.
  */
-export function ListingActions({ listing, isOwner }: ListingActionsProps) {
-  const canEdit = isOwner && listing.status !== "hidden" && listing.status !== "completed";
-  if (!isOwner) return null;
+export function ListingActions({ listing, isOwner, canModerate }: ListingActionsProps) {
+  const hidden = listing.status === "hidden";
+  const canEdit = isOwner && !hidden && listing.status !== "completed";
+  if (!isOwner && !canModerate) return null;
 
   return (
-    <div className="flex flex-wrap gap-2" aria-label="Acciones del anuncio" role="group">
-      {canEdit && (
-        <Link href={`/anuncios/${listing.id}/editar`} className={secondary}>
-          Editar anuncio
-        </Link>
+    <div className="flex flex-col gap-3">
+      {hidden && (isOwner || canModerate) && (
+        <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Este anuncio está retirado y no se muestra en la comunidad.
+        </p>
       )}
-      <ConfirmDialog
-        action={deleteListing}
-        triggerLabel="Eliminar anuncio"
-        title="¿Eliminar este anuncio?"
-        message="Dejará de verse en la comunidad. Esta acción no se puede deshacer."
-        confirmLabel="Eliminar"
-      >
-        <input type="hidden" name="listing_id" value={listing.id} />
-      </ConfirmDialog>
+      <div className="flex flex-wrap gap-2" aria-label="Acciones del anuncio" role="group">
+        {canEdit && (
+          <Link href={`/anuncios/${listing.id}/editar`} className={secondary}>
+            Editar anuncio
+          </Link>
+        )}
+        {isOwner && (
+          <ConfirmDialog
+            action={deleteListing}
+            triggerLabel="Eliminar anuncio"
+            title="¿Eliminar este anuncio?"
+            message="Dejará de verse en la comunidad. Esta acción no se puede deshacer."
+            confirmLabel="Eliminar"
+          >
+            <input type="hidden" name="listing_id" value={listing.id} />
+          </ConfirmDialog>
+        )}
+        {canModerate && !hidden && (
+          <ConfirmDialog
+            action={moderateListing}
+            triggerLabel="Retirar anuncio"
+            title="¿Retirar este anuncio?"
+            message="Dejará de mostrarse en la comunidad. Podrás restaurarlo más tarde."
+            confirmLabel="Retirar"
+          >
+            <input type="hidden" name="listing_id" value={listing.id} />
+            <input type="hidden" name="status" value="hidden" />
+          </ConfirmDialog>
+        )}
+        {canModerate && hidden && (
+          <form action={moderateListing}>
+            <input type="hidden" name="listing_id" value={listing.id} />
+            <input type="hidden" name="status" value="active" />
+            <button type="submit" className={secondary}>
+              Restaurar anuncio
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

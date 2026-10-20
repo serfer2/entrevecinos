@@ -110,6 +110,34 @@ export async function updateListing(
   redirect(`/anuncios/${listingId}?actualizado=1`);
 }
 
+/**
+ * Retira (`hidden`) o restaura (`active`) un anuncio por moderación. Al retirar vuelve a la
+ * comunidad; al restaurar se queda en el detalle. Los errores llegan por la URL.
+ */
+export async function moderateListing(formData: FormData): Promise<void> {
+  await requireUser();
+  const listingId = formText(formData, "listing_id");
+  const status = formText(formData, "status");
+  if (!isUuid(listingId)) redirect("/inicio");
+  if (status !== "hidden" && status !== "active") redirect(`/anuncios/${listingId}?error=moderar`);
+
+  const result = await userApiFetch<ApiListing>(`/listings/${listingId}/status`, {
+    method: "PATCH",
+    body: { status },
+  });
+  if (result.ok) {
+    const community = `/comunidades/${result.data.community_id}`;
+    revalidatePath(community);
+    revalidatePath(`/anuncios/${listingId}`);
+    redirect(status === "hidden" ? `${community}?retirado=1` : `/anuncios/${listingId}?restaurado=1`);
+  }
+  const { status: code } = result.error;
+  if (code === 404) redirect("/inicio?no-disponible=1");
+  if (code === 403) redirect(`/anuncios/${listingId}?error=moderar-permiso`);
+  if (code === 409) redirect(`/anuncios/${listingId}?error=moderar-estado`);
+  redirect(`/anuncios/${listingId}?error=moderar`);
+}
+
 /** Elimina un anuncio propio y vuelve a su comunidad (el destino sale del anuncio, no del formulario). */
 export async function deleteListing(formData: FormData): Promise<void> {
   await requireUser();
