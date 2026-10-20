@@ -201,8 +201,8 @@ def test_listing_visibility_rules(
     attach_to_listing(db_session, asset["id"], community, other_author, **fields)
 
     assert (read(client, member, asset["id"]).status_code == 302) is member_reads
-    # El administrador de la comunidad ve los retirados, pero no los eliminados.
-    expected_admin = "deleted_at" not in fields and fields.get("status") != "draft"
+    # El administrador de la comunidad ve los retirados y borradores, pero no los eliminados.
+    expected_admin = "deleted_at" not in fields
     assert (read(client, owner, asset["id"]).status_code == 302) is expected_admin
 
 

@@ -27,7 +27,8 @@ def listing_with_owner() -> Select[tuple[ListingModel, UserModel]]:
     return (
         select(ListingModel, UserModel)
         .join(UserModel, UserModel.id == ListingModel.owner_id)
-        .where(ListingModel.deleted_at.is_(None))
+        # Los anuncios de cuentas eliminadas tampoco se muestran (contrato, `users_me.yaml`).
+        .where(ListingModel.deleted_at.is_(None), UserModel.deleted_at.is_(None))
     )
 
 
@@ -112,14 +113,11 @@ class SqlAlchemyListingRepository:
         return found[0] if found else None
 
     def search(self, query: ListingQuery) -> PageResult[Listing]:
-        conditions = self._visible_in_community(query)
-        total = self._session.scalar(
-            select(func.count()).select_from(ListingModel).where(*conditions)
-        )
+        # Misma consulta base para la página y el total (incluido el filtro del autor).
+        visible = listing_with_owner().where(*self._visible_in_community(query))
+        total = self._session.scalar(select(func.count()).select_from(visible.subquery()))
         rows = self._session.execute(
-            listing_with_owner()
-            .where(*conditions)
-            .order_by(ListingModel.published_at.desc(), ListingModel.id.desc())
+            visible.order_by(ListingModel.published_at.desc(), ListingModel.id.desc())
             .offset(query.page.offset)
             .limit(query.page.page_size)
         )

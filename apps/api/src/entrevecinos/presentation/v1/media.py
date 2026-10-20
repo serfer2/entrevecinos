@@ -5,11 +5,14 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse
 from starlette.datastructures import UploadFile
 
+from entrevecinos.application.listings.visibility import ListingVisibility
 from entrevecinos.application.media.get_image_url import GetImageUrl
 from entrevecinos.application.media.upload_image import UploadImage
 from entrevecinos.domain.media.errors import EmptyImage, ImageTooLarge
 from entrevecinos.presentation.dependencies import (
+    CommunityAccessDep,
     CurrentUserDep,
+    ListingRepositoryDep,
     MediaRepositoryDep,
     ObjectStorageDep,
     SettingsDep,
@@ -118,9 +121,12 @@ def get_media(
     media: MediaRepositoryDep,
     storage: ObjectStorageDep,
     settings: SettingsDep,
+    listings: ListingRepositoryDep,
+    access: CommunityAccessDep,
 ) -> RedirectResponse:
     ttl = settings.media_url_ttl_seconds
-    url = GetImageUrl(media, storage, ttl).execute(user, asset_id)
+    use_case = GetImageUrl(media, storage, ttl, listings, ListingVisibility(access))
+    url = use_case.execute(user, asset_id)
     return RedirectResponse(
         url,
         status_code=status.HTTP_302_FOUND,

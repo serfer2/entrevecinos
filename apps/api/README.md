@@ -125,12 +125,14 @@ En los routers, la política se inyecta con `CommunityAccessDep`.
 - `Listing` incluye `owner` (leído siempre de `users`) e `images` ordenadas. Los precios son `Decimal` de extremo a extremo y se serializan como número JSON.
 - `DELETE /v1/listings/{id}`: borrado lógico (`deleted_at`, `status = deleted`) por el autor, un gestor de la comunidad o `platform_admin`. Las lecturas parten de `listing_with_owner()`, que ya excluye los eliminados.
 - `GET /v1/communities/{id}/listings`: anuncios `active` y `reserved` de la comunidad para miembros aprobados, del más reciente al más antiguo (`published_at DESC, id DESC`). Los criterios llegan en `ListingQuery`; el filtro de visibilidad común está en `SqlAlchemyListingRepository._visible_in_community` (lo comparten la página y el `total`).
+- `GET /v1/listings/{id}`: detalle. La visibilidad de un anuncio la decide solo `ListingVisibility` (`application/listings/visibility.py`): membresía aprobada (403) y, si está `hidden` o `draft`, solo autor y gestores (404 para el resto). La usan el detalle, las imágenes y la edición.
+- Los anuncios de cuentas eliminadas no aparecen en ninguna lectura.
 - `ListingLoader` (`infrastructure/listings/sqlalchemy_listing_repository.py`) carga anuncios con su autor y todas sus imágenes en dos consultas: úsalo en cualquier lectura de anuncios para evitar N+1.
 
 ## Imágenes
 
 - `POST /v1/media` (multipart, campo `file`) guarda una imagen en el almacenamiento de objetos. El tipo se decide por los *magic bytes* (JPEG, PNG o WebP; otro → `415`), máximo `MEDIA_MAX_BYTES` (→ `413`, comprobado antes de leer el cuerpo cuando hay `Content-Length`); vacío → `422`. La clave del objeto es `media/<usuario>/<uuid>.<ext>`.
-- `GET /v1/media/{id}` responde `302` a una URL prefirmada (`MEDIA_URL_TTL_SECONDS`) si el usuario la subió o pertenece a un anuncio visible para él; si no, `403`.
+- `GET /v1/media/{id}` responde `302` a una URL prefirmada (`MEDIA_URL_TTL_SECONDS`) si el usuario la subió o puede ver (`ListingVisibility`) el anuncio que la usa; si no, `403`.
 - `S3ObjectStorage` sube por `STORAGE_ENDPOINT` y firma con `STORAGE_PUBLIC_ENDPOINT`, porque la firma incluye el host que abre el navegador.
 - En las pruebas, la fixture `object_storage` sustituye el almacenamiento por uno en memoria; `pytest -m storage` prueba contra el MinIO real.
 

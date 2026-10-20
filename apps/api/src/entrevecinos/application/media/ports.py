@@ -21,6 +21,6 @@ class MediaRepository(Protocol):
         """Si todas las imágenes existen, las subió `user_id` y no están en ningún anuncio."""
         ...
 
-    def is_readable_by(self, asset_id: uuid.UUID, user_id: uuid.UUID) -> bool:
-        """Si la imagen está en algún anuncio no eliminado que el usuario puede ver."""
+    def listing_using(self, asset_id: uuid.UUID) -> uuid.UUID | None:
+        """Anuncio que usa la imagen (una imagen solo se asocia a un anuncio)."""
         ...

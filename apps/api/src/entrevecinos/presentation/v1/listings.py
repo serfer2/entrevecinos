@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 
 from entrevecinos.application.listings.delete_listing import DeleteListing
+from entrevecinos.application.listings.get_listing import GetListing
 from entrevecinos.application.listings.list_community_listings import ListCommunityListings
 from entrevecinos.application.listings.ports import ListingQuery
 from entrevecinos.application.listings.publish_listing import PublishListing, PublishListingCommand
+from entrevecinos.application.listings.visibility import ListingVisibility
 from entrevecinos.presentation.dependencies import (
     CategoryRepositoryDep,
     CommunityAccessDep,
@@ -103,6 +105,28 @@ def create_listing(
     listing = PublishListing(access, categories, media, listings).execute(
         user, community_id, command
     )
+    return ListingResponse.from_domain(listing)
+
+
+@router.get(
+    "/listings/{listing_id}",
+    operation_id="getListing",
+    summary="Obtener el detalle de un anuncio",
+    description=(
+        "Devuelve el anuncio con imágenes y datos del anunciante (incluido el teléfono, canal de "
+        "contacto del MVP). Requiere membresía aprobada en la comunidad del anuncio (403). Un "
+        "anuncio `hidden` solo lo ven su autor y los gestores de la comunidad; para el resto, como "
+        "uno eliminado o inexistente, 404."
+    ),
+    responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **VALIDATION_ERROR},
+)
+def get_listing(
+    listing_id: uuid.UUID,
+    user: CurrentUserDep,
+    access: CommunityAccessDep,
+    listings: ListingRepositoryDep,
+) -> ListingResponse:
+    listing = GetListing(ListingVisibility(access), listings).execute(user, listing_id)
     return ListingResponse.from_domain(listing)
 
 

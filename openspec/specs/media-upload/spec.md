@@ -22,7 +22,7 @@ El tipo MUST decidirse por los *magic bytes*, ignorando el `Content-Type` y la e
 - **THEN** la respuesta es `413 {"detail": "La imagen supera el tamaño máximo de 5 MB."}`
 
 ### Requirement: Leer una imagen
-`GET /v1/media/{asset_id}` SHALL responder `302` a una URL prefirmada del host público (válida 300 s) a quien la subió o a un miembro aprobado de la comunidad de un anuncio visible que la use; a cualquier otro usuario MUST responder `403`, y `404` si no existe.
+`GET /v1/media/{asset_id}` SHALL responder `302` a una URL prefirmada del host público (válida 300 s) a quien la subió o a quien puede ver (según `ListingVisibility`) el anuncio no eliminado que la usa; a cualquier otro usuario MUST responder `403`, y `404` si no existe.
 
 #### Scenario: Miembro de la comunidad
 - **WHEN** un miembro aprobado pide una imagen de un anuncio de su comunidad

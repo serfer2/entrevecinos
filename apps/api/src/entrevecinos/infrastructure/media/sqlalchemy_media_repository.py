@@ -1,18 +1,10 @@
 import uuid
 
-from sqlalchemy import exists, or_, select
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
-from entrevecinos.domain.communities.entities import MembershipRole, MembershipStatus
 from entrevecinos.domain.media.entities import MediaAsset, NewMediaAsset
-from entrevecinos.infrastructure.db.models import (
-    CommunityMembershipModel,
-    ListingImageModel,
-    ListingModel,
-    MediaAssetModel,
-)
-
-VISIBLE_STATUSES = ("active", "reserved", "completed")
+from entrevecinos.infrastructure.db.models import ListingImageModel, MediaAssetModel
 
 
 def to_domain(model: MediaAssetModel) -> MediaAsset:
@@ -58,31 +50,7 @@ class SqlAlchemyMediaRepository:
         ).all()
         return set(valid) == ids
 
-    def is_readable_by(self, asset_id: uuid.UUID, user_id: uuid.UUID) -> bool:
-        membership = CommunityMembershipModel
-        query = (
-            select(ListingImageModel.asset_id)
-            .join(ListingModel, ListingModel.id == ListingImageModel.listing_id)
-            .join(
-                membership,
-                (membership.community_id == ListingModel.community_id)
-                & (membership.user_id == user_id)
-                & (membership.status == MembershipStatus.APPROVED),
-            )
-            .where(
-                ListingImageModel.asset_id == asset_id,
-                ListingModel.deleted_at.is_(None),
-                or_(
-                    ListingModel.status.in_(VISIBLE_STATUSES),
-                    # Un anuncio retirado solo lo ven su autor y los gestores de la comunidad.
-                    (ListingModel.status == "hidden")
-                    & (
-                        (ListingModel.owner_id == user_id)
-                        | membership.role.in_(
-                            [MembershipRole.COMMUNITY_ADMIN, MembershipRole.MODERATOR]
-                        )
-                    ),
-                ),
-            )
+    def listing_using(self, asset_id: uuid.UUID) -> uuid.UUID | None:
+        return self._session.scalar(
+            select(ListingImageModel.listing_id).where(ListingImageModel.asset_id == asset_id)
         )
-        return bool(self._session.scalar(select(exists(query))))
