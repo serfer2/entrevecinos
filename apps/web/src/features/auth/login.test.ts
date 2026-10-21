@@ -58,6 +58,13 @@ describe("login", () => {
     },
   );
 
+  it("redirige a la comunidad que devuelve postLoginPath", async () => {
+    apiFetch.mockResolvedValue(success);
+    postLoginPath.mockResolvedValue("/comunidades/c1");
+
+    await expect(login(undefined, form(credentials))).rejects.toThrow("NEXT_REDIRECT:/comunidades/c1");
+  });
+
   it("muestra un error genérico con 401 y conserva solo el correo", async () => {
     apiFetch.mockResolvedValue({ ok: false, error: { status: 401, detail: "x" } });
 

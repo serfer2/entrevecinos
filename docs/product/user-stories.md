@@ -23,7 +23,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 4. Explorar y encontrar anuncios | HU-10, HU-11, HU-12, HU-13 |
 | 5. Detalle y contacto | HU-14, HU-15 |
 | 6. Administración mínima | HU-16, HU-17 |
-| 7. Mejora de funcionalidades del MVP | HU-18, HU-19 |
+| 7. Mejora de funcionalidades del MVP | HU-18, HU-19, HU-20 |
 
 ---
 
@@ -531,3 +531,24 @@ Mejoras sobre las funcionalidades ya implementadas en las épicas 1 a 6. No aña
 - **When** inicio sesión
 - **Then** vuelvo a esa ruta en lugar de a la lista de comunidades (asumido)
 
+### HU-20 Entrar en mi comunidad al iniciar sesión si solo pertenezco a una
+
+**Como** miembro de una sola comunidad, **quiero** llegar directamente a ella al iniciar sesión, **para** ver sus anuncios sin pasos intermedios.
+
+**AC1 — Una comunidad**
+
+- **Given** que soy miembro aprobado de una sola comunidad
+- **When** inicio sesión
+- **Then** llego a esa comunidad
+
+**AC2 — Varias comunidades**
+
+- **Given** que soy miembro aprobado de dos o más comunidades
+- **When** inicio sesión
+- **Then** llego a mi página de inicio, con la lista de mis comunidades (asumido)
+
+**AC3 — Destino solicitado**
+
+- **Given** que el inicio de sesión me lo pidió una ruta protegida
+- **When** inicio sesión
+- **Then** vuelvo a esa ruta en lugar de a mi comunidad (asumido)

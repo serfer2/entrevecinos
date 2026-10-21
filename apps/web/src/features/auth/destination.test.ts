@@ -39,7 +39,19 @@ describe("postLoginPath", () => {
     expect(await postLoginPath("jwt")).toBe("/comunidades");
   });
 
-  it("lleva a /inicio con alguna comunidad", async () => {
+  it("lleva a la comunidad si solo hay una", async () => {
+    apiFetch.mockResolvedValue(memberships(membership("c1")));
+
+    expect(await postLoginPath("jwt")).toBe("/comunidades/c1");
+  });
+
+  it("ignora las comunidades desactivadas al contar", async () => {
+    apiFetch.mockResolvedValue(memberships(membership("c1"), membership("c2", false)));
+
+    expect(await postLoginPath("jwt")).toBe("/comunidades/c1");
+  });
+
+  it("lleva a /inicio con varias comunidades", async () => {
     apiFetch.mockResolvedValue(memberships(membership("c1"), membership("c2")));
 
     expect(await postLoginPath("jwt")).toBe("/inicio");

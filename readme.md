@@ -157,7 +157,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Registro e inicio de sesión con correo electrónico.
    - Perfil con nombre y datos de contacto.
    - Asociación del usuario a una comunidad.
-   - Tras registrarse o iniciar sesión, llevar al usuario a la lista de comunidades si todavía no pertenece a ninguna.
+   - Tras registrarse o iniciar sesión, llevar al usuario a la lista de comunidades si todavía no pertenece a ninguna, o directamente a su comunidad si solo pertenece a una.
 2. **Comunidades**
    - Crear o seleccionar una comunidad local.
    - Permitir que sus miembros vean los anuncios asociados a ella.
