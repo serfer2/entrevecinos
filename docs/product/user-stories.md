@@ -23,7 +23,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 4. Explorar y encontrar anuncios | HU-10, HU-11, HU-12, HU-13 |
 | 5. Detalle y contacto | HU-14, HU-15 |
 | 6. Administración mínima | HU-16, HU-17 |
-| 7. Mejora de funcionalidades del MVP | HU-18 |
+| 7. Mejora de funcionalidades del MVP | HU-18, HU-19 |
 
 ---
 
@@ -508,3 +508,26 @@ Mejoras sobre las funcionalidades ya implementadas en las épicas 1 a 6. No aña
 - **Given** que tengo la sesión iniciada
 - **When** abro la dirección principal de la aplicación
 - **Then** llego a mi página de inicio
+
+### HU-19 Buscar comunidades al registrarme o iniciar sesión si no pertenezco a ninguna
+
+**Como** vecino que todavía no pertenece a ninguna comunidad, **quiero** llegar a la lista de comunidades al registrarme o al iniciar sesión, **para** encontrar la mía y solicitar el acceso sin pasos intermedios.
+
+**AC1 — Sin comunidades**
+
+- **Given** que no soy miembro aprobado de ninguna comunidad (asumido: una solicitud pendiente, rechazada o un bloqueo no cuentan)
+- **When** inicio sesión
+- **Then** llego a la lista de comunidades existentes
+
+**AC2 — Registro**
+
+- **Given** que acabo de crear mi cuenta
+- **When** termino el registro
+- **Then** llego a la lista de comunidades existentes
+
+**AC3 — Destino solicitado**
+
+- **Given** que el inicio de sesión me lo pidió una ruta protegida
+- **When** inicio sesión
+- **Then** vuelvo a esa ruta en lugar de a la lista de comunidades (asumido)
+

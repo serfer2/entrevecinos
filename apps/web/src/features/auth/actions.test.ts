@@ -33,14 +33,14 @@ describe("signup", () => {
     vi.clearAllMocks();
   });
 
-  it("crea la sesión y redirige a /inicio con 201", async () => {
+  it("crea la sesión y redirige a /comunidades con 201", async () => {
     apiFetch.mockResolvedValue({
       ok: true,
       status: 201,
       data: { access_token: "jwt", expires_in: 86400, token_type: "Bearer", user: {} },
     });
 
-    await expect(signup(undefined, form(validForm))).rejects.toThrow("NEXT_REDIRECT:/inicio");
+    await expect(signup(undefined, form(validForm))).rejects.toThrow("NEXT_REDIRECT:/comunidades");
 
     expect(apiFetch).toHaveBeenCalledWith("/auth/register", {
       method: "POST",

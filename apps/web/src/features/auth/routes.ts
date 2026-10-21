@@ -3,6 +3,7 @@ export const PUBLIC_ROUTES: readonly string[] = ["/", "/registro", "/iniciar-ses
 
 export const LOGIN_PATH = "/iniciar-sesion";
 export const HOME_PATH = "/inicio";
+export const COMMUNITIES_PATH = "/comunidades";
 export const SESSION_EXPIRED_PATH = `${LOGIN_PATH}?motivo=sesion-caducada`;
 
 /** Nombre de la cookie de sesión (sin dependencias de servidor: lo usa también el proxy). */

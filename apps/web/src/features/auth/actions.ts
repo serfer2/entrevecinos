@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { invalidBodyFields } from "@/lib/api/errors";
 import { apiFetch } from "@/lib/api/server";
 
+import { postLoginPath } from "./destination";
 import { safeNextPath } from "./redirect";
-import { HOME_PATH } from "./routes";
+import { COMMUNITIES_PATH } from "./routes";
 import {
   fieldErrorsOf,
   LOGIN_MESSAGES,
@@ -67,7 +68,8 @@ export async function signup(_state: SignupState, formData: FormData): Promise<S
   }
 
   await createSession(result.data.access_token, result.data.expires_in);
-  redirect(HOME_PATH);
+  // Una cuenta recién creada no pertenece a ninguna comunidad: empieza buscando la suya.
+  redirect(COMMUNITIES_PATH);
 }
 
 export type LoginState =
@@ -108,5 +110,5 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
   }
 
   await createSession(result.data.access_token, result.data.expires_in);
-  redirect(safeNextPath(formData.get("next")) ?? HOME_PATH);
+  redirect(safeNextPath(formData.get("next")) ?? (await postLoginPath(result.data.access_token)));
 }

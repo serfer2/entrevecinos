@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiFetch, cookieSet, redirect } = vi.hoisted(() => ({
+const { apiFetch, cookieSet, postLoginPath, redirect } = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   cookieSet: vi.fn(),
+  postLoginPath: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT:${url}`);
   }),
@@ -11,6 +12,7 @@ const { apiFetch, cookieSet, redirect } = vi.hoisted(() => ({
 vi.mock("@/lib/api/server", () => ({ apiFetch }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ set: cookieSet }) }));
 vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("./destination", () => ({ postLoginPath }));
 
 import { login } from "./actions";
 
@@ -40,16 +42,19 @@ describe("login", () => {
     );
     expect(apiFetch).toHaveBeenCalledWith("/auth/token", { method: "POST", body: credentials });
     expect(cookieSet).toHaveBeenCalledWith("ev_session", "jwt", expect.objectContaining({ httpOnly: true }));
+    expect(postLoginPath).not.toHaveBeenCalled();
   });
 
   it.each(["https://evil.example", "//evil.example", ""])(
-    "ignora next=%s y redirige a /inicio",
+    "ignora next=%s y redirige al destino según las comunidades",
     async (next) => {
       apiFetch.mockResolvedValue(success);
+      postLoginPath.mockResolvedValue("/comunidades");
 
       await expect(login(undefined, form({ ...credentials, next }))).rejects.toThrow(
-        "NEXT_REDIRECT:/inicio",
+        "NEXT_REDIRECT:/comunidades",
       );
+      expect(postLoginPath).toHaveBeenCalledWith("jwt");
     },
   );
 

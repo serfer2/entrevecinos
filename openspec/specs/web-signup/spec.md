@@ -4,11 +4,11 @@
 Registro desde el navegador (`/registro`) con validación en servidor y sesión en la cookie httpOnly `ev_session`.
 ## Requirements
 ### Requirement: Registro desde el navegador
-La página `/registro` SHALL permitir crear una cuenta con nombre, correo, contraseña y teléfono opcional y, al terminar, redirigir a `/inicio` con la *cookie* `ev_session` (`HttpOnly`, `SameSite=Lax`).
+La página `/registro` SHALL permitir crear una cuenta con nombre, correo, contraseña y teléfono opcional y, al terminar, redirigir a `/comunidades` con la *cookie* `ev_session` (`HttpOnly`, `SameSite=Lax`).
 
 #### Scenario: Registro correcto
 - **WHEN** se envía el formulario con datos válidos y un correo no registrado
-- **THEN** el navegador queda en `/inicio` y la *cookie* `ev_session` no es accesible desde `document.cookie`
+- **THEN** el navegador queda en `/comunidades` y la *cookie* `ev_session` no es accesible desde `document.cookie`
 
 ### Requirement: Correo ya registrado
 El formulario SHALL mostrar «Este correo ya está en uso.» bajo el campo de correo cuando la API responda `409`, conservando nombre, correo y teléfono.
