@@ -154,7 +154,7 @@ La interfaz se adapta a ordenadores, tablets y smartphones para facilitar el uso
 
 El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su comunidad y que otra persona pueda encontrarla y contactar con él. Para cubrir ese recorrido, incluiría:
 1. **Registro y perfil básico**
-   - Registro e inicio de sesión con correo electrónico.
+   - Registro, inicio y cierre de sesión con correo electrónico.
    - Perfil con nombre y datos de contacto.
    - Asociación del usuario a una comunidad.
    - Tras registrarse o iniciar sesión, llevar al usuario a la lista de comunidades si todavía no pertenece a ninguna, o directamente a su comunidad si solo pertenece a una.

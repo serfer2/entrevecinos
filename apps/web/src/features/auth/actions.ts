@@ -17,7 +17,7 @@ import {
   signupSchema,
   type SignupField,
 } from "./schemas";
-import { createSession } from "./session";
+import { createSession, deleteSession } from "./session";
 import type { AuthResponse } from "./types";
 
 export type SignupState =
@@ -111,4 +111,11 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
 
   await createSession(result.data.access_token, result.data.expires_in);
   redirect(safeNextPath(formData.get("next")) ?? (await postLoginPath(result.data.access_token)));
+}
+
+/** Cierra la sesión y va a la raíz, que lleva al inicio de sesión. Se envía por POST. */
+export async function logout(): Promise<void> {
+  // Borrar la cookie en una Server Action invalida también la caché del router del cliente.
+  await deleteSession();
+  redirect("/");
 }

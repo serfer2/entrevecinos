@@ -12,7 +12,7 @@ Historias del MVP definido en la sección 1.2 del `readme.md`. Las inferencias q
 
 ## Fuera de alcance
 
-No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Tampoco la recuperación de contraseña ni el cierre de sesión, que no aparecen en el README.
+No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Tampoco la recuperación de contraseña, que no aparece en el README.
 
 ## Índice
 
@@ -26,6 +26,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 6. Administración mínima | HU-16, HU-17 |
 | 7. Mejora de funcionalidades del MVP | HU-18, HU-19, HU-20 |
 | 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23 |
+| 9. Cierre de sesión | HU-24 |
 
 ---
 
@@ -620,3 +621,29 @@ Control sobre las comunidades que se crean: un administrador de plataforma las r
 - **Given** que mi comunidad pendiente ha sido aprobada
 - **When** creo otra comunidad
 - **Then** se crea y queda pendiente de aprobación
+
+---
+
+## Épica 9 — Cierre de sesión
+
+### HU-24 Cerrar sesión
+
+**Como** vecino con la sesión iniciada, **quiero** cerrar mi sesión, **para** que nadie más pueda usar mi cuenta desde este navegador, por ejemplo en un equipo compartido.
+
+**AC1 — Acceso visible**
+
+- **Given** que tengo la sesión iniciada
+- **When** estoy en cualquier página de la zona privada
+- **Then** tengo a mano la opción «Cerrar sesión» en la cabecera, junto a «Mi perfil» (asumido)
+
+**AC2 — Cierre de sesión**
+
+- **Given** que tengo la sesión iniciada
+- **When** pulso «Cerrar sesión»
+- **Then** mi sesión termina y voy a la raíz del sitio, que me lleva al inicio de sesión
+
+**AC3 — Sin acceso tras cerrar**
+
+- **Given** que he cerrado la sesión
+- **When** intento abrir una página privada, también con el botón «Atrás» del navegador
+- **Then** se me pide iniciar sesión
