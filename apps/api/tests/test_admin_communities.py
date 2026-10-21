@@ -105,6 +105,26 @@ def test_approving_an_active_community_changes_nothing(
     assert response.json() == community
 
 
+def test_platform_admin_creates_active_communities(
+    client: TestClient, platform_admin: dict, neighbour: dict
+) -> None:
+    response = client.post(
+        "/v1/communities", json={"name": "Barrio"}, headers=platform_admin["headers"]
+    )
+
+    assert response.status_code == 201
+    community = response.json()
+    assert community["is_active"] is True
+    detail = client.get(f"/v1/communities/{community['id']}", headers=neighbour["headers"])
+    assert detail.status_code == 200
+    search = client.get("/v1/communities", headers=neighbour["headers"]).json()
+    assert [c["id"] for c in search["items"]] == [community["id"]]
+    mine = client.get("/v1/users/me/memberships", headers=platform_admin["headers"]).json()
+    assert [(m["community"]["id"], m["role"]) for m in mine["items"]] == [
+        (community["id"], "community_admin")
+    ]
+
+
 def test_unknown_community_is_not_found(client: TestClient, platform_admin: dict) -> None:
     assert approve(client, platform_admin, uuid.uuid4()).status_code == 404
 

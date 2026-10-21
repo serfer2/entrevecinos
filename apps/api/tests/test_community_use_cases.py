@@ -13,23 +13,35 @@ from entrevecinos.domain.communities.entities import (
     NewCommunity,
 )
 from entrevecinos.domain.communities.errors import CommunityNotFound, MembershipAlreadyExists
+from entrevecinos.domain.users.entities import PlatformRole
 from tests.fakes import InMemoryCommunityRepository, InMemoryMembershipRepository
+from tests.test_community_access import make_user
 
 
 def test_creator_becomes_approved_admin_of_a_pending_community() -> None:
     repository = InMemoryCommunityRepository()
-    creator = uuid.uuid4()
+    creator = make_user()
 
     community = CreateCommunity(repository).execute(
-        NewCommunity(name="Los Olivos", city="Majadahonda"), creator_id=creator
+        NewCommunity(name="Los Olivos", city="Majadahonda"), creator=creator
     )
 
-    assert community.created_by == creator
+    assert community.created_by == creator.id
     assert community.is_active is False
-    membership = repository.memberships[(community.id, creator)]
+    membership = repository.memberships[(community.id, creator.id)]
     assert membership.role is MembershipRole.COMMUNITY_ADMIN
     assert membership.status is MembershipStatus.APPROVED
     assert membership.joined_at is not None
+
+
+def test_platform_admin_creates_an_active_community() -> None:
+    repository = InMemoryCommunityRepository()
+    creator = make_user(PlatformRole.PLATFORM_ADMIN)
+
+    community = CreateCommunity(repository).execute(NewCommunity(name="X"), creator=creator)
+
+    assert community.is_active is True
+    assert repository.memberships[(community.id, creator.id)].role is MembershipRole.COMMUNITY_ADMIN
 
 
 def test_get_returns_active_community() -> None:

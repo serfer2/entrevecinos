@@ -66,6 +66,7 @@ Cambios compatibles del contrato durante el desarrollo del MVP:
 | TK-038 | `ListingOwner.email` (obligatorio): canal de contacto del MVP junto con `phone`. |
 | TK-044 | `updateListingStatus`: transiciones del autor (`active` ↔ `reserved`, → `completed` final) y 409 para transiciones no permitidas. |
 | TK-050 | `createCommunity` crea la comunidad con `is_active: false` (pendiente de aprobación). `adminListCommunities` y `adminUpdateCommunity` pasan al MVP (`x-mvp: true`) para listar las pendientes y aprobarlas; `adminUpdateCommunity` solo admite `is_active: true`. |
+| TK-052 | `createCommunity`: las comunidades que crea un `platform_admin` se crean activas (`is_active: true`). |
 
 ## Resumen de endpoints
 

@@ -40,12 +40,13 @@ docs/product/tickets/
 | `EP-07-mejora-de-funcionalidades-del-mvp/HU-19-buscar-comunidades-al-registrarme-o-iniciar-sesion-si-no-pertenezco-a-ninguna/` | TK-048 lista de comunidades tras el registro o el inicio de sesión sin comunidades |
 | `EP-07-mejora-de-funcionalidades-del-mvp/HU-20-entrar-en-mi-comunidad-al-iniciar-sesion-si-solo-pertenezco-a-una/` | TK-049 mi comunidad tras el inicio de sesión con una sola |
 | `EP-08-mejora-de-la-gestion-de-comunidades/HU-21-aprobar-las-comunidades-nuevas-antes-de-activarlas/` | TK-050 backend comunidades pendientes y aprobación · TK-051 comunidades pendientes y página de aprobación |
+| `EP-08-mejora-de-la-gestion-de-comunidades/HU-22-activar-al-momento-las-comunidades-que-crea-un-administrador-de-plataforma/` | TK-052 backend comunidades activas para el `platform_admin` |
 
 ## Orden de implementación recomendado
 
 Respeta las dependencias de cada ticket (campo **Depende de**). Los números de migración (`0002`…`0006`) asumen este orden.
 
-**Estado:** todos los tickets (TK-001 a TK-051) están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket.
+**Estado:** todos los tickets (TK-001 a TK-052) están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket.
 
 | Bloque | Orden |
 |---|---|
@@ -59,6 +60,6 @@ Respeta las dependencias de cada ticket (campo **Depende de**). Los números de 
 | Administración | TK-040 → TK-041 → TK-042 → TK-043 |
 | Reservar y finalizar | TK-044 → TK-045 |
 | Épica 7 — Mejoras | TK-047 → TK-048 → TK-049 |
-| Épica 8 — Gestión de comunidades | TK-050 → TK-051 |
+| Épica 8 — Gestión de comunidades | TK-050 → TK-051 → TK-052 |
 
 El detalle del anuncio (TK-036/TK-037) se adelanta a la edición y la eliminación de la interfaz porque es su punto de entrada. La CSP (TK-046) va justo después de TK-023, en cuanto se sirven imágenes desde el almacenamiento. Reservar y finalizar (TK-044/TK-045) va al final porque amplía el endpoint de estado de TK-042.

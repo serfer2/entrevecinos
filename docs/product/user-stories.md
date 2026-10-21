@@ -25,7 +25,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 5. Detalle y contacto | HU-14, HU-15 |
 | 6. Administración mínima | HU-16, HU-17 |
 | 7. Mejora de funcionalidades del MVP | HU-18, HU-19, HU-20 |
-| 8. Mejora de la gestión de comunidades | HU-21 |
+| 8. Mejora de la gestión de comunidades | HU-21, HU-22 |
 
 ---
 
@@ -588,3 +588,19 @@ Control sobre las comunidades que se crean: un administrador de plataforma las r
 - **Given** que no soy administrador de plataforma
 - **When** intento ver las comunidades pendientes o aprobar una
 - **Then** no tengo acceso a esa función
+
+### HU-22 Activar al momento las comunidades que crea un administrador de plataforma
+
+**Como** administrador de plataforma, **quiero** que las comunidades que creo queden activas al momento, **para** no tener que aprobar mis propias comunidades.
+
+**AC1 — Comunidad activa**
+
+- **Given** que soy administrador de plataforma
+- **When** creo una comunidad
+- **Then** queda activa, aparece en las búsquedas y entro en ella como su administrador
+
+**AC2 — Vecinos**
+
+- **Given** que soy un vecino sin rol de administrador de plataforma
+- **When** creo una comunidad
+- **Then** sigue quedando pendiente de aprobación (HU-21)

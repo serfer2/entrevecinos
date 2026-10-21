@@ -100,7 +100,8 @@ Hoy `POST /communities` crea la comunidad activa. HU-21 pide que quede pendiente
 ```bash
 make dev
 COMPOSE="docker compose --env-file .env -f infra/docker-compose.yml"
-$COMPOSE exec api python -m pytest -q
+# Las pruebas no están montadas en el contenedor de desarrollo: se montan para ejecutarlas.
+$COMPOSE run --rm -v "$PWD/apps/api/tests:/app/tests" api python -m pytest -q
 # Usuario normal: POST /v1/communities → is_active false; GET /v1/communities/{id} → 404
 # platform_admin: GET /v1/admin/communities?is_active=false → la lista; PATCH {"is_active": true} → 200
 ```

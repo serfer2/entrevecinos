@@ -53,7 +53,8 @@ post:
     El creador queda registrado como `community_admin` con membresía `approved`. La comunidad se crea
     con `is_active: false`, pendiente de aprobación por un `platform_admin` (`PATCH
     /admin/communities/{community_id}`): hasta entonces no aparece en las búsquedas ni admite
-    solicitudes ni anuncios. Requiere estar autenticado.
+    solicitudes ni anuncios. Las que crea un `platform_admin` se crean con `is_active: true`.
+    Requiere estar autenticado.
   x-mvp: true
   requestBody:
     required: true
