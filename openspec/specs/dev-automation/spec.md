@@ -19,11 +19,11 @@ El Makefile SHALL ofrecer `build-frontend` (solo `web`), `build-backend` (solo `
 - **THEN** quedan construidas `entrevecinos-web` y `entrevecinos-api`
 
 ### Requirement: Entorno de desarrollo completo
-`make dev` SHALL construir las imágenes y levantar `db`, `api` y `web` en segundo plano, y mostrar sus URLs.
+`make dev` SHALL construir las imágenes y levantar `db`, `mail`, `api` y `web` en segundo plano, y mostrar las URLs de la web, la API y el buzón de correo.
 
 #### Scenario: dev
 - **WHEN** se ejecuta `make dev` con los puertos por defecto
-- **THEN** los tres servicios quedan en marcha y `http://localhost:3000` y `http://localhost:8000/docs` responden
+- **THEN** los servicios quedan en marcha y `http://localhost:3000`, `http://localhost:8000/docs` y `http://localhost:8025` responden
 
 ### Requirement: Limpieza sin pérdida de datos
 `make clean` SHALL detener y eliminar los contenedores y las imágenes construidas localmente, y MUST NOT eliminar el volumen `db_data`.

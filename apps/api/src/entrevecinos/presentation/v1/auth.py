@@ -1,15 +1,41 @@
+import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 
 from entrevecinos.application.users.authenticate_user import AuthenticateUser, LoginCommand
+from entrevecinos.application.users.ports import EmailSender, OutgoingEmail
 from entrevecinos.application.users.register_user import RegisterUser, RegisterUserCommand
-from entrevecinos.presentation.dependencies import get_authenticate_user, get_register_user
-from entrevecinos.presentation.v1.schemas.auth import AuthResponse, LoginRequest, RegisterRequest
+from entrevecinos.application.users.verify_email import VerifyEmail
+from entrevecinos.presentation.dependencies import (
+    EmailSenderDep,
+    get_authenticate_user,
+    get_register_user,
+    get_verify_email,
+)
+from entrevecinos.presentation.v1.schemas.auth import (
+    AuthResponse,
+    EmailNotVerifiedResponse,
+    EmailVerificationRequest,
+    LoginRequest,
+    RegisterRequest,
+    RegistrationResponse,
+    VerificationErrorResponse,
+)
 from entrevecinos.presentation.v1.schemas.common import CONFLICT, UNAUTHORIZED, VALIDATION_ERROR
 from entrevecinos.presentation.v1.schemas.users import UserResponse
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
+
+
+def send_in_background(sender: EmailSender, email: OutgoingEmail) -> None:
+    """Se ejecuta tras responder: si el SMTP falla, la cuenta sigue creada y se anota el error."""
+    try:
+        sender.send(email)
+    except Exception:
+        logger.exception("No se pudo enviar el correo «%s»", email.subject)
 
 
 @router.post(
@@ -17,17 +43,49 @@ router = APIRouter(prefix="/auth", tags=["Autenticación"])
     status_code=status.HTTP_201_CREATED,
     operation_id="registerUser",
     summary="Registrar una cuenta",
-    description="Crea una cuenta con rol `user` y devuelve un token JWT para iniciar la sesión.",
+    description=(
+        "Crea una cuenta inactiva con rol `user` y envía un correo con el enlace de validación. "
+        "La cuenta se activa al validar el correo (`POST /auth/email-verification`)."
+    ),
     responses={**CONFLICT, **VALIDATION_ERROR},
 )
 def register(
-    body: RegisterRequest, register_user: Annotated[RegisterUser, Depends(get_register_user)]
-) -> AuthResponse:
-    user, token = register_user.execute(
+    body: RegisterRequest,
+    register_user: Annotated[RegisterUser, Depends(get_register_user)],
+    sender: EmailSenderDep,
+    background_tasks: BackgroundTasks,
+) -> RegistrationResponse:
+    registration = register_user.execute(
         RegisterUserCommand(
             email=body.email, password=body.password, full_name=body.full_name, phone=body.phone
         )
     )
+    background_tasks.add_task(send_in_background, sender, registration.verification_email)
+    return RegistrationResponse(
+        email=registration.user.email,
+        verification_expires_at=registration.verification_expires_at,
+    )
+
+
+@router.post(
+    "/email-verification",
+    operation_id="verifyEmail",
+    summary="Validar el correo electrónico",
+    description=(
+        "Valida el correo con el token del enlace, activa la cuenta y emite un token JWT. "
+        "Acceso público."
+    ),
+    responses={
+        400: {"model": VerificationErrorResponse},
+        410: {"model": VerificationErrorResponse},
+        **VALIDATION_ERROR,
+    },
+)
+def verify_email(
+    body: EmailVerificationRequest,
+    verify: Annotated[VerifyEmail, Depends(get_verify_email)],
+) -> AuthResponse:
+    user, token = verify.execute(body.token)
     return AuthResponse(
         access_token=token.token, expires_in=token.expires_in, user=UserResponse.from_domain(user)
     )
@@ -38,7 +96,7 @@ def register(
     operation_id="loginUser",
     summary="Iniciar sesión",
     description="Valida las credenciales y emite un token JWT. Acceso público.",
-    responses={**UNAUTHORIZED, **VALIDATION_ERROR},
+    responses={**UNAUTHORIZED, 403: {"model": EmailNotVerifiedResponse}, **VALIDATION_ERROR},
 )
 def login(
     body: LoginRequest,

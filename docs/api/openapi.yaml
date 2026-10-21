@@ -6,7 +6,7 @@ info:
     API REST del marketplace de proximidad **EntreVecinos**.
 
     ## Convenciones
-    - **Autenticación:** JWT en `Authorization: Bearer <token>` (`/auth/register`, `/auth/token`). Los endpoints públicos declaran `security: []`.
+    - **Autenticación:** JWT en `Authorization: Bearer <token>` (`/auth/token`, o `/auth/email-verification` tras registrarse con `/auth/register`). Los endpoints públicos declaran `security: []`.
     - **Autorización (RBAC):** cada operación indica en su descripción el rol necesario: usuario autenticado, miembro aprobado de la comunidad, `community_admin`/`moderator` o `platform_admin`.
     - **MVP:** la extensión `x-mvp` marca con `true` las operaciones del MVP y con `false` las de fases posteriores.
     - **Paginación:** los listados aceptan `page` y `page_size` y devuelven `{items, page, page_size, total}`.
@@ -26,7 +26,7 @@ tags:
   - name: Sistema
     description: Comprobaciones de disponibilidad.
   - name: Autenticación
-    description: Registro e inicio de sesión.
+    description: Registro, validación del correo e inicio de sesión.
   - name: Usuarios
     description: Perfil del usuario autenticado y sus recursos.
   - name: Categorías
@@ -57,6 +57,8 @@ paths:
     $ref: ./paths/auth_register.yaml
   /auth/token:
     $ref: ./paths/auth_token.yaml
+  /auth/email-verification:
+    $ref: ./paths/auth_email_verification.yaml
   /users/me:
     $ref: ./paths/users_me.yaml
   /users/me/memberships:
@@ -205,6 +207,8 @@ components:
       $ref: ./components/schemas/ConversationStatus.yaml
     ConversationUpdate:
       $ref: ./components/schemas/ConversationUpdate.yaml
+    EmailVerificationRequest:
+      $ref: ./components/schemas/EmailVerificationRequest.yaml
     Error:
       $ref: ./components/schemas/Error.yaml
     Health:
@@ -277,6 +281,8 @@ components:
       $ref: ./components/schemas/ProfessionalServiceUpdate.yaml
     RegisterRequest:
       $ref: ./components/schemas/RegisterRequest.yaml
+    RegistrationResponse:
+      $ref: ./components/schemas/RegistrationResponse.yaml
     Report:
       $ref: ./components/schemas/Report.yaml
     ReportCreate:
@@ -295,3 +301,5 @@ components:
       $ref: ./components/schemas/UserUpdate.yaml
     ValidationError:
       $ref: ./components/schemas/ValidationError.yaml
+    VerificationError:
+      $ref: ./components/schemas/VerificationError.yaml

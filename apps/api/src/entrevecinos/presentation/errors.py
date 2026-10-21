@@ -21,8 +21,11 @@ from entrevecinos.domain.listings.errors import (
 from entrevecinos.domain.media.errors import EmptyImage, ImageTooLarge, UnsupportedImageType
 from entrevecinos.domain.users.errors import (
     EmailAlreadyRegistered,
+    EmailNotVerified,
     InvalidCredentials,
     NotAuthenticated,
+    VerificationExpired,
+    VerificationInvalid,
 )
 
 
@@ -56,6 +59,38 @@ async def invalid_credentials_handler(request: Request, exc: InvalidCredentials)
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
         content={"detail": "Correo o contraseña incorrectos."},
+    )
+
+
+async def email_not_verified_handler(request: Request, exc: EmailNotVerified) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content={
+            "detail": "Tienes que validar tu correo electrónico antes de iniciar sesión.",
+            "code": "email_not_verified",
+        },
+    )
+
+
+async def verification_invalid_handler(request: Request, exc: VerificationInvalid) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={
+            "detail": "El enlace de validación no es válido.",
+            "code": "verification_invalid",
+        },
+    )
+
+
+async def verification_expired_handler(request: Request, exc: VerificationExpired) -> JSONResponse:
+    # El correo permite ofrecer el reenvío sin pedirlo: quien tiene el token recibió el mensaje.
+    return JSONResponse(
+        status_code=status.HTTP_410_GONE,
+        content={
+            "detail": "El enlace de validación ha caducado.",
+            "code": "verification_expired",
+            "email": exc.email,
+        },
     )
 
 
@@ -181,6 +216,9 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(EmailAlreadyRegistered, email_already_registered_handler)
     app.add_exception_handler(InvalidCredentials, invalid_credentials_handler)
+    app.add_exception_handler(EmailNotVerified, email_not_verified_handler)
+    app.add_exception_handler(VerificationInvalid, verification_invalid_handler)
+    app.add_exception_handler(VerificationExpired, verification_expired_handler)
     app.add_exception_handler(NotAuthenticated, not_authenticated_handler)
     app.add_exception_handler(NotFoundError, not_found_handler)
     app.add_exception_handler(MembershipAlreadyExists, membership_already_exists_handler)

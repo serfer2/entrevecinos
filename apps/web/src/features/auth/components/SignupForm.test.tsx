@@ -56,6 +56,16 @@ describe("SignupForm", () => {
     expect((screen.getByLabelText("Contraseña") as HTMLInputElement).value).toBe("");
   });
 
+  it("tras el registro sustituye el formulario por el aviso del correo enviado", async () => {
+    await submitWith({ verificationSentTo: "vecino@example.com" });
+
+    const notice = await screen.findByRole("status");
+    expect(notice.textContent).toContain("Te hemos enviado un correo a vecino@example.com.");
+    expect(notice.textContent).toContain("El enlace caduca en 24 horas.");
+    expect(notice.textContent).toContain("revisa la carpeta de correo no deseado");
+    expect(screen.queryByRole("button", { name: "Crear cuenta" })).toBeNull();
+  });
+
   it("enlaza con el inicio de sesión", () => {
     render(<SignupForm action={vi.fn()} />);
 

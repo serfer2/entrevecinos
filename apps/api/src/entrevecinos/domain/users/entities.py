@@ -30,7 +30,26 @@ class User:
     is_active: bool
     created_at: datetime
     deleted_at: datetime | None = None
+    email_verified_at: datetime | None = None
 
     @property
     def can_authenticate(self) -> bool:
         return self.is_active and self.deleted_at is None
+
+    @property
+    def email_verification_pending(self) -> bool:
+        """Falta validar el correo. Un `platform_admin` no lo necesita para estar activo."""
+        return (
+            self.email_verified_at is None
+            and self.platform_role != PlatformRole.PLATFORM_ADMIN
+            and self.deleted_at is None
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EmailVerification:
+    """Enlace de validación pendiente de usar. No incluye el token: solo viaja por correo."""
+
+    user_id: uuid.UUID
+    expires_at: datetime
+    created_at: datetime

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
@@ -36,3 +37,25 @@ class AuthResponse(BaseModel):
     token_type: Literal["Bearer"] = "Bearer"
     expires_in: int
     user: UserResponse
+
+
+class RegistrationResponse(BaseModel):
+    email: str
+    verification_expires_at: datetime
+
+
+class EmailVerificationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: Annotated[str, Field(min_length=1, max_length=256)]
+
+
+class VerificationErrorResponse(BaseModel):
+    detail: str
+    code: Literal["verification_expired", "verification_invalid"]
+    email: str | None = None
+
+
+class EmailNotVerifiedResponse(BaseModel):
+    detail: str
+    code: Literal["email_not_verified"]

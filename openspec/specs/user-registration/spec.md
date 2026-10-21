@@ -1,14 +1,18 @@
 # user-registration Specification
 
 ## Purpose
-Registro de cuentas con correo y contraseña (`POST /v1/auth/register`) y emisión del token de acceso JWT.
+Registro de cuentas con correo y contraseña (`POST /v1/auth/register`), pendientes de validar el correo, y emisión del token de acceso JWT.
 ## Requirements
 ### Requirement: Registro de cuenta
-`POST /v1/auth/register` SHALL crear una cuenta con rol `user` a partir de `email`, `password`, `full_name` y `phone` opcional, y responder `201` con `AuthResponse` (`access_token`, `token_type: "Bearer"`, `expires_in`, `user`).
+`POST /v1/auth/register` SHALL crear una cuenta inactiva (`is_active = false`, `email_verified_at` nulo) con rol `user` a partir de `email`, `password`, `full_name` y `phone` opcional, enviar el correo de validación tras responder y responder `201` con `RegistrationResponse` (`email`, `verification_expires_at`). La respuesta MUST NOT incluir un token de acceso.
 
 #### Scenario: Registro correcto
 - **WHEN** se envía un correo no registrado, una contraseña de 12 a 128 caracteres y un nombre
-- **THEN** la respuesta es `201`, el `sub` del token es el `id` del usuario y la contraseña se guarda como hash Argon2id
+- **THEN** la respuesta es `201` sin `access_token`, la cuenta queda inactiva, la contraseña se guarda como hash Argon2id y se envía un correo con el enlace `{WEB_PUBLIC_URL}/verificar-correo?token=…`
+
+#### Scenario: Fallo del SMTP
+- **WHEN** el servidor de correo no responde durante el registro
+- **THEN** la respuesta sigue siendo `201`, la cuenta existe y el error queda en el log
 
 ### Requirement: Correo único sin distinguir mayúsculas
 El registro MUST rechazar con `409` y `detail: "El correo ya está en uso."` un correo ya registrado, comparando en minúsculas.

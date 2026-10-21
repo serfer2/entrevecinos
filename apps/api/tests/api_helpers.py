@@ -5,15 +5,37 @@ from fastapi.testclient import TestClient
 PASSWORD = "UnaClaveSegura123!"
 
 
-def register(
+def sent_emails(client: TestClient):
+    """`FakeEmailSender` de la app de la prueba."""
+    from entrevecinos.presentation.dependencies import get_email_sender
+
+    return client.app.dependency_overrides[get_email_sender]()
+
+
+def register_pending(
     client: TestClient, email: str, full_name: str = "Alex Vecino", phone: str | None = None
 ) -> dict:
-    """Registra una cuenta y devuelve el `AuthResponse` con `headers` listos para usar."""
+    """Registra una cuenta sin validar su correo y devuelve la `RegistrationResponse`."""
     response = client.post(
         "/v1/auth/register",
         json={"email": email, "password": PASSWORD, "full_name": full_name, "phone": phone},
     )
     assert response.status_code == 201, response.text
+    return response.json()
+
+
+def verify_email(client: TestClient, email: str):
+    token = sent_emails(client).last_token(email.strip().lower())
+    return client.post("/v1/auth/email-verification", json={"token": token})
+
+
+def register(
+    client: TestClient, email: str, full_name: str = "Alex Vecino", phone: str | None = None
+) -> dict:
+    """Registra una cuenta, valida su correo y devuelve el `AuthResponse` con `headers`."""
+    register_pending(client, email, full_name, phone)
+    response = verify_email(client, email)
+    assert response.status_code == 200, response.text
     account = response.json()
     account["headers"] = {"Authorization": f"Bearer {account['access_token']}"}
     return account

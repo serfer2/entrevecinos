@@ -9,6 +9,11 @@ import { HOME_PATH } from "@/features/auth/routes";
 
 export const metadata: Metadata = { title: "Iniciar sesión · EntreVecinos" };
 
+const NOTICES: Record<string, string> = {
+  "sesion-caducada": "Tu sesión ha caducado. Vuelve a iniciar sesión.",
+  "correo-validado": "Tu correo ya está validado. Inicia sesión.",
+};
+
 type LoginPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -20,10 +25,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   // Con una sesión válida no tiene sentido volver a iniciarla. Si la API falla, se muestra el formulario.
   if (await getCurrentUser().catch(() => null)) redirect(HOME_PATH);
 
-  const notice =
-    params.motivo === "sesion-caducada"
-      ? "Tu sesión ha caducado. Vuelve a iniciar sesión."
-      : undefined;
+  const notice = NOTICES[String(params.motivo)];
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-12">

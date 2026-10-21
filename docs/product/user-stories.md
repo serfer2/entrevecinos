@@ -27,6 +27,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 7. Mejora de funcionalidades del MVP | HU-18, HU-19, HU-20 |
 | 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23 |
 | 9. Cierre de sesión | HU-24 |
+| 10. Validación del correo electrónico | HU-25, HU-26 |
 
 ---
 
@@ -647,3 +648,65 @@ Control sobre las comunidades que se crean: un administrador de plataforma las r
 - **Given** que he cerrado la sesión
 - **When** intento abrir una página privada, también con el botón «Atrás» del navegador
 - **Then** se me pide iniciar sesión
+
+---
+
+## Épica 10 — Validación del correo electrónico
+
+Las cuentas nuevas solo se activan cuando su titular demuestra que controla la dirección de correo con la que se registró.
+
+### HU-25 Validar mi correo electrónico al registrarme
+
+**Como** visitante que se registra, **quiero** validar mi dirección de correo con un enlace que recibo por email, **para** que mi cuenta quede activa y nadie pueda registrarse con un correo que no es suyo.
+
+**AC1 — Correo de validación**
+
+- **Given** que no tengo cuenta y completo el registro con datos válidos
+- **When** envío el formulario
+- **Then** mi cuenta se crea sin activar, recibo un correo con un enlace de validación y, en lugar de entrar en la aplicación, veo un aviso de que me hemos enviado ese correo
+
+**AC2 — Validación**
+
+- **Given** que he recibido el correo de validación hace menos de 24 horas
+- **When** visito el enlace
+- **Then** mi cuenta queda activa, entro con la sesión iniciada y llego a la lista de comunidades
+
+**AC3 — Enlace caducado**
+
+- **Given** que el enlace de validación tiene más de 24 horas
+- **When** lo visito
+- **Then** veo que ha caducado, mi cuenta sigue sin activar y puedo pedir un correo nuevo (HU-26)
+
+**AC4 — Cuenta sin validar**
+
+- **Given** que no he validado mi correo
+- **When** intento iniciar sesión con mi correo y mi contraseña correctos
+- **Then** no entro y veo que tengo que validar mi correo, con la opción de recibir de nuevo el mensaje (asumido)
+
+**AC5 — Administrador de plataforma**
+
+- **Given** que mi cuenta es de administrador de plataforma
+- **When** inicio sesión sin haber validado mi correo
+- **Then** entro con normalidad
+
+### HU-26 Recibir de nuevo el correo de validación
+
+**Como** vecino que no ha validado su correo, **quiero** pedir que me envíen de nuevo el mensaje de validación, **para** activar mi cuenta si no me llegó, lo borré o caducó.
+
+**AC1 — Registro con un correo pendiente**
+
+- **Given** que ya me registré con un correo que sigue pendiente de validación
+- **When** intento registrarme de nuevo con ese correo
+- **Then** veo un error que me indica que el correo está pendiente de validación y la opción de recibir de nuevo el mensaje
+
+**AC2 — Reenvío**
+
+- **Given** que tengo una cuenta pendiente de validación
+- **When** pido recibir de nuevo el mensaje
+- **Then** recibo un correo nuevo con un enlace válido durante 24 horas y los enlaces anteriores dejan de funcionar
+
+**AC3 — Sin revelar cuentas**
+
+- **Given** que pido el reenvío para un correo que no existe o ya está validado
+- **When** envío la petición
+- **Then** veo el mismo aviso que en el caso anterior y no se envía ningún correo (asumido)

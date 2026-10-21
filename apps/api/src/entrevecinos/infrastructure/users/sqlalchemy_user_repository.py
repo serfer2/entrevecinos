@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Mapping
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ def to_domain(model: UserModel) -> User:
         is_active=model.is_active,
         created_at=model.created_at,
         deleted_at=model.deleted_at,
+        email_verified_at=model.email_verified_at,
     )
 
 
@@ -45,6 +46,8 @@ class SqlAlchemyUserRepository:
             full_name=user.full_name,
             phone=user.phone,
             password_hash=password_hash,
+            # Se activa al validar el correo (HU-25).
+            is_active=False,
         )
         try:
             # El savepoint permite seguir usando la sesión si falla la restricción.
@@ -54,6 +57,14 @@ class SqlAlchemyUserRepository:
             if "uq_users_email" in str(error.orig):
                 raise EmailAlreadyRegistered(user.email) from error
             raise
+        self._session.refresh(model)
+        return to_domain(model)
+
+    def mark_email_verified(self, user_id: uuid.UUID) -> User:
+        model = self._session.get_one(UserModel, user_id)
+        model.email_verified_at = func.now()
+        model.is_active = True
+        self._session.flush()
         self._session.refresh(model)
         return to_domain(model)
 

@@ -17,7 +17,7 @@ docs/product/tickets/
 
 | Carpeta | Tickets |
 |---|---|
-| `00-infra/` | TK-001 PostgreSQL · TK-002 esqueleto FastAPI · TK-003 esqueleto Next.js · TK-004 Makefile · TK-046 `Content-Security-Policy` |
+| `00-infra/` | TK-001 PostgreSQL · TK-002 esqueleto FastAPI · TK-003 esqueleto Next.js · TK-004 Makefile · TK-046 `Content-Security-Policy` · TK-062 documentación de la validación del correo |
 | `EP-01-registro-y-perfil-basico/HU-01-registrarme-con-mi-correo-electronico/` | TK-005 persistencia y tabla `users` · TK-006 backend de registro · TK-007 formulario de registro |
 | `EP-01-registro-y-perfil-basico/HU-02-iniciar-sesion/` | TK-008 backend de inicio de sesión y usuario actual · TK-009 inicio de sesión y rutas protegidas |
 | `EP-01-registro-y-perfil-basico/HU-03-gestionar-mi-perfil-y-datos-de-contacto/` | TK-010 backend de actualización del perfil · TK-011 página de perfil |
@@ -43,12 +43,14 @@ docs/product/tickets/
 | `EP-08-mejora-de-la-gestion-de-comunidades/HU-22-activar-al-momento-las-comunidades-que-crea-un-administrador-de-plataforma/` | TK-052 backend comunidades activas para el `platform_admin` |
 | `EP-08-mejora-de-la-gestion-de-comunidades/HU-23-tener-una-sola-comunidad-pendiente-de-aprobacion-a-la-vez/` | TK-053 una comunidad pendiente por usuario (BD y backend) · TK-054 aviso de comunidad pendiente al crear |
 | `EP-09-cierre-de-sesion/HU-24-cerrar-sesion/` | TK-055 cerrar sesión desde la cabecera |
+| `EP-10-validacion-del-correo-electronico/HU-25-validar-mi-correo-electronico-al-registrarme/` | TK-056 envío de correo y Mailpit · TK-057 BD de la validación · TK-058 backend registro y validación · TK-060 aviso y validación desde el enlace |
+| `EP-10-validacion-del-correo-electronico/HU-26-recibir-de-nuevo-el-correo-de-validacion/` | TK-059 backend correo pendiente y reenvío · TK-061 reenviar el correo de validación |
 
 ## Orden de implementación recomendado
 
-Respeta las dependencias de cada ticket (campo **Depende de**). Los números de migración (`0002`…`0007`) asumen este orden.
+Respeta las dependencias de cada ticket (campo **Depende de**). Los números de migración (`0002`…`0008`) asumen este orden.
 
-**Estado:** todos los tickets (TK-001 a TK-055) están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket.
+**Estado:** los tickets TK-001 a TK-055 están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket. De la Épica 10 están implementados TK-056, TK-057, TK-058 y TK-060 (HU-25); TK-059, TK-061 y TK-062 están pendientes.
 
 | Bloque | Orden |
 |---|---|
@@ -64,5 +66,6 @@ Respeta las dependencias de cada ticket (campo **Depende de**). Los números de 
 | Épica 7 — Mejoras | TK-047 → TK-048 → TK-049 |
 | Épica 8 — Gestión de comunidades | TK-050 → TK-051 → TK-052 → TK-053 → TK-054 |
 | Épica 9 — Cierre de sesión | TK-055 |
+| Épica 10 — Validación del correo | TK-056 → TK-057 → TK-058 → TK-059 → TK-060 → TK-061 → TK-062 |
 
 El detalle del anuncio (TK-036/TK-037) se adelanta a la edición y la eliminación de la interfaz porque es su punto de entrada. La CSP (TK-046) va justo después de TK-023, en cuanto se sirven imágenes desde el almacenamiento. Reservar y finalizar (TK-044/TK-045) va al final porque amplía el endpoint de estado de TK-042.

@@ -64,6 +64,23 @@ services:
     networks:
       - data
 
+  mail:
+    # Buzón de pruebas: recoge por SMTP todo el correo que envía la API y lo muestra en su interfaz web.
+    image: axllent/mailpit:v1.31.4
+    restart: unless-stopped
+    # `data` para la API (SMTP en mail:1025); `edge` solo para publicar la interfaz web.
+    networks:
+      - data
+      - edge
+    ports:
+      - "127.0.0.1:${MAIL_UI_HOST_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
   api:
     build:
       context: ../apps/api
@@ -81,11 +98,22 @@ services:
       STORAGE_BUCKET: ${STORAGE_BUCKET:?Define STORAGE_BUCKET en .env}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Define STORAGE_ACCESS_KEY en .env}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Define STORAGE_SECRET_KEY en .env}
+      SMTP_HOST: ${SMTP_HOST:?Define SMTP_HOST en .env}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      MAIL_FROM: ${MAIL_FROM:?Define MAIL_FROM en .env}
+      # Origen de los enlaces que se envían por correo (la web que abre el usuario).
+      WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:?Define WEB_PUBLIC_URL en .env}
+      EMAIL_VERIFICATION_TTL_HOURS: ${EMAIL_VERIFICATION_TTL_HOURS:-24}
     depends_on:
       db:
         condition: service_healthy
       storage-init:
         condition: service_completed_successfully
+      mail:
+        condition: service_healthy
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:

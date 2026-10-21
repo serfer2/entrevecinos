@@ -75,6 +75,20 @@ describe("login", () => {
     expect(cookieSet).not.toHaveBeenCalled();
   });
 
+  it("con 403 email_not_verified pide validar el correo", async () => {
+    apiFetch.mockResolvedValue({
+      ok: false,
+      error: { status: 403, detail: "x", payload: { detail: "x", code: "email_not_verified" } },
+    });
+
+    expect(await login(undefined, form(credentials))).toEqual({
+      formError: "Tienes que validar tu correo electrónico antes de iniciar sesión.",
+      emailNotVerified: true,
+      values: { email: "vecino@example.com" },
+    });
+    expect(cookieSet).not.toHaveBeenCalled();
+  });
+
   it("valida los campos antes de llamar a la API", async () => {
     const state = await login(undefined, form({ email: "mal", password: "" }));
 

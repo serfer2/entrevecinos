@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from entrevecinos.infrastructure.db.models import UserModel
+from tests.api_helpers import register as api_register
 
 pytestmark = pytest.mark.db
 
@@ -12,12 +13,7 @@ PASSWORD = "UnaClaveSegura123!"
 
 
 def register(client: TestClient, email: str, phone: str | None = "600111222") -> dict:
-    response = client.post(
-        "/v1/auth/register",
-        json={"email": email, "password": PASSWORD, "full_name": "Alex Vecino", "phone": phone},
-    )
-    assert response.status_code == 201
-    return response.json()
+    return api_register(client, email, phone=phone)
 
 
 @pytest.fixture

@@ -5,8 +5,8 @@ import pytest
 
 from entrevecinos.application.users.authenticate_user import AuthenticateUser, LoginCommand
 from entrevecinos.application.users.get_current_user import GetCurrentUser
-from entrevecinos.domain.users.entities import NewUser
-from entrevecinos.domain.users.errors import InvalidCredentials, NotAuthenticated
+from entrevecinos.domain.users.entities import NewUser, PlatformRole
+from entrevecinos.domain.users.errors import EmailNotVerified, InvalidCredentials, NotAuthenticated
 from tests.fakes import FakePasswordHasher, FakeTokenIssuer, InMemoryUserRepository
 
 PASSWORD = "UnaClaveSegura123!"
@@ -15,7 +15,10 @@ PASSWORD = "UnaClaveSegura123!"
 @pytest.fixture
 def users() -> InMemoryUserRepository:
     repository = InMemoryUserRepository()
-    repository.add(NewUser(email="vecino@example.com", full_name="Alex"), f"hashed:{PASSWORD}")
+    user = repository.add(
+        NewUser(email="vecino@example.com", full_name="Alex"), f"hashed:{PASSWORD}"
+    )
+    repository.mark_email_verified(user.id)
     return repository
 
 
@@ -65,6 +68,34 @@ def test_inactive_or_deleted_users_cannot_log_in(
 
     with pytest.raises(InvalidCredentials):
         authenticate.execute(LoginCommand(email="vecino@example.com", password=PASSWORD))
+
+
+def test_unverified_user_cannot_log_in(
+    authenticate: AuthenticateUser, users: InMemoryUserRepository
+) -> None:
+    set_user(users, is_active=False, email_verified_at=None)
+
+    with pytest.raises(EmailNotVerified):
+        authenticate.execute(LoginCommand(email="vecino@example.com", password=PASSWORD))
+
+
+def test_unverified_user_with_wrong_password_gets_generic_error(
+    authenticate: AuthenticateUser, users: InMemoryUserRepository
+) -> None:
+    set_user(users, is_active=False, email_verified_at=None)
+
+    with pytest.raises(InvalidCredentials):
+        authenticate.execute(LoginCommand(email="vecino@example.com", password="otra-clave-123"))
+
+
+def test_unverified_platform_admin_can_log_in(
+    authenticate: AuthenticateUser, users: InMemoryUserRepository
+) -> None:
+    set_user(users, email_verified_at=None, platform_role=PlatformRole.PLATFORM_ADMIN)
+
+    user, _ = authenticate.execute(LoginCommand(email="vecino@example.com", password=PASSWORD))
+
+    assert user.platform_role is PlatformRole.PLATFORM_ADMIN
 
 
 def test_outdated_hash_is_replaced(

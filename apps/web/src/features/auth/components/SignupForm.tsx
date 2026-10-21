@@ -16,6 +16,21 @@ export function SignupForm({ action }: SignupFormProps) {
   const errors = state?.fieldErrors ?? {};
   const values = state?.values;
 
+  if (state?.verificationSentTo) {
+    return (
+      <div
+        role="status"
+        className="flex flex-col gap-2 rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+      >
+        <p>
+          Te hemos enviado un correo a <strong>{state.verificationSentTo}</strong>. Abre el enlace
+          que contiene para activar tu cuenta. El enlace caduca en 24 horas.
+        </p>
+        <p>Si no lo ves, revisa la carpeta de correo no deseado.</p>
+      </div>
+    );
+  }
+
   return (
     <form action={formAction} className="flex flex-col gap-4">
       {state?.formError && (

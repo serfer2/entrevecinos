@@ -26,7 +26,11 @@ const nextConfig: NextConfig = {
     },
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // El enlace de validación lleva el token en la URL: que no viaje en el Referer.
+      { source: "/verificar-correo", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+    ];
   },
 };
 

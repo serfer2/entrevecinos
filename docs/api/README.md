@@ -55,7 +55,7 @@ npx @redocly/cli preview-docs openapi.yaml
 
 ## Cambios
 
-Cambios compatibles del contrato durante el desarrollo del MVP:
+Cambios del contrato durante el desarrollo del MVP (compatibles salvo que se indique):
 
 | Ticket | Cambio |
 |---|---|
@@ -68,13 +68,14 @@ Cambios compatibles del contrato durante el desarrollo del MVP:
 | TK-050 | `createCommunity` crea la comunidad con `is_active: false` (pendiente de aprobación). `adminListCommunities` y `adminUpdateCommunity` pasan al MVP (`x-mvp: true`) para listar las pendientes y aprobarlas; `adminUpdateCommunity` solo admite `is_active: true`. |
 | TK-052 | `createCommunity`: las comunidades que crea un `platform_admin` se crean activas (`is_active: true`). |
 | TK-053 | `createCommunity`: 409 si el usuario ya tiene una comunidad pendiente de aprobación. |
+| TK-058 | **Incompatible:** `registerUser` crea la cuenta inactiva y responde `RegistrationResponse` (`email`, `verification_expires_at`) sin token. Nuevo `verifyEmail` (`POST /auth/email-verification`): `200` con `AuthResponse`, `400`/`410` con `VerificationError`. `loginUser`: `403` con `code: email_not_verified` si la cuenta no ha validado su correo. |
 
 ## Resumen de endpoints
 
 | Grupo | Operaciones | MVP |
 |---|---|---|
 | Sistema | `GET /health` | Sí |
-| Autenticación | `POST /auth/register`, `POST /auth/token` | Sí |
+| Autenticación | `POST /auth/register`, `POST /auth/email-verification`, `POST /auth/token` | Sí |
 | Usuarios | `GET/PATCH/DELETE /users/me`, `GET /users/me/memberships`, `GET /users/me/listings` | Sí |
 | Categorías | `GET/POST /categories`, `PATCH /categories/{category_id}` | Sí |
 | Comunidades | `GET/POST /communities`, `GET/PATCH /communities/{community_id}` | Sí |

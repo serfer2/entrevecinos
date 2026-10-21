@@ -33,15 +33,16 @@ describe("signup", () => {
     vi.clearAllMocks();
   });
 
-  it("crea la sesión y redirige a /comunidades con 201", async () => {
+  it("con 201 devuelve el correo de validación sin crear la sesión", async () => {
     apiFetch.mockResolvedValue({
       ok: true,
       status: 201,
-      data: { access_token: "jwt", expires_in: 86400, token_type: "Bearer", user: {} },
+      data: { email: "vecino@example.com", verification_expires_at: "2026-10-22T10:00:00Z" },
     });
 
-    await expect(signup(undefined, form(validForm))).rejects.toThrow("NEXT_REDIRECT:/comunidades");
+    const state = await signup(undefined, form(validForm));
 
+    expect(state).toEqual({ verificationSentTo: "vecino@example.com" });
     expect(apiFetch).toHaveBeenCalledWith("/auth/register", {
       method: "POST",
       body: {
@@ -51,11 +52,8 @@ describe("signup", () => {
         phone: null,
       },
     });
-    expect(cookieSet).toHaveBeenCalledWith(
-      "ev_session",
-      "jwt",
-      expect.objectContaining({ httpOnly: true, sameSite: "lax", path: "/", maxAge: 86400 }),
-    );
+    expect(cookieSet).not.toHaveBeenCalled();
+    expect(redirect).not.toHaveBeenCalled();
   });
 
   it("no llama a la API si los datos no son válidos", async () => {

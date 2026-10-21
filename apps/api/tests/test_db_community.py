@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 from alembic import command
-from sqlalchemy import Engine, inspect
+from sqlalchemy import Engine, func, inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,9 @@ pytestmark = pytest.mark.db
 
 
 def make_user(db_session: Session, email: str = "vecino@example.com") -> UserModel:
-    user = UserModel(email=email, password_hash="hash", full_name="Alex Vecino")
+    user = UserModel(
+        email=email, password_hash="hash", full_name="Alex Vecino", email_verified_at=func.now()
+    )
     db_session.add(user)
     db_session.flush()
     return user

@@ -2,7 +2,10 @@ post:
   tags: [Autenticación]
   operationId: registerUser
   summary: Registrar una cuenta
-  description: Crea una cuenta con rol `user` y devuelve un token JWT para iniciar la sesión. Acceso público.
+  description: >-
+    Crea una cuenta inactiva con rol `user` y envía un correo con un enlace de validación que
+    caduca a las 24 horas. No inicia la sesión: la cuenta se activa al validar el correo
+    (`POST /auth/email-verification`). Acceso público.
   x-mvp: true
   security: []
   requestBody:
@@ -18,11 +21,14 @@ post:
           phone: "+34600111222"
   responses:
     "201":
-      description: Cuenta creada.
+      description: Cuenta creada, pendiente de validar el correo.
       content:
         application/json:
           schema:
-            $ref: ../components/schemas/AuthResponse.yaml
+            $ref: ../components/schemas/RegistrationResponse.yaml
+          example:
+            email: vecino@example.com
+            verification_expires_at: "2026-10-22T10:00:00Z"
     "409":
       $ref: ../components/responses/Conflict.yaml
     "422":

@@ -1,0 +1,46 @@
+post:
+  tags: [Autenticación]
+  operationId: verifyEmail
+  summary: Validar el correo electrónico
+  description: >-
+    Valida el correo con el token del enlace enviado al registrarse, activa la cuenta y emite un
+    token JWT para iniciar la sesión. El enlace caduca a las 24 horas y solo vale el último
+    enviado. Acceso público.
+  x-mvp: true
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/EmailVerificationRequest.yaml
+        example:
+          token: 3q2-7wEXAMPLEtokenK1x0
+  responses:
+    "200":
+      description: Correo validado y cuenta activa.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/AuthResponse.yaml
+    "400":
+      description: El enlace no existe, ya se usó o lo sustituyó otro más reciente.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/VerificationError.yaml
+          example:
+            detail: "El enlace de validación no es válido."
+            code: verification_invalid
+    "410":
+      description: El enlace ha caducado; la cuenta sigue inactiva.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/VerificationError.yaml
+          example:
+            detail: "El enlace de validación ha caducado."
+            code: verification_expired
+            email: vecino@example.com
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

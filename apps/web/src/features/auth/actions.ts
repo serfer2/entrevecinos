@@ -2,12 +2,11 @@
 
 import { redirect } from "next/navigation";
 
-import { invalidBodyFields } from "@/lib/api/errors";
+import { errorCodeOf, invalidBodyFields } from "@/lib/api/errors";
 import { apiFetch } from "@/lib/api/server";
 
 import { postLoginPath } from "./destination";
 import { safeNextPath } from "./redirect";
-import { COMMUNITIES_PATH } from "./routes";
 import {
   fieldErrorsOf,
   LOGIN_MESSAGES,
@@ -18,7 +17,7 @@ import {
   type SignupField,
 } from "./schemas";
 import { createSession, deleteSession } from "./session";
-import type { AuthResponse } from "./types";
+import type { AuthResponse, RegistrationResponse } from "./types";
 
 export type SignupState =
   | {
@@ -26,6 +25,8 @@ export type SignupState =
       formError?: string;
       /** Valores a conservar en el formulario. Nunca incluye la contraseña. */
       values?: { full_name: string; email: string; phone: string };
+      /** Cuenta creada: correo al que se ha enviado el enlace de validación. */
+      verificationSentTo?: string;
     }
   | undefined;
 
@@ -46,7 +47,7 @@ export async function signup(_state: SignupState, formData: FormData): Promise<S
     return { fieldErrors: fieldErrorsOf<SignupField>(parsed.error), values };
   }
 
-  const result = await apiFetch<AuthResponse>("/auth/register", {
+  const result = await apiFetch<RegistrationResponse>("/auth/register", {
     method: "POST",
     body: parsed.data,
   });
@@ -67,9 +68,8 @@ export async function signup(_state: SignupState, formData: FormData): Promise<S
     return { formError: "No se pudo crear la cuenta. Inténtalo de nuevo.", values };
   }
 
-  await createSession(result.data.access_token, result.data.expires_in);
-  // Una cuenta recién creada no pertenece a ninguna comunidad: empieza buscando la suya.
-  redirect(COMMUNITIES_PATH);
+  // La cuenta se activa al abrir el enlace del correo (/verificar-correo): aún no hay sesión.
+  return { verificationSentTo: result.data.email };
 }
 
 export type LoginState =
@@ -78,6 +78,8 @@ export type LoginState =
       formError?: string;
       /** Valores a conservar en el formulario. Nunca incluye la contraseña. */
       values?: { email: string };
+      /** Credenciales correctas, pero falta validar el correo. */
+      emailNotVerified?: boolean;
     }
   | undefined;
 
@@ -98,6 +100,13 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
     if (result.error.status === 401) {
       // Mensaje genérico: no revela si falló el correo o la contraseña.
       return { formError: "Correo o contraseña incorrectos.", values };
+    }
+    if (result.error.status === 403 && errorCodeOf(result.error) === "email_not_verified") {
+      return {
+        formError: "Tienes que validar tu correo electrónico antes de iniciar sesión.",
+        emailNotVerified: true,
+        values,
+      };
     }
     if (result.error.status === 422) {
       const fieldErrors: Partial<Record<LoginField, string>> = {};
