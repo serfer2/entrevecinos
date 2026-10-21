@@ -42,6 +42,10 @@ export default async function VerifyEmailErrorPage({ searchParams }: VerifyEmail
           Ir al registro
         </Link>
       )}
+      {/* La raíz lleva a /inicio con sesión o al inicio de sesión sin ella. */}
+      <Link href="/" className={linkClass}>
+        Volver al inicio
+      </Link>
     </main>
   );
 }

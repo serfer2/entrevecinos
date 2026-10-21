@@ -45,12 +45,13 @@ docs/product/tickets/
 | `EP-09-cierre-de-sesion/HU-24-cerrar-sesion/` | TK-055 cerrar sesión desde la cabecera |
 | `EP-10-validacion-del-correo-electronico/HU-25-validar-mi-correo-electronico-al-registrarme/` | TK-056 envío de correo y Mailpit · TK-057 BD de la validación · TK-058 backend registro y validación · TK-060 aviso y validación desde el enlace |
 | `EP-10-validacion-del-correo-electronico/HU-26-recibir-de-nuevo-el-correo-de-validacion/` | TK-059 backend correo pendiente y reenvío · TK-061 reenviar el correo de validación |
+| `EP-10-validacion-del-correo-electronico/HU-27-entender-por-que-no-funciona-un-enlace-de-validacion-antiguo/` | TK-063 BD enlaces usados y sustituidos · TK-064 backend motivo del enlace no válido · TK-065 mensaje del enlace sustituido |
 
 ## Orden de implementación recomendado
 
-Respeta las dependencias de cada ticket (campo **Depende de**). Los números de migración (`0002`…`0008`) asumen este orden.
+Respeta las dependencias de cada ticket (campo **Depende de**). Los números de migración (`0002`…`0009`) asumen este orden.
 
-**Estado:** los tickets TK-001 a TK-055 están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket. También están implementados los de la Épica 10 (TK-056 a TK-062), con un commit por historia y otro para la documentación.
+**Estado:** los tickets TK-001 a TK-055 están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket. También están implementados los de la Épica 10 (TK-056 a TK-062), con un commit por historia y otro para la documentación. TK-063 a TK-065 (HU-27) están pendientes.
 
 | Bloque | Orden |
 |---|---|
@@ -66,6 +67,6 @@ Respeta las dependencias de cada ticket (campo **Depende de**). Los números de 
 | Épica 7 — Mejoras | TK-047 → TK-048 → TK-049 |
 | Épica 8 — Gestión de comunidades | TK-050 → TK-051 → TK-052 → TK-053 → TK-054 |
 | Épica 9 — Cierre de sesión | TK-055 |
-| Épica 10 — Validación del correo | TK-056 → TK-057 → TK-058 → TK-059 → TK-060 → TK-061 → TK-062 |
+| Épica 10 — Validación del correo | TK-056 → TK-057 → TK-058 → TK-059 → TK-060 → TK-061 → TK-062 → TK-063 → TK-064 → TK-065 |
 
 El detalle del anuncio (TK-036/TK-037) se adelanta a la edición y la eliminación de la interfaz porque es su punto de entrada. La CSP (TK-046) va justo después de TK-023, en cuanto se sirven imágenes desde el almacenamiento. Reservar y finalizar (TK-044/TK-045) va al final porque amplía el endpoint de estado de TK-042.

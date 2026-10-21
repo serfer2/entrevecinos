@@ -27,7 +27,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 7. Mejora de funcionalidades del MVP | HU-18, HU-19, HU-20 |
 | 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23 |
 | 9. Cierre de sesión | HU-24 |
-| 10. Validación del correo electrónico | HU-25, HU-26 |
+| 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
 
 ---
 
@@ -716,3 +716,31 @@ Las cuentas nuevas solo se activan cuando su titular demuestra que controla la d
 - **Given** que pido el reenvío para un correo que no existe o ya está validado
 - **When** envío la petición
 - **Then** veo el mismo aviso que en el caso anterior y no se envía ningún correo (asumido)
+
+### HU-27 Entender por qué no funciona un enlace de validación antiguo
+
+**Como** vecino que ha pedido varios correos de validación, **quiero** que, si abro un enlace que ya no vale, se me explique el motivo real, **para** saber qué hacer en lugar de creer que mi cuenta ya está activa.
+
+**AC1 — Enlace sustituido por otro más reciente**
+
+- **Given** que mi cuenta sigue pendiente de validación y he recibido un correo de validación más reciente
+- **When** abro el enlace de un correo anterior sin tener la sesión iniciada
+- **Then** veo que ese enlace ya no es válido porque te hemos enviado uno más reciente, con la opción de recibir de nuevo el mensaje, y no se me dice que mi correo está validado
+
+**AC2 — Cuenta ya validada**
+
+- **Given** que ya validé mi correo
+- **When** abro de nuevo el mismo enlace o el de un correo anterior
+- **Then** veo «Tu correo ya está validado. Inicia sesión.» en el inicio de sesión, o entro en la aplicación si tengo la sesión iniciada, como hasta ahora
+
+**AC3 — Enlace desconocido**
+
+- **Given** un enlace cuyo token no corresponde a ningún correo de validación enviado
+- **When** lo abro
+- **Then** veo «El enlace de validación no es válido.» y no se me dice que mi correo está validado
+
+**AC4 — Sin revelar cuentas**
+
+- **Given** un token que no se ha enviado nunca por correo
+- **When** se usa
+- **Then** la respuesta no revela si un correo está registrado ni su estado (asumido)
