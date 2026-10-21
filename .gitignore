@@ -229,3 +229,6 @@ typings/
 
 # Artefactos del navegador de pruebas (Playwright MCP)
 .playwright-mcp/
+
+# AI local config
+.agents/
