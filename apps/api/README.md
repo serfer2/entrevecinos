@@ -75,6 +75,13 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 | `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` | Credenciales S3 propias de la API | obligatorias |
 | `MEDIA_MAX_BYTES` | Tamaño máximo de una imagen | `5242880` (5 MB) |
 | `MEDIA_URL_TTL_SECONDS` | Validez de las URL prefirmadas | `300` |
+| `SMTP_HOST` | Servidor SMTP (`mail` en desarrollo) | obligatoria |
+| `SMTP_PORT` | Puerto SMTP | `587` (`1025` en `.env.example`) |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | Credenciales SMTP | vacías |
+| `SMTP_STARTTLS` | STARTTLS; en producción debe ser `true` | `true` |
+| `MAIL_FROM` | Remitente de los correos | obligatoria |
+| `WEB_PUBLIC_URL` | Origen de los enlaces que se envían por correo; en producción, `https` | obligatoria |
+| `EMAIL_VERIFICATION_TTL_HOURS` | Caducidad del enlace de validación del correo (`> 0`) | `24` |
 
 ## Salud
 
@@ -82,13 +89,18 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 
 ## Autenticación
 
-- `POST /v1/auth/register` crea la cuenta y devuelve un JWT (`AuthResponse`).
-- `POST /v1/auth/token` inicia sesión. Ante cualquier fallo responde `401` con el mismo mensaje (`Correo o contraseña incorrectos.`) y el mismo coste de verificación, exista o no la cuenta.
+- `POST /v1/auth/register` crea la cuenta **inactiva**, sin validar el correo, y responde `RegistrationResponse` (`email`, `verification_expires_at`), sin JWT. El correo con el enlace `{WEB_PUBLIC_URL}/verificar-correo?token=…` se envía tras responder (`BackgroundTasks`): si el SMTP falla, la cuenta queda creada y el error va al log. Un correo ya registrado → `409` con `code: email_in_use`, o `email_pending_verification` si la cuenta está pendiente (no se modifica).
+- `POST /v1/auth/email-verification` (público) valida el token: activa la cuenta y devuelve `AuthResponse`. Caducado → `410` `verification_expired` con el `email`; desconocido, usado o sustituido → `400` `verification_invalid`.
+- `POST /v1/auth/email-verification/resend` (público) responde siempre `202`; si la cuenta está pendiente y su último enlace tiene al menos 60 segundos, crea otro y lo envía.
+- Tokens de validación: `secrets.token_urlsafe(32)`, guardados como SHA-256 en `email_verification`; emitir uno borra los anteriores del usuario (`EmailVerificationIssuer`, `application/users/email_verification.py`).
+- `POST /v1/auth/token` inicia sesión. Ante cualquier fallo responde `401` con el mismo mensaje (`Correo o contraseña incorrectos.`) y el mismo coste de verificación, exista o no la cuenta. Con la contraseña correcta y el correo sin validar (salvo `platform_admin`) → `403` `email_not_verified`.
+- Envío de correo: puerto `EmailSender` (`application/users/ports.py`) y adaptador `SmtpEmailSender` (`infrastructure/mail/`, `smtplib`). En desarrollo llega a Mailpit: http://localhost:8025.
 - `GET /v1/users/me` devuelve el usuario autenticado.
 - `PATCH /v1/users/me` actualiza parcialmente `full_name` y `phone` (`null` o `""` borra el teléfono). `avatar_asset_id`, `password` y `current_password` del contrato aún no están implementados y se rechazan con `422`.
 - Contraseñas con Argon2id (`pwdlib`); tokens HS256 (`pyjwt`) con `sub`, `iat` y `exp`. El algoritmo está fijado en código.
 - Los errores `422` solo devuelven `loc`, `msg` y `type` (nunca los valores enviados).
 - Los errores de dominio se traducen a HTTP en `presentation/errors.py`.
+- En las pruebas, la fixture `email_sender` sustituye el SMTP por `FakeEmailSender` (`tests/fakes.py`), que guarda los correos en `sent`; `last_token(correo)` devuelve el token del último enlace. El *helper* `register` (`tests/api_helpers.py`) registra **y valida** la cuenta, para que las pruebas trabajen con cuentas activas; `register_pending` la deja sin validar.
 
 ## Comunidades
 

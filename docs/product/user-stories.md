@@ -41,13 +41,13 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 
 - **Given** que no tengo cuenta y estoy en el formulario de registro
 - **When** introduzco mi nombre, un correo válido no registrado y una contraseña válida y envío el formulario
-- **Then** se crea mi cuenta y accedo a la aplicación con la sesión iniciada (asumido)
+- **Then** se crea mi cuenta, pendiente de validar el correo, y veo un aviso de que he recibido un correo de confirmación; la sesión se inicia al abrir el enlace (ver HU-25)
 
 **AC2 — Correo ya registrado**
 
 - **Given** que ya existe una cuenta con el correo `vecino@example.com`
 - **When** intento registrarme con ese mismo correo
-- **Then** veo un mensaje que indica que el correo ya está en uso y no se crea ninguna cuenta
+- **Then** veo un mensaje que indica que el correo ya está en uso y no se crea ninguna cuenta; si la cuenta está pendiente de validación, el mensaje lo indica y me ofrece recibir de nuevo el correo (ver HU-26)
 
 **AC3 — Datos inválidos**
 
@@ -61,9 +61,15 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 
 **AC1 — Acceso correcto**
 
-- **Given** que tengo una cuenta
+- **Given** que tengo una cuenta con el correo validado
 - **When** introduzco mi correo y mi contraseña correctos
 - **Then** accedo a la aplicación con mi sesión iniciada
+
+**AC4 — Correo sin validar**
+
+- **Given** que mi cuenta todavía no ha validado el correo y no soy administrador de la plataforma
+- **When** introduzco mi correo y mi contraseña correctos
+- **Then** no se inicia la sesión, veo que tengo que validar mi correo y puedo pedir otro correo de validación (ver HU-25 y HU-26)
 
 **AC2 — Credenciales incorrectas**
 

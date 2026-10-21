@@ -155,6 +155,7 @@ La interfaz se adapta a ordenadores, tablets y smartphones para facilitar el uso
 El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su comunidad y que otra persona pueda encontrarla y contactar con él. Para cubrir ese recorrido, incluiría:
 1. **Registro y perfil básico**
    - Registro, inicio y cierre de sesión con correo electrónico.
+   - Validación del correo por enlace, con caducidad de 24 horas y posibilidad de recibirlo de nuevo; sin validarlo, la cuenta no se activa (salvo la de un administrador de la plataforma).
    - Perfil con nombre y datos de contacto.
    - Asociación del usuario a una comunidad.
    - Tras registrarse o iniciar sesión, llevar al usuario a la lista de comunidades si todavía no pertenece a ninguna, o directamente a su comunidad si solo pertenece a una.
@@ -195,6 +196,8 @@ Quedan para una fase posterior el perfil profesional, las notificaciones automá
 > Documenta de manera precisa las instrucciones para instalar y poner en marcha el proyecto en local (librerías, backend, frontend, servidor, base de datos, migraciones y semillas de datos, etc.)
 
 **Pendiente**. Se proporcionará una vez completado el desarrollo de backend y frontend.
+
+Mientras tanto, el entorno local se levanta con `cp .env.example .env` y `make dev` (detalle en `infra/README.md`). Además de la web (`http://localhost:3000`) y la API (`http://localhost:8000/docs`), `make dev` levanta **Mailpit**, el buzón de desarrollo donde llegan los correos de validación del registro: `http://localhost:8025`. Un `.env` creado antes de la validación del correo necesita las variables nuevas de la sección «Correo (SMTP)» de `.env.example` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `MAIL_FROM`, `WEB_PUBLIC_URL`, `EMAIL_VERIFICATION_TTL_HOURS` y `MAIL_UI_HOST_PORT`); sin ellas, la API no arranca.
 
 ---
 
@@ -237,11 +240,15 @@ flowchart TB
         IMG --- IMGVOL
     end
 
+    SMTP["Servidor SMTP<br/>Mailpit en desarrollo"]
+
     U -->|"HTTPS"| NEXT
     HELMET -->|"Solicitudes API con JWT"| CORS
     RBAC -->|"Solicitud autorizada"| API
     API -->|"Consultas y transacciones"| DB
     API -->|"Carga y lectura de imágenes"| IMG
+    API -->|"Correo de validación"| SMTP
+    SMTP -.->|"Enlace de validación"| U
 ```
 
 #### Patrón arquitectónico
@@ -279,6 +286,8 @@ JWT Auth valida la identidad y RBAC comprueba los permisos en el backend. CORS r
 - **Base de datos relacional:** **PostgreSQL 16**, desplegada en un contenedor Docker. Guarda la información estructurada, como usuarios, comunidades, anuncios y mensajes. Un volumen persistente conserva los datos cuando se reinicia o recrea el contenedor.
 
 - **Almacenamiento de imágenes:** un servicio compatible con S3, como **MinIO**, almacena las fotografías de los anuncios y perfiles. Sus ficheros se conservan en un volumen persistente. PostgreSQL guarda las referencias y metadatos de cada imagen, mientras que el backend gestiona las cargas y lecturas.
+
+- **Envío de correo:** la API envía por **SMTP** los correos de la aplicación, como el enlace de validación del registro. En desarrollo los recoge **Mailpit**, que los muestra en `http://localhost:8025` sin enviarlos a nadie; en producción se usa un proveedor SMTP con STARTTLS.
 
 - **Contenedores y red de despliegue:** **Docker** ejecuta frontend, backend, PostgreSQL y almacenamiento de imágenes en servicios separados. La base de datos y el almacenamiento deberían permanecer en una red interna, accesibles desde el backend, y no exponerse directamente a los usuarios.
 
@@ -362,12 +371,15 @@ flowchart LR
         API_LOCAL["Backend<br/>FastAPI · contenedor"]
         DB_LOCAL[("PostgreSQL 16<br/>contenedor + volumen")]
         IMG_LOCAL[("MinIO<br/>contenedor + volumen")]
+        MAIL_LOCAL["Mailpit<br/>SMTP + buzón web"]
 
         DEV --> BROWSER_LOCAL
         BROWSER_LOCAL --> WEB_LOCAL
         WEB_LOCAL -->|"API REST · JWT"| API_LOCAL
         API_LOCAL --> DB_LOCAL
         API_LOCAL --> IMG_LOCAL
+        API_LOCAL -->|"SMTP"| MAIL_LOCAL
+        BROWSER_LOCAL -.->|"Ver correos"| MAIL_LOCAL
     end
 
     subgraph CLOUD["Producción · Cloud"]
@@ -397,7 +409,7 @@ flowchart LR
 
 #### Desarrollo local
 
-Docker Compose levanta los componentes necesarios en el equipo del desarrollador: frontend Next.js, API FastAPI, PostgreSQL y MinIO. Como MinIO ya no publica imágenes Docker oficiales, se usa la compilación comunitaria `pgsty/minio` con versión fija (licencia AGPLv3, usada sin modificar como servicio independiente); el detalle está en TK-019. Los servicios se comunican por una red de Docker y los datos sobreviven a reinicios mediante volúmenes persistentes.
+Docker Compose levanta los componentes necesarios en el equipo del desarrollador: frontend Next.js, API FastAPI, PostgreSQL, MinIO y Mailpit, el buzón que recoge el correo de desarrollo. Como MinIO ya no publica imágenes Docker oficiales, se usa la compilación comunitaria `pgsty/minio` con versión fija (licencia AGPLv3, usada sin modificar como servicio independiente); el detalle está en TK-019. Los servicios se comunican por una red de Docker y los datos sobreviven a reinicios mediante volúmenes persistentes.
 
 Esta configuración facilita arrancar el proyecto con un entorno reproducible y probar la integración entre componentes. Las credenciales locales deben ser de desarrollo y no reutilizarse en producción.
 
@@ -465,9 +477,17 @@ erDiagram
         UUID avatar_asset_id FK "NULL; FK a media_asset.id"
         user_role platform_role "NOT NULL; DEFAULT user"
         BOOLEAN is_active "NOT NULL; DEFAULT true"
+        TIMESTAMPTZ email_verified_at "NULL; correo validado"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
         TIMESTAMPTZ deleted_at "NULL; borrado lógico"
+    }
+
+    EMAIL_VERIFICATION {
+        CHAR token_hash PK "CHAR(64); SHA-256 del token; NOT NULL"
+        UUID user_id FK "NOT NULL; FK a user.id; ON DELETE CASCADE"
+        TIMESTAMPTZ expires_at "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     COMMUNITY {
@@ -602,6 +622,7 @@ erDiagram
         TIMESTAMPTZ reviewed_at "NULL"
     }
 
+    USER ||--o{ EMAIL_VERIFICATION : "valida su correo"
     USER ||--o{ COMMUNITY : "crea"
     USER ||--o{ COMMUNITY_MEMBERSHIP : "solicita membresía"
     COMMUNITY ||--o{ COMMUNITY_MEMBERSHIP : "incluye miembros"
@@ -648,7 +669,8 @@ El modelo cubre las funciones descritas en el README: usuarios, comunidades, anu
 - `phone VARCHAR(32)` — `NULL`.
 - `avatar_asset_id UUID` — `NULL`, **FK** → `media_asset.id`.
 - `platform_role user_role` — `NOT NULL`, `DEFAULT 'user'`; rol global.
-- `is_active BOOLEAN` — `NOT NULL`, `DEFAULT TRUE`.
+- `is_active BOOLEAN` — `NOT NULL`, `DEFAULT TRUE`. El registro crea la cuenta con `FALSE` hasta que se valida el correo.
+- `email_verified_at TIMESTAMPTZ` — `NULL`; fecha en que se validó el correo. La restricción `ck_users_active_requires_verified_email` (`CHECK (NOT is_active OR email_verified_at IS NOT NULL OR platform_role = 'platform_admin')`) impide tener activa una cuenta sin validar, salvo la de un `platform_admin`.
 - `created_at TIMESTAMPTZ` — `NOT NULL`.
 - `updated_at TIMESTAMPTZ` — `NOT NULL`.
 - `deleted_at TIMESTAMPTZ` — `NULL`; permite borrado lógico.
@@ -800,6 +822,15 @@ La aplicación debe comprobar que el remitente pertenece a la conversación.
 - `resolution TEXT` — `NULL`.
 - `created_at TIMESTAMPTZ` — `NOT NULL`.
 - `reviewed_at TIMESTAMPTZ` — `NULL`.
+
+#### 15. `email_verification` — Enlace de validación del correo
+
+- `token_hash CHAR(64)` — **PK**; SHA-256 en hexadecimal del token. El token en claro solo viaja en el correo, así que una copia de la base de datos no permite validar cuentas.
+- `user_id UUID` — `NOT NULL`, **FK** → `user.id` `ON DELETE CASCADE`, con índice.
+- `expires_at TIMESTAMPTZ` — `NOT NULL`; 24 horas tras la emisión (`EMAIL_VERIFICATION_TTL_HOURS`).
+- `created_at TIMESTAMPTZ` — `NOT NULL`, `DEFAULT now()`; limita los reenvíos a uno por minuto.
+
+Emitir un enlace borra los anteriores del usuario (solo vale el último) y validar el correo borra todos los suyos.
 
 #### Tipos enumerados
 
