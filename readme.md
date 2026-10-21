@@ -2003,11 +2003,131 @@ docker stop web-prod
 
 ## 7. Pull Requests
 
-> Documenta 3 de las Pull Requests realizadas durante la ejecución del proyecto
-
 **Pull Request 1**
 
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/2
+
+#### Titulo
+
+```
+feat: implementar el MVP de EntreVecinos (TK-001 a TK-046)
+```
+
+#### Contenido
+
+~~~markdown
+## Resumen
+
+Implementación completa del MVP de EntreVecinos: los 46 tickets de `docs/product/tickets/` (infraestructura y épicas 1 a 6, incluida HU-09b). Cada ticket tiene su cambio de OpenSpec archivado en `openspec/changes/archive/` y un commit propio.
+
+### Infraestructura
+- PostgreSQL 16, API FastAPI y web Next.js 16 en Docker Compose, con `Makefile` (TK-001…TK-004).
+- Almacenamiento de imágenes en MinIO con bucket privado y usuario de mínimos privilegios (TK-019). Usa la compilación comunitaria `pgsty/minio` con versión fija (AGPLv3), porque las imágenes oficiales ya no están en Docker Hub.
+- Content-Security-Policy con nonce por petición (TK-046).
+- `GET /v1/health`, usado por el healthcheck de la API.
+
+### Funcionalidad
+- **Épica 1:** registro, inicio de sesión (JWT en cookie `httpOnly`) y perfil.
+- **Épica 2:** crear y buscar comunidades, solicitar el acceso y revisar las solicitudes; política única de permisos `CommunityAccess`.
+- **Épica 3:** publicar anuncios con hasta 10 fotos (URL prefirmadas servidas por `/media/<id>`), editar, eliminar, y reservar o finalizar (HU-09b).
+- **Épica 4:** listado paginado, búsqueda de texto completo en español sin tildes, filtros por tipo y categoría, orden por fecha o precio y selector de comunidad.
+- **Épica 5:** detalle con galería y contacto con el anunciante (teléfono y correo, solo para miembros aprobados).
+- **Épica 6:** bloquear, desbloquear y expulsar miembros (los anuncios del bloqueado se ocultan), y retirar o restaurar anuncios.
+
+### Cambios de contrato (`docs/api`, compatibles)
+- `CommunityCreate`/`CommunityUpdate.description` (2000) y `ListingCreate`/`ListingUpdate.description` (5000).
+- `EUR` por defecto cuando hay precio sin moneda.
+- `q` de la búsqueda con un mínimo de 2 caracteres.
+- `MembershipError` y las respuestas `MembershipForbidden` (403) y `MembershipConflict` (409).
+- `ListingOwner.email` obligatorio.
+- Transiciones de estado del autor, con 409 para las no permitidas.
+
+### Migraciones
+`0001` users · `0002` community · `0003` unaccent · `0004` category/listing/media · `0005` búsqueda · `0006` auditoría de retirada.
+
+## Cómo probar
+
+```bash
+cp .env.example .env      # un .env existente necesita las variables de «Almacenamiento»
+make dev
+COMPOSE="docker compose --env-file .env -f infra/docker-compose.yml"
+$COMPOSE run --rm api pytest
+$COMPOSE exec web npm run lint && $COMPOSE exec web npm run typecheck && $COMPOSE exec web npm run test
+```
+
+Resultado: 392 pruebas de API (más `ruff` y `alembic check`) y 293 de web, todas en verde; el build de producción compila.
+
+## Notas
+- **BREAKING (entorno local):** desaparecen el volumen `api_assets` y `ASSETS_DIR`. El volumen antiguo se puede borrar con `docker volume rm entrevecinos_api_assets`.
+- El servicio `api` monta `docs/api` en solo lectura para la prueba que compara el esquema con el contrato.
+- Operaciones del contrato marcadas como MVP pero sin historia ni ticket, y no implementadas: `POST`/`PATCH /categories`, `PATCH /communities/{id}`, `DELETE /media/{id}`, `GET /users/me/listings`, `DELETE /users/me` y el cambio de rol de un miembro.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+~~~
+
+
 **Pull Request 2**
+
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/3
+
+#### Título
+
+```
+feat: mejoras del MVP, aprobación de comunidades, cierre de sesión y validación del correo
+```
+
+#### Contenido
+
+~~~markdown
+## Resumen
+
+Segunda tanda de funcionalidad sobre el MVP: épicas 7 a 10 (TK-047 a TK-062) y los tickets de la HU-27, pendientes de implementar. Cada ticket tiene su cambio de OpenSpec archivado en `openspec/changes/archive/` y las especificaciones de `openspec/specs/` están sincronizadas.                                                                                ### Épica 7 — Mejoras del MVP- `/` redirige a `/inicio` con sesión y a `/iniciar-sesion` sin ella (TK-047).  - Tras el registro o el inicio de sesión: sin comunidades → lista de comunidades; con una sola → esacomunidad (TK-048, TK-049).                                                     ### Épica 8 — Gestión de comunidades                                            - Las comunidades nuevas quedan pendientes hasta que un `platform_admin` las aprueba desde`/admin/comunidades` (TK-050, TK-051).                                          - Las que crea un `platform_admin` quedan activas al momento (TK-052).- Una sola comunidad pendiente por usuario: `409` y aviso en la web (TK-053, TK-### Épica 9 — Cierre de sesión                                                  - Botón «Cerrar sesión» en la cabecera privada (*Server Action* por `POST`, borra la *cookie* y va a`/`) (TK-055).                                                                  ### Épica 10 — Validación del correo                                            - **Mailpit** en Docker Compose como buzón de desarrollo (`http://localhost:8025`) y envío por SMTPdesde la API (TK-056).                                                          - El registro crea la cuenta **inactiva** y envía un enlace válido 24 horas; abrirlo activa la cuenta,inicia la sesión y lleva a `/comunidades`. Sin validar no se puede iniciar sesión (`403 email_not_verified`), salvo un `platform_admin`. Una restricción de la base de datos garantiza la regla (TK-057, TK-058, TK-060).
+- Reenvío del correo de validación desde el registro, el enlace caducado y el inicio de sesión. Siempre responde `202`, para no revelar qué correos existen, y como mucho envía un correo por minuto (TK-059, TK-061).
+- Documentación actualizada: `readme.md`, historias, `infra/`, `apps/api` y `apps/web` (TK-062).
+- `/verificar-correo/error` enlaza siempre con la raíz.
+
+### HU-27 (solo tickets)
+TK-063 a TK-065 corrigen el mensaje «Tu correo ya está validado» que aparece al abrir un enlace
+sustituido por un reenvío cuando la cuenta sigue pendiente. Están documentados y **pendientes de
+implementar**.
+
+### Cambios de contrato (`docs/api`)
+- **Incompatible:** `registerUser` responde `RegistrationResponse` (`email`, `verification_expires_at`) en lugar de un JWT (TK-058).
+- Nuevos `verifyEmail` (`POST /auth/email-verification`) y `resendEmailVerification` (`POST /auth/email-verification/resend`) (TK-058, TK-059).
+- `loginUser`: `403` con `code: email_not_verified` (TK-058).
+- `registerUser`: el `409` lleva `code` `email_in_use` o `email_pending_verification` (TK-059).
+- `createCommunity` crea la comunidad pendiente de aprobación (salvo un `platform_admin`) y responde `409` si el usuario ya tiene una pendiente (TK-050, TK-052, TK-053).
+- `adminListCommunities` y `adminUpdateCommunity` pasan al MVP (TK-050).
+
+### Migraciones
+`0007` una comunidad pendiente por usuario · `0008` validación del correo (`users.email_verified_at`, `ck_users_active_requires_verified_email`, tabla `email_verification`). Las cuentas existentes se dan por validadas.
+
+## Cómo probar
+
+```bash
+# Un .env existente necesita las variables de «Correo (SMTP)» de .env.example
+make dev
+COMPOSE="docker compose --env-file .env -f infra/docker-compose.yml"
+$COMPOSE run --rm -v "$PWD/apps/api/tests:/app/tests" api python -m pytest -q
+$COMPOSE exec web npm run lint && $COMPOSE exec web npm run typecheck && $COMPOSE exec web npm run test
+```
+
+1. Regístrate en http://localhost:3000/registro y abre el correo en http://localhost:8025. El enlace te lleva a `/comunidades` con la sesión iniciada.
+2. Con otra cuenta sin validar, inicia sesión: verás el aviso y el botón de reenvío.
+
+Resultado: 461 pruebas de API (más `ruff`, `alembic check` y `redocly lint`) y 339 de web, todas en verde. El flujo de validación y reenvío está comprobado de extremo a extremo con Mailpit.
+
+## Notas
+- **BREAKING (entorno):** los `.env` existentes necesitan `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `MAIL_FROM`, `WEB_PUBLIC_URL`, `EMAIL_VERIFICATION_TTL_HOURS` y `MAIL_UI_HOST_PORT`. Sin ellas, la API no arranca. Comprobación: `diff <(grep -o '^[A-Z_]*=' .env.example | sort) <(grep -o '^[A-Z_]*=' .env | sort)`.
+- En producción, `SMTP_STARTTLS=true` y `WEB_PUBLIC_URL` con `https` son obligatorios (validados en `Settings`).
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+~~~
 
 **Pull Request 3**
 
