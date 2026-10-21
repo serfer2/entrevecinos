@@ -65,6 +65,7 @@ Cambios compatibles del contrato durante el desarrollo del MVP:
 | TK-030 | `q` del listado: vacío equivale a no enviarlo; menos de 2 caracteres → 422; se ignoran las palabras de un carácter. |
 | TK-038 | `ListingOwner.email` (obligatorio): canal de contacto del MVP junto con `phone`. |
 | TK-044 | `updateListingStatus`: transiciones del autor (`active` ↔ `reserved`, → `completed` final) y 409 para transiciones no permitidas. |
+| TK-050 | `createCommunity` crea la comunidad con `is_active: false` (pendiente de aprobación). `adminListCommunities` y `adminUpdateCommunity` pasan al MVP (`x-mvp: true`) para listar las pendientes y aprobarlas; `adminUpdateCommunity` solo admite `is_active: true`. |
 
 ## Resumen de endpoints
 
@@ -82,4 +83,5 @@ Cambios compatibles del contrato durante el desarrollo del MVP:
 | Notificaciones | `GET /notifications`, `PATCH /notifications/{notification_id}`, `POST /notifications/read-all` | No |
 | Perfil profesional | `GET /professionals`, `GET /professionals/{user_id}`, `GET/PUT/DELETE /users/me/professional-profile`, servicios e imágenes del perfil | No |
 | Denuncias | `POST /listings/{listing_id}/reports`, `GET /communities/{community_id}/reports`, `GET/PATCH /reports/{report_id}` | No |
-| Administración | `GET /admin/users`, `PATCH /admin/users/{user_id}`, `GET /admin/communities`, `PATCH /admin/communities/{community_id}` | No |
+| Administración | `GET /admin/communities`, `PATCH /admin/communities/{community_id}` (aprobación de comunidades) | Sí |
+| Administración | `GET /admin/users`, `PATCH /admin/users/{user_id}` | No |

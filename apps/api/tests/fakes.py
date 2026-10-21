@@ -93,7 +93,7 @@ class InMemoryCommunityRepository:
         self.communities: dict[uuid.UUID, Community] = {}
         self.memberships: dict[tuple[uuid.UUID, uuid.UUID], Membership] = {}
 
-    def add(self, community: NewCommunity, admin_id: uuid.UUID) -> Community:
+    def add(self, community: NewCommunity, admin_id: uuid.UUID, is_active: bool) -> Community:
         now = datetime.now(UTC)
         stored = Community(
             id=uuid.uuid4(),
@@ -102,7 +102,7 @@ class InMemoryCommunityRepository:
             postal_code=community.postal_code,
             city=community.city,
             created_by=admin_id,
-            is_active=True,
+            is_active=is_active,
             created_at=now,
         )
         self.communities[stored.id] = stored
@@ -121,6 +121,14 @@ class InMemoryCommunityRepository:
     def get(self, community_id: uuid.UUID) -> Community | None:
         community = self.communities.get(community_id)
         return community if community and community.is_active else None
+
+    def activate(self, community_id: uuid.UUID) -> Community | None:
+        if community_id not in self.communities:
+            return None
+        self.communities[community_id] = dataclasses.replace(
+            self.communities[community_id], is_active=True
+        )
+        return self.communities[community_id]
 
 
 class InMemoryMembershipRepository:

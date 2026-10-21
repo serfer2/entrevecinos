@@ -8,6 +8,7 @@ Historias del MVP definido en la sección 1.2 del `readme.md`. Las inferencias q
 - **Vecino**: usuario registrado con sesión iniciada.
 - **Miembro**: vecino con acceso aprobado a una comunidad.
 - **Administrador de comunidad**: persona que gestiona los miembros y los anuncios de su comunidad.
+- **Administrador de plataforma** (`platform_admin`): persona que aprueba las comunidades nuevas y puede gestionar cualquier comunidad. Se nombra directamente en la base de datos (asumido).
 
 ## Fuera de alcance
 
@@ -24,6 +25,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 5. Detalle y contacto | HU-14, HU-15 |
 | 6. Administración mínima | HU-16, HU-17 |
 | 7. Mejora de funcionalidades del MVP | HU-18, HU-19, HU-20 |
+| 8. Mejora de la gestión de comunidades | HU-21 |
 
 ---
 
@@ -117,7 +119,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 
 **AC3 — Comunidad disponible para otros**
 
-- **Given** que he creado una comunidad
+- **Given** que he creado una comunidad y ha sido aprobada (HU-21)
 - **When** otro vecino busca comunidades
 - **Then** puede encontrar la mía y solicitar el acceso
 
@@ -552,3 +554,37 @@ Mejoras sobre las funcionalidades ya implementadas en las épicas 1 a 6. No aña
 - **Given** que el inicio de sesión me lo pidió una ruta protegida
 - **When** inicio sesión
 - **Then** vuelvo a esa ruta en lugar de a mi comunidad (asumido)
+
+---
+
+## Épica 8 — Mejora de la gestión de comunidades
+
+Control sobre las comunidades que se crean: un administrador de plataforma las revisa antes de que estén disponibles.
+
+### HU-21 Aprobar las comunidades nuevas antes de activarlas
+
+**Como** administrador de plataforma, **quiero** aprobar las comunidades que crean los vecinos antes de que estén activas, **para** evitar comunidades duplicadas o falsas.
+
+**AC1 — Comunidad pendiente**
+
+- **Given** que soy un vecino con la sesión iniciada
+- **When** creo una comunidad
+- **Then** queda pendiente de aprobación: no aparece en las búsquedas, nadie puede entrar en ella ni solicitar el acceso, y yo la veo en mis comunidades como pendiente
+
+**AC2 — Revisión**
+
+- **Given** que soy administrador de plataforma
+- **When** abro la lista de comunidades pendientes
+- **Then** veo las comunidades por aprobar, de la más antigua a la más reciente, con su nombre, descripción, ubicación y fecha de creación (asumido)
+
+**AC3 — Aprobación**
+
+- **Given** que soy administrador de plataforma y hay una comunidad pendiente
+- **When** la apruebo
+- **Then** queda activa: aparece en las búsquedas y su creador entra en ella como administrador
+
+**AC4 — Restricción**
+
+- **Given** que no soy administrador de plataforma
+- **When** intento ver las comunidades pendientes o aprobar una
+- **Then** no tengo acceso a esa función

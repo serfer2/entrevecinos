@@ -16,7 +16,7 @@ from entrevecinos.domain.communities.errors import CommunityNotFound, Membership
 from tests.fakes import InMemoryCommunityRepository, InMemoryMembershipRepository
 
 
-def test_creator_becomes_approved_admin() -> None:
+def test_creator_becomes_approved_admin_of_a_pending_community() -> None:
     repository = InMemoryCommunityRepository()
     creator = uuid.uuid4()
 
@@ -25,6 +25,7 @@ def test_creator_becomes_approved_admin() -> None:
     )
 
     assert community.created_by == creator
+    assert community.is_active is False
     membership = repository.memberships[(community.id, creator)]
     assert membership.role is MembershipRole.COMMUNITY_ADMIN
     assert membership.status is MembershipStatus.APPROVED
@@ -33,14 +34,14 @@ def test_creator_becomes_approved_admin() -> None:
 
 def test_get_returns_active_community() -> None:
     repository = InMemoryCommunityRepository()
-    community = CreateCommunity(repository).execute(NewCommunity(name="X"), uuid.uuid4())
+    community = repository.add(NewCommunity(name="X"), uuid.uuid4(), is_active=True)
 
     assert GetCommunity(repository).execute(community.id) == community
 
 
 def test_get_raises_not_found_for_missing_or_inactive() -> None:
     repository = InMemoryCommunityRepository()
-    community = CreateCommunity(repository).execute(NewCommunity(name="X"), uuid.uuid4())
+    community = repository.add(NewCommunity(name="X"), uuid.uuid4(), is_active=True)
     repository.communities[community.id] = dataclasses.replace(community, is_active=False)
 
     with pytest.raises(CommunityNotFound):
@@ -52,7 +53,7 @@ def test_get_raises_not_found_for_missing_or_inactive() -> None:
 def test_request_membership_creates_pending_member() -> None:
     communities = InMemoryCommunityRepository()
     memberships = InMemoryMembershipRepository(communities)
-    community = CreateCommunity(communities).execute(NewCommunity(name="X"), uuid.uuid4())
+    community = communities.add(NewCommunity(name="X"), uuid.uuid4(), is_active=True)
     user = uuid.uuid4()
 
     detail = RequestMembership(communities, memberships).execute(community.id, user)
@@ -66,7 +67,7 @@ def test_request_membership_creates_pending_member() -> None:
 def test_request_membership_rejects_any_existing_membership(status: MembershipStatus) -> None:
     communities = InMemoryCommunityRepository()
     memberships = InMemoryMembershipRepository(communities)
-    community = CreateCommunity(communities).execute(NewCommunity(name="X"), uuid.uuid4())
+    community = communities.add(NewCommunity(name="X"), uuid.uuid4(), is_active=True)
     user = uuid.uuid4()
     RequestMembership(communities, memberships).execute(community.id, user)
     key = (community.id, user)

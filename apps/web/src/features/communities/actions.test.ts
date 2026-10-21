@@ -30,8 +30,16 @@ describe("createCommunity", () => {
     requireUser.mockResolvedValue({ id: "u1" });
   });
 
-  it("crea la comunidad y redirige a su página", async () => {
-    userApiFetch.mockResolvedValue({ ok: true, status: 201, data: { id: "c1" } });
+  it("crea la comunidad y, si queda pendiente, avisa en /inicio", async () => {
+    userApiFetch.mockResolvedValue({ ok: true, status: 201, data: { id: "c1", is_active: false } });
+
+    await expect(createCommunity(undefined, form(filled))).rejects.toThrow(
+      "NEXT_REDIRECT:/inicio?comunidad-pendiente=1",
+    );
+  });
+
+  it("crea la comunidad y, si ya está activa, redirige a su página", async () => {
+    userApiFetch.mockResolvedValue({ ok: true, status: 201, data: { id: "c1", is_active: true } });
 
     await expect(createCommunity(undefined, form(filled))).rejects.toThrow(
       "NEXT_REDIRECT:/comunidades/c1",

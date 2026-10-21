@@ -4,11 +4,15 @@
 Creación y consulta de comunidades (`POST /v1/communities`, `GET /v1/communities/{id}`).
 ## Requirements
 ### Requirement: Crear una comunidad
-`POST /v1/communities` SHALL crear la comunidad del usuario autenticado y registrarlo como `community_admin` con membresía `approved` y `joined_at`, respondiendo `201` con el esquema `Community`.
+`POST /v1/communities` SHALL crear la comunidad del usuario autenticado con `is_active: false` (pendiente de aprobación) y registrarlo como `community_admin` con membresía `approved` y `joined_at`, respondiendo `201` con el esquema `Community`. Mientras está pendiente, la comunidad MUST NOT aparecer en `GET /v1/communities` y su detalle, sus solicitudes y sus anuncios SHALL responder `404`.
 
 #### Scenario: Creación correcta
 - **WHEN** un usuario autenticado envía `{"name": "Urbanización Los Olivos", "city": "Majadahonda", "postal_code": "28220"}`
-- **THEN** recibe `201` con `created_by` igual a su id y existe su membresía `community_admin`/`approved`
+- **THEN** recibe `201` con `created_by` igual a su id e `is_active: false`, y existe su membresía `community_admin`/`approved`
+
+#### Scenario: Comunidad pendiente oculta
+- **WHEN** otro usuario busca comunidades o solicita el acceso a una comunidad pendiente
+- **THEN** no la encuentra y la solicitud responde `404`
 
 ### Requirement: Validación de la comunidad
 `name` MUST tener de 1 a 120 caracteres tras recortar espacios; `description` (máximo 2000), `postal_code` (16) y `city` (120) son opcionales y `""` equivale a `null`. Datos inválidos SHALL responder `422` sin crear nada.

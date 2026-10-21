@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from entrevecinos.presentation.v1 import (
+    admin,
     auth,
     categories,
     communities,
@@ -18,3 +19,4 @@ router.include_router(media.router)
 router.include_router(categories.router)
 router.include_router(listings.router)
 router.include_router(health.router)
+router.include_router(admin.router)

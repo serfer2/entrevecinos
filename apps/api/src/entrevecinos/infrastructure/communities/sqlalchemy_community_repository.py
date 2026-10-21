@@ -32,13 +32,14 @@ class SqlAlchemyCommunityRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def add(self, community: NewCommunity, admin_id: uuid.UUID) -> Community:
+    def add(self, community: NewCommunity, admin_id: uuid.UUID, is_active: bool) -> Community:
         model = CommunityModel(
             name=community.name,
             description=community.description,
             postal_code=community.postal_code,
             city=community.city,
             created_by=admin_id,
+            is_active=is_active,
         )
         self._session.add(model)
         self._session.flush()
@@ -91,3 +92,26 @@ class SqlAlchemyCommunityRepository:
             .limit(page.page_size)
         )
         return PageResult(items=[community_to_domain(m) for m in models], total=total or 0)
+
+    def list_all(self, is_active: bool | None, page: PageRequest) -> PageResult[Community]:
+        conditions = [] if is_active is None else [CommunityModel.is_active.is_(is_active)]
+        total = self._session.scalar(
+            select(func.count()).select_from(CommunityModel).where(*conditions)
+        )
+        models = self._session.scalars(
+            select(CommunityModel)
+            .where(*conditions)
+            .order_by(CommunityModel.created_at, CommunityModel.id)
+            .offset(page.offset)
+            .limit(page.page_size)
+        )
+        return PageResult(items=[community_to_domain(m) for m in models], total=total or 0)
+
+    def activate(self, community_id: uuid.UUID) -> Community | None:
+        model = self._session.get(CommunityModel, community_id)
+        if model is None:
+            return None
+        model.is_active = True
+        self._session.flush()
+        self._session.refresh(model)
+        return community_to_domain(model)

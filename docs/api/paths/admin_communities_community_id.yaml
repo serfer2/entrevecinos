@@ -4,8 +4,11 @@ patch:
   tags: [Administración]
   operationId: adminUpdateCommunity
   summary: Activar o desactivar una comunidad
-  description: Solo `platform_admin`. Una comunidad desactivada deja de ser visible y de admitir anuncios.
-  x-mvp: false
+  description: >-
+    Solo `platform_admin`. Una comunidad desactivada deja de ser visible y de admitir anuncios. En el
+    MVP solo se admite `is_active: true`, que aprueba una comunidad pendiente (idempotente si ya
+    está activa); `false` se rechaza con 422.
+  x-mvp: true
   requestBody:
     required: true
     content:

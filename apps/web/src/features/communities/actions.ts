@@ -55,6 +55,8 @@ export async function createCommunity(
     return { formError: "No se pudo crear la comunidad. Inténtalo de nuevo.", values };
   }
 
+  // Una comunidad nueva queda pendiente hasta que la apruebe un administrador de plataforma.
+  if (!result.data.is_active) redirect("/inicio?comunidad-pendiente=1");
   redirect(`/comunidades/${result.data.id}`);
 }
 

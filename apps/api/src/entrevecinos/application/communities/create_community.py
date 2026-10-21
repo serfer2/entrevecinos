@@ -9,5 +9,8 @@ class CreateCommunity:
         self._communities = communities
 
     def execute(self, community: NewCommunity, creator_id: uuid.UUID) -> Community:
-        """El creador queda como administrador de la comunidad, con el acceso aprobado."""
-        return self._communities.add(community, admin_id=creator_id)
+        """El creador queda como administrador de la comunidad, con el acceso aprobado.
+
+        La comunidad queda pendiente (inactiva) hasta que un `platform_admin` la apruebe.
+        """
+        return self._communities.add(community, admin_id=creator_id, is_active=False)

@@ -162,6 +162,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Crear o seleccionar una comunidad local.
    - Permitir que sus miembros vean los anuncios asociados a ella.
    - Incluir una gestión sencilla de acceso, por ejemplo, aprobación por parte de un administrador.
+   - Las comunidades nuevas quedan pendientes hasta que un administrador de la plataforma las aprueba.
 3. **Gestión de anuncios**
    - Crear, editar y eliminar anuncios propios.
    - Marcar los anuncios propios como reservados o finalizados.
@@ -660,7 +661,7 @@ El modelo cubre las funciones descritas en el README: usuarios, comunidades, anu
 - `postal_code VARCHAR(16)` — `NULL`.
 - `city VARCHAR(120)` — `NULL`.
 - `created_by UUID` — `NOT NULL`, **FK** → `user.id`.
-- `is_active BOOLEAN` — `NOT NULL`, `DEFAULT TRUE`.
+- `is_active BOOLEAN` — `NOT NULL`, `DEFAULT TRUE`. En el MVP, `FALSE` significa pendiente de aprobación por un `platform_admin`.
 - `created_at TIMESTAMPTZ` — `NOT NULL`.
 - `updated_at TIMESTAMPTZ` — `NOT NULL`.
 

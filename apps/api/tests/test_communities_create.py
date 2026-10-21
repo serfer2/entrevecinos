@@ -16,7 +16,7 @@ def account(client: TestClient) -> dict:
     return register(client, "vecino@example.com")
 
 
-def test_creates_community_with_creator_as_approved_admin(
+def test_creates_pending_community_with_creator_as_approved_admin(
     client: TestClient, account: dict, db_session: Session
 ) -> None:
     response = client.post(
@@ -34,13 +34,34 @@ def test_creates_community_with_creator_as_approved_admin(
         None,
     )
     assert body["created_by"] == account["user"]["id"]
-    assert body["is_active"] is True
+    assert body["is_active"] is False
     membership = db_session.scalars(select(CommunityMembershipModel)).one()
     assert str(membership.community_id) == body["id"]
     assert str(membership.user_id) == account["user"]["id"]
     assert (membership.role, membership.status) == ("community_admin", "approved")
     assert membership.joined_at is not None
     assert str(membership.reviewed_by) == account["user"]["id"]
+
+
+def test_pending_community_is_hidden_until_approved(client: TestClient, account: dict) -> None:
+    community = client.post(
+        "/v1/communities", json={"name": "Los Olivos"}, headers=account["headers"]
+    ).json()
+    other = register(client, "otra@example.com")
+
+    detail = client.get(f"/v1/communities/{community['id']}", headers=account["headers"])
+    search = client.get("/v1/communities", headers=other["headers"])
+    request = client.post(
+        f"/v1/communities/{community['id']}/memberships", headers=other["headers"]
+    )
+    mine = client.get("/v1/users/me/memberships", headers=account["headers"]).json()["items"]
+
+    assert detail.status_code == 404
+    assert search.json()["items"] == []
+    assert request.status_code == 404
+    assert [(m["community"]["id"], m["community"]["is_active"]) for m in mine] == [
+        (community["id"], False)
+    ]
 
 
 def test_blank_optional_fields_are_null(client: TestClient, account: dict) -> None:
