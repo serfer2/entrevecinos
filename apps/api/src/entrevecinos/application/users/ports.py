@@ -65,16 +65,18 @@ class TokenService(TokenIssuer, Protocol):
 
 class EmailVerificationRepository(Protocol):
     def replace(self, user_id: uuid.UUID, token_hash: str, expires_at: datetime) -> None:
-        """Guarda el enlace nuevo y borra los anteriores del usuario: solo vale el último."""
+        """Guarda el enlace nuevo y marca los anteriores como sustituidos: solo vale el último."""
         ...
 
     def get(self, token_hash: str) -> EmailVerification | None: ...
 
     def last_created_at(self, user_id: uuid.UUID) -> datetime | None:
-        """Fecha del enlace vigente más reciente del usuario, o `None` si no tiene ninguno."""
+        """Fecha del enlace más reciente del usuario, o `None` si no tiene ninguno."""
         ...
 
-    def delete_for_user(self, user_id: uuid.UUID) -> None: ...
+    def mark_used(self, token_hash: str) -> None:
+        """Marca el enlace como usado y los demás vigentes de su usuario como sustituidos."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)

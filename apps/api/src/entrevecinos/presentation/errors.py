@@ -21,12 +21,14 @@ from entrevecinos.domain.listings.errors import (
 from entrevecinos.domain.media.errors import EmptyImage, ImageTooLarge, UnsupportedImageType
 from entrevecinos.domain.users.errors import (
     EmailAlreadyRegistered,
+    EmailAlreadyVerified,
     EmailNotVerified,
     EmailPendingVerification,
     InvalidCredentials,
     NotAuthenticated,
     VerificationExpired,
     VerificationInvalid,
+    VerificationSuperseded,
 )
 
 
@@ -92,6 +94,29 @@ async def verification_invalid_handler(request: Request, exc: VerificationInvali
         content={
             "detail": "El enlace de validación no es válido.",
             "code": "verification_invalid",
+        },
+    )
+
+
+async def email_already_verified_handler(
+    request: Request, exc: EmailAlreadyVerified
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": "Tu correo ya está validado.", "code": "email_already_verified"},
+    )
+
+
+async def verification_superseded_handler(
+    request: Request, exc: VerificationSuperseded
+) -> JSONResponse:
+    # Como en el 410: quien tiene el token recibió el correo, así que se puede ofrecer el reenvío.
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={
+            "detail": "Este enlace ya no es válido porque te hemos enviado uno más reciente.",
+            "code": "verification_superseded",
+            "email": exc.email,
         },
     )
 
@@ -233,6 +258,8 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(InvalidCredentials, invalid_credentials_handler)
     app.add_exception_handler(EmailNotVerified, email_not_verified_handler)
     app.add_exception_handler(VerificationInvalid, verification_invalid_handler)
+    app.add_exception_handler(EmailAlreadyVerified, email_already_verified_handler)
+    app.add_exception_handler(VerificationSuperseded, verification_superseded_handler)
     app.add_exception_handler(VerificationExpired, verification_expired_handler)
     app.add_exception_handler(NotAuthenticated, not_authenticated_handler)
     app.add_exception_handler(NotFoundError, not_found_handler)

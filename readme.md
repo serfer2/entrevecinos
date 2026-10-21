@@ -488,6 +488,8 @@ erDiagram
         UUID user_id FK "NOT NULL; FK a user.id; ON DELETE CASCADE"
         TIMESTAMPTZ expires_at "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ used_at "NULL; se validó el correo con él"
+        TIMESTAMPTZ superseded_at "NULL; lo sustituyó otro más reciente"
     }
 
     COMMUNITY {
@@ -829,8 +831,12 @@ La aplicación debe comprobar que el remitente pertenece a la conversación.
 - `user_id UUID` — `NOT NULL`, **FK** → `user.id` `ON DELETE CASCADE`, con índice.
 - `expires_at TIMESTAMPTZ` — `NOT NULL`; 24 horas tras la emisión (`EMAIL_VERIFICATION_TTL_HOURS`).
 - `created_at TIMESTAMPTZ` — `NOT NULL`, `DEFAULT now()`; limita los reenvíos a uno por minuto.
+- `used_at TIMESTAMPTZ` — `NULL`; fecha en que se validó el correo con este enlace.
+- `superseded_at TIMESTAMPTZ` — `NULL`; fecha en que otro enlace más reciente lo sustituyó.
+- `CHECK (used_at IS NULL OR superseded_at IS NULL)` (`ck_email_verification_used_or_superseded`).
+- Índice único parcial `uq_email_verification_one_active_per_user` sobre `user_id` `WHERE used_at IS NULL AND superseded_at IS NULL`: como mucho un enlace vigente por usuario.
 
-Emitir un enlace borra los anteriores del usuario (solo vale el último) y validar el correo borra todos los suyos.
+Solo vale el último enlace: emitir uno marca los anteriores como sustituidos y validar el correo marca el usado y sustituye el resto. Se conservan para explicar por qué un enlace antiguo ya no vale (HU-27); al emitir uno nuevo se borran los del usuario caducados hace más de 30 días.
 
 #### Tipos enumerados
 

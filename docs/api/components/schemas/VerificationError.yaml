@@ -1,6 +1,6 @@
 description: >-
-  Error al validar el correo (extensión de `Error`). Si el enlace ha caducado, incluye el correo
-  de la cuenta para ofrecer el reenvío.
+  Error al validar el correo (extensión de `Error`). Si el enlace ha caducado o lo ha sustituido
+  otro más reciente, incluye el correo de la cuenta para ofrecer el reenvío.
 allOf:
   - $ref: ./Error.yaml
   - type: object
@@ -8,8 +8,8 @@ allOf:
     properties:
       code:
         type: string
-        enum: [verification_expired, verification_invalid]
+        enum: [verification_expired, verification_invalid, verification_superseded, email_already_verified]
       email:
         type: string
         format: email
-        description: "Solo con `code: verification_expired`."
+        description: "Solo con `code` `verification_expired` o `verification_superseded`."

@@ -70,24 +70,41 @@ describe("GET /verificar-correo", () => {
     expect(createSession).not.toHaveBeenCalled();
   });
 
-  it("con 400 y sin sesión pide iniciar sesión", async () => {
-    apiFetch.mockResolvedValue({
-      ok: false,
-      error: { status: 400, detail: "x" },
-    });
+  function rejectWith400(payload?: Record<string, unknown>) {
+    apiFetch.mockResolvedValue({ ok: false, error: { status: 400, detail: "x", payload } });
+  }
+
+  it("con 400 email_already_verified y sin sesión pide iniciar sesión", async () => {
+    rejectWith400({ code: "email_already_verified" });
 
     expect(location(await call())).toBe("/iniciar-sesion?motivo=correo-validado");
   });
 
-  it("con 400 y con sesión sigue a /comunidades", async () => {
-    apiFetch.mockResolvedValue({
-      ok: false,
-      error: { status: 400, detail: "x" },
-    });
+  it("con 400 email_already_verified y con sesión sigue a /comunidades", async () => {
+    rejectWith400({ code: "email_already_verified" });
     getCurrentUser.mockResolvedValue({ id: "u1" });
 
     expect(location(await call())).toBe("/comunidades");
   });
+
+  it("con 400 verification_superseded lleva al enlace sustituido con el correo", async () => {
+    rejectWith400({ code: "verification_superseded", email: "vecino@example.com" });
+
+    expect(location(await call())).toBe(
+      "/verificar-correo/error?motivo=reemplazado&email=vecino%40example.com",
+    );
+    expect(getCurrentUser).not.toHaveBeenCalled();
+  });
+
+  it.each([{ code: "verification_invalid" }, { code: "otro" }, undefined])(
+    "con 400 %j muestra el enlace no válido aunque haya sesión",
+    async (payload) => {
+      rejectWith400(payload);
+      getCurrentUser.mockResolvedValue({ id: "u1" });
+
+      expect(location(await call())).toBe("/verificar-correo/error?motivo=invalido");
+    },
+  );
 
   it.each([0, 500])("con estado %i muestra el error genérico", async (status) => {
     apiFetch.mockResolvedValue({

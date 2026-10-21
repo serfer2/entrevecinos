@@ -24,14 +24,32 @@ post:
           schema:
             $ref: ../components/schemas/AuthResponse.yaml
     "400":
-      description: El enlace no existe, ya se usó o lo sustituyó otro más reciente.
+      description: >-
+        El enlace no vale. `verification_invalid`: no existe (nunca se envió o se ha purgado).
+        `email_already_verified`: la cuenta ya validó su correo (con este enlace u otro).
+        `verification_superseded`: otro enlace más reciente lo sustituyó y la cuenta sigue
+        pendiente; incluye el correo para ofrecer el reenvío.
       content:
         application/json:
           schema:
             $ref: ../components/schemas/VerificationError.yaml
-          example:
-            detail: "El enlace de validación no es válido."
-            code: verification_invalid
+          examples:
+            invalid:
+              summary: Enlace desconocido
+              value:
+                detail: "El enlace de validación no es válido."
+                code: verification_invalid
+            alreadyVerified:
+              summary: Cuenta ya validada
+              value:
+                detail: "Tu correo ya está validado."
+                code: email_already_verified
+            superseded:
+              summary: Enlace sustituido por uno más reciente
+              value:
+                detail: "Este enlace ya no es válido porque te hemos enviado uno más reciente."
+                code: verification_superseded
+                email: vecino@example.com
     "410":
       description: El enlace ha caducado; la cuenta sigue inactiva.
       content:

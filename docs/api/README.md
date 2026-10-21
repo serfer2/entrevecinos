@@ -70,6 +70,7 @@ Cambios del contrato durante el desarrollo del MVP (compatibles salvo que se ind
 | TK-053 | `createCommunity`: 409 si el usuario ya tiene una comunidad pendiente de aprobación. |
 | TK-058 | **Incompatible:** `registerUser` crea la cuenta inactiva y responde `RegistrationResponse` (`email`, `verification_expires_at`) sin token. Nuevo `verifyEmail` (`POST /auth/email-verification`): `200` con `AuthResponse`, `400`/`410` con `VerificationError`. `loginUser`: `403` con `code: email_not_verified` si la cuenta no ha validado su correo. |
 | TK-059 | `registerUser`: el `409` usa `RegistrationConflict` (`Error` + `code`): `email_in_use` o `email_pending_verification`. Nuevo `resendEmailVerification` (`POST /auth/email-verification/resend`): siempre `202`. |
+| TK-064 | `verifyEmail`: el `400` distingue `verification_invalid`, `email_already_verified` y `verification_superseded` (con `email`). Compatible para clientes que solo miran el estado. |
 
 ## Resumen de endpoints
 

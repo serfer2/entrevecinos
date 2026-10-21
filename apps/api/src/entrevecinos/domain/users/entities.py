@@ -48,8 +48,11 @@ class User:
 
 @dataclass(frozen=True, slots=True)
 class EmailVerification:
-    """Enlace de validación pendiente de usar. No incluye el token: solo viaja por correo."""
+    """Enlace de validación enviado. No incluye el token: solo viaja por correo."""
 
     user_id: uuid.UUID
     expires_at: datetime
     created_at: datetime
+    used_at: datetime | None = None
+    # Otro enlace más reciente lo sustituyó: solo vale el último.
+    superseded_at: datetime | None = None
