@@ -52,7 +52,12 @@ class EmailVerificationRequest(BaseModel):
 
 class VerificationErrorResponse(BaseModel):
     detail: str
-    code: Literal["verification_expired", "verification_invalid"]
+    code: Literal[
+        "verification_expired",
+        "verification_invalid",
+        "verification_superseded",
+        "email_already_verified",
+    ]
     email: str | None = None
 
 

@@ -58,9 +58,21 @@ class EmailVerificationModel(Base):
     """Enlace de validación del correo. Solo se guarda el SHA-256 del token."""
 
     __tablename__ = "email_verification"
-    __table_args__ = (Index(None, "user_id"),)
+    __table_args__ = (
+        Index(None, "user_id"),
+        CheckConstraint("used_at IS NULL OR superseded_at IS NULL", name="used_or_superseded"),
+        # Solo vale el último enlace: como mucho uno vigente por usuario (migración 0009).
+        Index(
+            "uq_email_verification_one_active_per_user",
+            "user_id",
+            unique=True,
+            postgresql_where=text("used_at IS NULL AND superseded_at IS NULL"),
+        ),
+    )
 
     token_hash: Mapped[str] = mapped_column(CHAR(64), primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

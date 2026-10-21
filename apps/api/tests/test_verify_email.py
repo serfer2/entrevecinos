@@ -2,10 +2,15 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from entrevecinos.application.users.email_verification import EmailVerificationIssuer
+from entrevecinos.application.users.email_verification import EmailVerificationIssuer, hash_token
 from entrevecinos.application.users.verify_email import VerifyEmail
 from entrevecinos.domain.users.entities import NewUser, User
-from entrevecinos.domain.users.errors import VerificationExpired, VerificationInvalid
+from entrevecinos.domain.users.errors import (
+    EmailAlreadyVerified,
+    VerificationExpired,
+    VerificationInvalid,
+    VerificationSuperseded,
+)
 from tests.fakes import FakeTokenIssuer, InMemoryEmailVerificationRepository, InMemoryUserRepository
 
 ISSUED = datetime(2026, 10, 21, 12, 0, tzinfo=UTC)
@@ -64,7 +69,7 @@ def test_valid_token_activates_account_and_issues_token(
     assert verified.email_verified_at is not None
     assert verified.email_verification_pending is False
     assert access.token == f"token-for:{user.id}"
-    assert verifications.verifications == {}
+    assert verifications.get(hash_token(token)).used_at is not None
 
 
 def test_expired_token_is_rejected_with_email(
@@ -80,25 +85,49 @@ def test_expired_token_is_rejected_with_email(
     assert users.get_by_id(user.id).is_active is False
 
 
-def test_used_token_is_invalid(
+def test_used_token_reports_already_verified(
     verify: VerifyEmail, verifications, clock: Clock, user: User
 ) -> None:
     token = issue(verifications, clock, user)
     verify.execute(token)
 
-    with pytest.raises(VerificationInvalid):
+    with pytest.raises(EmailAlreadyVerified):
         verify.execute(token)
 
 
-def test_replaced_token_is_invalid(
-    verify: VerifyEmail, verifications, clock: Clock, user: User
+def test_replaced_token_reports_superseded_with_email(
+    verify: VerifyEmail, users: InMemoryUserRepository, verifications, clock: Clock, user: User
 ) -> None:
     old = issue(verifications, clock, user)
     new = issue(verifications, clock, user)
 
-    with pytest.raises(VerificationInvalid):
+    with pytest.raises(VerificationSuperseded) as error:
         verify.execute(old)
+
+    assert error.value.email == "vecino@example.com"
+    assert users.get_by_id(user.id).is_active is False
     assert verify.execute(new)[0].is_active is True
+
+
+def test_replaced_token_of_verified_account_reports_already_verified(
+    verify: VerifyEmail, verifications, clock: Clock, user: User
+) -> None:
+    old = issue(verifications, clock, user)
+    verify.execute(issue(verifications, clock, user))
+
+    with pytest.raises(EmailAlreadyVerified):
+        verify.execute(old)
+
+
+def test_replaced_and_expired_token_reports_superseded(
+    verify: VerifyEmail, verifications, clock: Clock, user: User
+) -> None:
+    old = issue(verifications, clock, user)
+    issue(verifications, clock, user)
+    clock.now = ISSUED + timedelta(hours=25)
+
+    with pytest.raises(VerificationSuperseded):
+        verify.execute(old)
 
 
 def test_unknown_token_is_invalid(verify: VerifyEmail) -> None:

@@ -71,9 +71,10 @@ class InMemoryEmailVerificationRepository:
         self.verifications: dict[str, EmailVerification] = {}
 
     def replace(self, user_id: uuid.UUID, token_hash: str, expires_at: datetime) -> None:
-        self.delete_for_user(user_id)
+        now = datetime.now(UTC)
+        self._supersede_active(user_id, now)
         self.verifications[token_hash] = EmailVerification(
-            user_id=user_id, expires_at=expires_at, created_at=datetime.now(UTC)
+            user_id=user_id, expires_at=expires_at, created_at=now
         )
 
     def get(self, token_hash: str) -> EmailVerification | None:
@@ -83,12 +84,20 @@ class InMemoryEmailVerificationRepository:
         dates = [v.created_at for v in self.verifications.values() if v.user_id == user_id]
         return max(dates, default=None)
 
-    def delete_for_user(self, user_id: uuid.UUID) -> None:
-        self.verifications = {
-            token_hash: verification
-            for token_hash, verification in self.verifications.items()
-            if verification.user_id != user_id
-        }
+    def mark_used(self, token_hash: str) -> None:
+        verification = self.verifications.get(token_hash)
+        if verification is None:
+            return
+        now = datetime.now(UTC)
+        self._supersede_active(verification.user_id, now)
+        self.verifications[token_hash] = dataclasses.replace(
+            verification, used_at=now, superseded_at=None
+        )
+
+    def _supersede_active(self, user_id: uuid.UUID, now: datetime) -> None:
+        for token_hash, v in self.verifications.items():
+            if v.user_id == user_id and v.used_at is None and v.superseded_at is None:
+                self.verifications[token_hash] = dataclasses.replace(v, superseded_at=now)
 
 
 class FakeEmailSender:

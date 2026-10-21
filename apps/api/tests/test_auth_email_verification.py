@@ -47,7 +47,7 @@ def test_valid_token_activates_account_and_returns_token(
     user = stored_user(db_session)
     assert user.is_active is True
     assert user.email_verified_at is not None
-    assert db_session.scalars(select(EmailVerificationModel)).all() == []
+    assert db_session.scalars(select(EmailVerificationModel)).one().used_at is not None
     assert login(client).status_code == 200
 
 
@@ -69,9 +69,15 @@ def test_expired_token_returns_410_with_email(client: TestClient, db_session: Se
 
 
 INVALID = {"detail": "El enlace de validación no es válido.", "code": "verification_invalid"}
+ALREADY_VERIFIED = {"detail": "Tu correo ya está validado.", "code": "email_already_verified"}
+SUPERSEDED = {
+    "detail": "Este enlace ya no es válido porque te hemos enviado uno más reciente.",
+    "code": "verification_superseded",
+    "email": EMAIL,
+}
 
 
-def test_used_token_returns_400(client: TestClient) -> None:
+def test_used_token_returns_400_already_verified(client: TestClient) -> None:
     register_pending(client, EMAIL)
     token = sent_emails(client).last_token(EMAIL)
     assert verify(client, token).status_code == 200
@@ -79,7 +85,7 @@ def test_used_token_returns_400(client: TestClient) -> None:
     response = verify(client, token)
 
     assert response.status_code == 400
-    assert response.json() == INVALID
+    assert response.json() == ALREADY_VERIFIED
 
 
 def test_unknown_token_returns_400(client: TestClient) -> None:
@@ -159,11 +165,43 @@ def test_resend_sends_new_link_and_invalidates_previous(
     new = sent_emails(client).last_token(EMAIL)
     assert new != previous
     db_session.expire_all()
-    stored = db_session.scalars(select(EmailVerificationModel)).one()
+    stored = db_session.scalars(
+        select(EmailVerificationModel).where(EmailVerificationModel.superseded_at.is_(None))
+    ).one()
     expected = datetime.now(UTC) + timedelta(hours=24)
     assert abs(stored.expires_at - expected) < timedelta(minutes=1)
-    assert verify(client, previous).status_code == 400
+    assert verify(client, previous).json() == SUPERSEDED
     assert verify(client, new).status_code == 200
+
+
+def test_superseded_token_of_pending_account_returns_400_with_email(
+    client: TestClient, db_session: Session
+) -> None:
+    register_pending(client, EMAIL)
+    previous = sent_emails(client).last_token(EMAIL)
+    age_verifications(db_session)
+    assert resend(client).status_code == 202
+
+    response = verify(client, previous)
+
+    assert response.status_code == 400
+    assert response.json() == SUPERSEDED
+    assert stored_user(db_session).is_active is False
+
+
+def test_superseded_token_of_verified_account_returns_400_already_verified(
+    client: TestClient, db_session: Session
+) -> None:
+    register_pending(client, EMAIL)
+    previous = sent_emails(client).last_token(EMAIL)
+    age_verifications(db_session)
+    assert resend(client).status_code == 202
+    assert verify(client, sent_emails(client).last_token(EMAIL)).status_code == 200
+
+    response = verify(client, previous)
+
+    assert response.status_code == 400
+    assert response.json() == ALREADY_VERIFIED
 
 
 def test_resend_after_expiry_sends_working_link(client: TestClient, db_session: Session) -> None:

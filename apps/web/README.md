@@ -104,9 +104,9 @@ export default async function MiPagina() {
 
 1. `/registro`: la *Server Action* `signup` crea la cuenta pero **no** inicia la sesión; `SignupForm` sustituye el formulario por el aviso «Te hemos enviado un correo a {email}…». En desarrollo, el correo se ve en Mailpit: http://localhost:8025.
 2. El enlace del correo abre `GET /verificar-correo?token=…` (`src/app/verificar-correo/route.ts`), un *route handler* porque las páginas de servidor no pueden escribir *cookies*. Valida el token con la API, crea la sesión y redirige con `303` a `/comunidades`. La respuesta lleva `Cache-Control: no-store` y `Referrer-Policy: no-referrer` (este, en `next.config.ts`, porque la cabecera global lo sobrescribiría). El `Location` es relativo: `request.url` lleva el host interno del servidor.
-3. Si falla: caducado → `/verificar-correo/error?motivo=caducado&email=…`; enlace ya usado → `/comunidades` con sesión o `/iniciar-sesion?motivo=correo-validado` sin ella (cubre el doble clic y los escáneres de correo); sin token o no válido → `motivo=invalido`; error de la API → `motivo=error`.
+3. Si falla, según el `code` de la API: caducado (`410`) → `/verificar-correo/error?motivo=caducado&email=…`; sustituido por un reenvío con la cuenta pendiente (`verification_superseded`) → `motivo=reemplazado&email=…`; cuenta ya validada (`email_already_verified`) → `/comunidades` con sesión o `/iniciar-sesion?motivo=correo-validado` sin ella (cubre el doble clic y los escáneres de correo); sin token o desconocido (`verification_invalid`) → `motivo=invalido`; error de la API → `motivo=error`.
 4. `/iniciar-sesion` con una cuenta sin validar muestra «Tienes que validar tu correo electrónico antes de iniciar sesión.».
-5. `ResendVerificationButton` (*Server Action* `resendVerification`) pide otro enlace en tres sitios: el registro con un correo pendiente, la página de enlace caducado y el inicio de sesión sin validar. Se renderiza fuera del formulario principal (no se pueden anidar formularios).
+5. `ResendVerificationButton` (*Server Action* `resendVerification`) pide otro enlace en tres sitios: el registro con un correo pendiente, la página de enlace caducado o sustituido y el inicio de sesión sin validar. Se renderiza fuera del formulario principal (no se pueden anidar formularios).
 
 ## Pruebas
 

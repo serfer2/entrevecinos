@@ -76,9 +76,10 @@ def test_sends_new_link_and_invalidates_previous(
     assert message is not None
     assert message.to == EMAIL
     new_token = token_of(message.text)
-    assert verifications.get(hash_token(token_of(previous.text))) is None
+    assert verifications.get(hash_token(token_of(previous.text))).superseded_at is not None
     stored = verifications.get(hash_token(new_token))
     assert stored is not None
+    assert stored.superseded_at is None
     assert stored.expires_at == clock.now + timedelta(hours=24)
 
 

@@ -9,9 +9,14 @@ export const metadata: Metadata = { title: "Validar el correo · EntreVecinos" }
 
 const MESSAGES: Record<string, string> = {
   caducado: "El enlace de validación ha caducado.",
+  reemplazado:
+    "Este enlace ya no es válido porque te hemos enviado uno más reciente. Abre el enlace del último correo que has recibido.",
   invalido: "El enlace de validación no es válido.",
   error: "No hemos podido validar tu correo. Inténtalo de nuevo más tarde.",
 };
+
+// Motivos en los que la cuenta sigue pendiente: se ofrece recibir otro enlace.
+const RESENDABLE = new Set(["caducado", "reemplazado"]);
 
 const linkClass = "text-sm font-medium text-emerald-800 underline";
 
@@ -31,7 +36,7 @@ export default async function VerifyEmailErrorPage({ searchParams }: VerifyEmail
       <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
         {MESSAGES[reason]}
       </p>
-      {reason !== "caducado" ? (
+      {!RESENDABLE.has(reason) ? (
         <Link href={LOGIN_PATH} className={linkClass}>
           Ir a iniciar sesión
         </Link>
