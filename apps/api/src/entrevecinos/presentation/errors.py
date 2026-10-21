@@ -22,6 +22,7 @@ from entrevecinos.domain.media.errors import EmptyImage, ImageTooLarge, Unsuppor
 from entrevecinos.domain.users.errors import (
     EmailAlreadyRegistered,
     EmailNotVerified,
+    EmailPendingVerification,
     InvalidCredentials,
     NotAuthenticated,
     VerificationExpired,
@@ -50,7 +51,20 @@ async def email_already_registered_handler(
     request: Request, exc: EmailAlreadyRegistered
 ) -> JSONResponse:
     return JSONResponse(
-        status_code=status.HTTP_409_CONFLICT, content={"detail": "El correo ya está en uso."}
+        status_code=status.HTTP_409_CONFLICT,
+        content={"detail": "El correo ya está en uso.", "code": "email_in_use"},
+    )
+
+
+async def email_pending_verification_handler(
+    request: Request, exc: EmailPendingVerification
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={
+            "detail": "Este correo está pendiente de validación.",
+            "code": "email_pending_verification",
+        },
     )
 
 
@@ -215,6 +229,7 @@ async def listing_locked_handler(request: Request, exc: ListingLocked) -> JSONRe
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(EmailAlreadyRegistered, email_already_registered_handler)
+    app.add_exception_handler(EmailPendingVerification, email_pending_verification_handler)
     app.add_exception_handler(InvalidCredentials, invalid_credentials_handler)
     app.add_exception_handler(EmailNotVerified, email_not_verified_handler)
     app.add_exception_handler(VerificationInvalid, verification_invalid_handler)

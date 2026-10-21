@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from entrevecinos.infrastructure.db.models import EmailVerificationModel, UserModel
+from tests.api_helpers import register, sent_emails
 
 pytestmark = pytest.mark.db
 
@@ -95,16 +96,35 @@ def test_register_blank_phone_is_stored_as_null(client: TestClient, db_session: 
 
 
 @pytest.mark.parametrize("email", ["vecino@example.com", "Vecino@Example.COM"])
-def test_register_duplicate_email_returns_409(
+def test_register_verified_email_returns_409_in_use(
     client: TestClient, db_session: Session, email: str
 ) -> None:
-    client.post(URL, json=payload())
+    register(client, "vecino@example.com")
 
     response = client.post(URL, json=payload(email=email, full_name="Otra persona"))
 
     assert response.status_code == 409
-    assert response.json() == {"detail": "El correo ya está en uso."}
+    assert response.json() == {"detail": "El correo ya está en uso.", "code": "email_in_use"}
     assert user_count(db_session) == 1
+
+
+@pytest.mark.parametrize("email", ["vecino@example.com", "Vecino@Example.COM"])
+def test_register_pending_email_returns_409_pending_without_changes(
+    client: TestClient, db_session: Session, email: str
+) -> None:
+    client.post(URL, json=payload())
+    emails_before = len(sent_emails(client).sent)
+
+    response = client.post(URL, json=payload(email=email, full_name="Otra persona"))
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Este correo está pendiente de validación.",
+        "code": "email_pending_verification",
+    }
+    assert user_count(db_session) == 1
+    assert stored_user(db_session).full_name == "Alex Vecino"
+    assert len(sent_emails(client).sent) == emails_before
 
 
 def test_register_invalid_data_returns_422_per_field(

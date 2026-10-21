@@ -69,13 +69,14 @@ Cambios del contrato durante el desarrollo del MVP (compatibles salvo que se ind
 | TK-052 | `createCommunity`: las comunidades que crea un `platform_admin` se crean activas (`is_active: true`). |
 | TK-053 | `createCommunity`: 409 si el usuario ya tiene una comunidad pendiente de aprobación. |
 | TK-058 | **Incompatible:** `registerUser` crea la cuenta inactiva y responde `RegistrationResponse` (`email`, `verification_expires_at`) sin token. Nuevo `verifyEmail` (`POST /auth/email-verification`): `200` con `AuthResponse`, `400`/`410` con `VerificationError`. `loginUser`: `403` con `code: email_not_verified` si la cuenta no ha validado su correo. |
+| TK-059 | `registerUser`: el `409` usa `RegistrationConflict` (`Error` + `code`): `email_in_use` o `email_pending_verification`. Nuevo `resendEmailVerification` (`POST /auth/email-verification/resend`): siempre `202`. |
 
 ## Resumen de endpoints
 
 | Grupo | Operaciones | MVP |
 |---|---|---|
 | Sistema | `GET /health` | Sí |
-| Autenticación | `POST /auth/register`, `POST /auth/email-verification`, `POST /auth/token` | Sí |
+| Autenticación | `POST /auth/register`, `POST /auth/email-verification`, `POST /auth/email-verification/resend`, `POST /auth/token` | Sí |
 | Usuarios | `GET/PATCH/DELETE /users/me`, `GET /users/me/memberships`, `GET /users/me/listings` | Sí |
 | Categorías | `GET/POST /categories`, `PATCH /categories/{category_id}` | Sí |
 | Comunidades | `GET/POST /communities`, `GET/PATCH /communities/{community_id}` | Sí |

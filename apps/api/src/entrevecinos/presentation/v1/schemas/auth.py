@@ -56,6 +56,21 @@ class VerificationErrorResponse(BaseModel):
     email: str | None = None
 
 
+class ResendVerificationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: Annotated[EmailStr, Field(max_length=320)]
+
+
+class ResendVerificationResponse(BaseModel):
+    detail: str
+
+
+class RegistrationConflictResponse(BaseModel):
+    detail: str
+    code: Literal["email_in_use", "email_pending_verification"]
+
+
 class EmailNotVerifiedResponse(BaseModel):
     detail: str
     code: Literal["email_not_verified"]

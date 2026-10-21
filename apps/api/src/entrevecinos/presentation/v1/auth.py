@@ -6,11 +6,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, status
 from entrevecinos.application.users.authenticate_user import AuthenticateUser, LoginCommand
 from entrevecinos.application.users.ports import EmailSender, OutgoingEmail
 from entrevecinos.application.users.register_user import RegisterUser, RegisterUserCommand
+from entrevecinos.application.users.resend_email_verification import ResendEmailVerification
 from entrevecinos.application.users.verify_email import VerifyEmail
 from entrevecinos.presentation.dependencies import (
     EmailSenderDep,
     get_authenticate_user,
     get_register_user,
+    get_resend_email_verification,
     get_verify_email,
 )
 from entrevecinos.presentation.v1.schemas.auth import (
@@ -19,10 +21,13 @@ from entrevecinos.presentation.v1.schemas.auth import (
     EmailVerificationRequest,
     LoginRequest,
     RegisterRequest,
+    RegistrationConflictResponse,
     RegistrationResponse,
+    ResendVerificationRequest,
+    ResendVerificationResponse,
     VerificationErrorResponse,
 )
-from entrevecinos.presentation.v1.schemas.common import CONFLICT, UNAUTHORIZED, VALIDATION_ERROR
+from entrevecinos.presentation.v1.schemas.common import UNAUTHORIZED, VALIDATION_ERROR
 from entrevecinos.presentation.v1.schemas.users import UserResponse
 
 logger = logging.getLogger(__name__)
@@ -47,7 +52,7 @@ def send_in_background(sender: EmailSender, email: OutgoingEmail) -> None:
         "Crea una cuenta inactiva con rol `user` y envía un correo con el enlace de validación. "
         "La cuenta se activa al validar el correo (`POST /auth/email-verification`)."
     ),
-    responses={**CONFLICT, **VALIDATION_ERROR},
+    responses={409: {"model": RegistrationConflictResponse}, **VALIDATION_ERROR},
 )
 def register(
     body: RegisterRequest,
@@ -88,6 +93,31 @@ def verify_email(
     user, token = verify.execute(body.token)
     return AuthResponse(
         access_token=token.token, expires_in=token.expires_in, user=UserResponse.from_domain(user)
+    )
+
+
+@router.post(
+    "/email-verification/resend",
+    status_code=status.HTTP_202_ACCEPTED,
+    operation_id="resendEmailVerification",
+    summary="Reenviar el correo de validación",
+    description=(
+        "Envía un enlace de validación nuevo si la cuenta está pendiente. Responde lo mismo exista "
+        "o no la cuenta, para no revelar qué correos están registrados. Acceso público."
+    ),
+    responses={**VALIDATION_ERROR},
+)
+def resend_email_verification(
+    body: ResendVerificationRequest,
+    resend: Annotated[ResendEmailVerification, Depends(get_resend_email_verification)],
+    sender: EmailSenderDep,
+    background_tasks: BackgroundTasks,
+) -> ResendVerificationResponse:
+    message = resend.execute(body.email)
+    if message is not None:
+        background_tasks.add_task(send_in_background, sender, message)
+    return ResendVerificationResponse(
+        detail="Si el correo está pendiente de validación, te enviaremos un enlace nuevo."
     )
 
 

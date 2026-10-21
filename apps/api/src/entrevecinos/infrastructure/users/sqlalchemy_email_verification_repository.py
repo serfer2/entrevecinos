@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from entrevecinos.domain.users.entities import EmailVerification
@@ -25,6 +25,13 @@ class SqlAlchemyEmailVerificationRepository:
             return None
         return EmailVerification(
             user_id=model.user_id, expires_at=model.expires_at, created_at=model.created_at
+        )
+
+    def last_created_at(self, user_id: uuid.UUID) -> datetime | None:
+        return self._session.scalar(
+            select(func.max(EmailVerificationModel.created_at)).where(
+                EmailVerificationModel.user_id == user_id
+            )
         )
 
     def delete_for_user(self, user_id: uuid.UUID) -> None:

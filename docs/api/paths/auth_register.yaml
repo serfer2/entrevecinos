@@ -30,6 +30,21 @@ post:
             email: vecino@example.com
             verification_expires_at: "2026-10-22T10:00:00Z"
     "409":
-      $ref: ../components/responses/Conflict.yaml
+      description: >-
+        El correo ya está registrado. Con una cuenta pendiente de validación, `code` es
+        `email_pending_verification` y la cuenta no cambia.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/RegistrationConflict.yaml
+          examples:
+            enUso:
+              value:
+                detail: "El correo ya está en uso."
+                code: email_in_use
+            pendiente:
+              value:
+                detail: "Este correo está pendiente de validación."
+                code: email_pending_verification
     "422":
       $ref: ../components/responses/ValidationError.yaml

@@ -124,3 +124,89 @@ def test_unverified_platform_admin_can_log_in(client: TestClient, db_session: Se
 
     assert response.status_code == 200
     assert response.json()["user"]["platform_role"] == "platform_admin"
+
+
+RESEND_URL = "/v1/auth/email-verification/resend"
+RESENT = {"detail": "Si el correo está pendiente de validación, te enviaremos un enlace nuevo."}
+
+
+def resend(client: TestClient, email: str = EMAIL):
+    return client.post(RESEND_URL, json={"email": email})
+
+
+def age_verifications(db_session: Session, seconds: int = 61) -> None:
+    """Hace que los enlaces parezcan creados hace `seconds` segundos (límite de reenvío)."""
+    db_session.execute(
+        update(EmailVerificationModel).values(
+            created_at=EmailVerificationModel.created_at - timedelta(seconds=seconds)
+        )
+    )
+
+
+def test_resend_sends_new_link_and_invalidates_previous(
+    client: TestClient, db_session: Session
+) -> None:
+    register_pending(client, EMAIL)
+    previous = sent_emails(client).last_token(EMAIL)
+    age_verifications(db_session)
+
+    response = resend(client, "Vecino@Example.COM")
+
+    assert response.status_code == 202
+    assert response.json() == RESENT
+    emails = sent_emails(client).sent
+    assert len(emails) == 2
+    new = sent_emails(client).last_token(EMAIL)
+    assert new != previous
+    db_session.expire_all()
+    stored = db_session.scalars(select(EmailVerificationModel)).one()
+    expected = datetime.now(UTC) + timedelta(hours=24)
+    assert abs(stored.expires_at - expected) < timedelta(minutes=1)
+    assert verify(client, previous).status_code == 400
+    assert verify(client, new).status_code == 200
+
+
+def test_resend_after_expiry_sends_working_link(client: TestClient, db_session: Session) -> None:
+    register_pending(client, EMAIL)
+    db_session.execute(
+        update(EmailVerificationModel).values(expires_at=datetime.now(UTC) - timedelta(seconds=1))
+    )
+    age_verifications(db_session)
+
+    assert resend(client).status_code == 202
+
+    assert verify(client, sent_emails(client).last_token(EMAIL)).status_code == 200
+
+
+def test_resend_within_60_seconds_sends_nothing(client: TestClient) -> None:
+    register_pending(client, EMAIL)
+
+    response = resend(client)
+
+    assert response.status_code == 202
+    assert response.json() == RESENT
+    assert len(sent_emails(client).sent) == 1
+
+
+def test_resend_unknown_email_sends_nothing(client: TestClient) -> None:
+    response = resend(client, "nadie@example.com")
+
+    assert response.status_code == 202
+    assert response.json() == RESENT
+    assert sent_emails(client).sent == []
+
+
+def test_resend_verified_account_sends_nothing(client: TestClient, db_session: Session) -> None:
+    register_pending(client, EMAIL)
+    assert verify(client, sent_emails(client).last_token(EMAIL)).status_code == 200
+
+    response = resend(client)
+
+    assert response.status_code == 202
+    assert response.json() == RESENT
+    assert len(sent_emails(client).sent) == 1
+
+
+@pytest.mark.parametrize("body", [{}, {"email": "mal"}, {"email": EMAIL, "extra": 1}])
+def test_resend_invalid_body_returns_422(client: TestClient, body: dict) -> None:
+    assert client.post(RESEND_URL, json=body).status_code == 422

@@ -5,7 +5,7 @@ import pytest
 from entrevecinos.application.users.email_verification import EmailVerificationIssuer, hash_token
 from entrevecinos.application.users.register_user import RegisterUser, RegisterUserCommand
 from entrevecinos.domain.users.entities import PlatformRole
-from entrevecinos.domain.users.errors import EmailAlreadyRegistered
+from entrevecinos.domain.users.errors import EmailAlreadyRegistered, EmailPendingVerification
 from tests.fakes import (
     FakePasswordHasher,
     InMemoryEmailVerificationRepository,
@@ -90,8 +90,21 @@ def test_normalizes_email(register_user: RegisterUser) -> None:
     assert user.email == "vecino@example.com"
 
 
-def test_rejects_registered_email_ignoring_case(register_user: RegisterUser) -> None:
-    register_user.execute(command())
+def test_rejects_registered_email_ignoring_case(
+    register_user: RegisterUser, users: InMemoryUserRepository
+) -> None:
+    users.mark_email_verified(register_user.execute(command()).user.id)
 
     with pytest.raises(EmailAlreadyRegistered):
         register_user.execute(command(email="VECINO@example.com"))
+
+
+def test_rejects_email_pending_verification_without_changes(
+    register_user: RegisterUser, users: InMemoryUserRepository
+) -> None:
+    first = register_user.execute(command()).user
+
+    with pytest.raises(EmailPendingVerification):
+        register_user.execute(command(email="VECINO@example.com", full_name="Otra persona"))
+
+    assert list(users.users.values()) == [first]

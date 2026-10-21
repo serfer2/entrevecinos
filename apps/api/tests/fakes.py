@@ -79,6 +79,10 @@ class InMemoryEmailVerificationRepository:
     def get(self, token_hash: str) -> EmailVerification | None:
         return self.verifications.get(token_hash)
 
+    def last_created_at(self, user_id: uuid.UUID) -> datetime | None:
+        dates = [v.created_at for v in self.verifications.values() if v.user_id == user_id]
+        return max(dates, default=None)
+
     def delete_for_user(self, user_id: uuid.UUID) -> None:
         self.verifications = {
             token_hash: verification

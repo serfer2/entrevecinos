@@ -59,6 +59,8 @@ paths:
     $ref: ./paths/auth_token.yaml
   /auth/email-verification:
     $ref: ./paths/auth_email_verification.yaml
+  /auth/email-verification/resend:
+    $ref: ./paths/auth_email_verification_resend.yaml
   /users/me:
     $ref: ./paths/users_me.yaml
   /users/me/memberships:
@@ -281,6 +283,8 @@ components:
       $ref: ./components/schemas/ProfessionalServiceUpdate.yaml
     RegisterRequest:
       $ref: ./components/schemas/RegisterRequest.yaml
+    RegistrationConflict:
+      $ref: ./components/schemas/RegistrationConflict.yaml
     RegistrationResponse:
       $ref: ./components/schemas/RegistrationResponse.yaml
     Report:
@@ -293,6 +297,8 @@ components:
       $ref: ./components/schemas/ReportStatus.yaml
     ReportUpdate:
       $ref: ./components/schemas/ReportUpdate.yaml
+    ResendVerificationRequest:
+      $ref: ./components/schemas/ResendVerificationRequest.yaml
     User:
       $ref: ./components/schemas/User.yaml
     UserSummary:

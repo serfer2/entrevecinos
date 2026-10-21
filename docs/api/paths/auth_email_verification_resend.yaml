@@ -1,0 +1,34 @@
+post:
+  tags: [Autenticación]
+  operationId: resendEmailVerification
+  summary: Reenviar el correo de validación
+  description: >-
+    Si el correo pertenece a una cuenta pendiente de validación, crea un enlace nuevo que caduca a
+    las 24 horas (el anterior deja de valer) y lo envía por correo. Responde siempre `202`, exista o
+    no la cuenta, para no revelar qué correos están registrados. Si el último enlace se creó hace
+    menos de 60 segundos, no se envía otro. Acceso público.
+  x-mvp: true
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/ResendVerificationRequest.yaml
+        example:
+          email: vecino@example.com
+  responses:
+    "202":
+      description: Solicitud aceptada.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [detail]
+            properties:
+              detail:
+                type: string
+          example:
+            detail: "Si el correo está pendiente de validación, te enviaremos un enlace nuevo."
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

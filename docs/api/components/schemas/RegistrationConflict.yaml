@@ -1,0 +1,12 @@
+description: >-
+  Conflicto al registrarse (extensión de `Error`): el correo ya pertenece a una cuenta validada
+  (`email_in_use`) o a una pendiente de validar (`email_pending_verification`), que puede pedir
+  otro enlace con `POST /auth/email-verification/resend`.
+allOf:
+  - $ref: ./Error.yaml
+  - type: object
+    required: [code]
+    properties:
+      code:
+        type: string
+        enum: [email_in_use, email_pending_verification]

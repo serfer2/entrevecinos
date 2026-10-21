@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { login } from "@/features/auth/actions";
+import { login, resendVerification } from "@/features/auth/actions";
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { getCurrentUser } from "@/features/auth/dal";
 import { safeNextPath } from "@/features/auth/redirect";
@@ -30,7 +30,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-12">
       <h1 className="mb-6 text-2xl font-semibold text-gray-900">Inicia sesión</h1>
-      <LoginForm action={login} next={next} notice={notice} />
+      <LoginForm action={login} resendAction={resendVerification} next={next} notice={notice} />
     </main>
   );
 }

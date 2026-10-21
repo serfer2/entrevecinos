@@ -27,6 +27,8 @@ export type SignupState =
       values?: { full_name: string; email: string; phone: string };
       /** Cuenta creada: correo al que se ha enviado el enlace de validación. */
       verificationSentTo?: string;
+      /** El correo pertenece a una cuenta pendiente de validar: se ofrece el reenvío. */
+      pendingVerification?: boolean;
     }
   | undefined;
 
@@ -54,6 +56,13 @@ export async function signup(_state: SignupState, formData: FormData): Promise<S
 
   if (!result.ok) {
     if (result.error.status === 409) {
+      if (errorCodeOf(result.error) === "email_pending_verification") {
+        return {
+          fieldErrors: { email: "Este correo está pendiente de validación." },
+          pendingVerification: true,
+          values,
+        };
+      }
       return { fieldErrors: { email: "Este correo ya está en uso." }, values };
     }
     if (result.error.status === 422) {
@@ -120,6 +129,21 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
 
   await createSession(result.data.access_token, result.data.expires_in);
   redirect(safeNextPath(formData.get("next")) ?? (await postLoginPath(result.data.access_token)));
+}
+
+export type ResendVerificationState = { sent?: boolean; error?: string } | undefined;
+
+/** Pide otro enlace de validación. La API responde igual exista o no la cuenta pendiente. */
+export async function resendVerification(
+  _state: ResendVerificationState,
+  formData: FormData,
+): Promise<ResendVerificationState> {
+  const result = await apiFetch("/auth/email-verification/resend", {
+    method: "POST",
+    body: { email: text(formData, "email") },
+  });
+  if (!result.ok) return { error: "No se pudo reenviar el correo. Inténtalo de nuevo." };
+  return { sent: true };
 }
 
 /** Cierra la sesión y va a la raíz, que lleva al inicio de sesión. Se envía por POST. */

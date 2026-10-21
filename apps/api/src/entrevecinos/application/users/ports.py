@@ -70,6 +70,10 @@ class EmailVerificationRepository(Protocol):
 
     def get(self, token_hash: str) -> EmailVerification | None: ...
 
+    def last_created_at(self, user_id: uuid.UUID) -> datetime | None:
+        """Fecha del enlace vigente más reciente del usuario, o `None` si no tiene ninguno."""
+        ...
+
     def delete_for_user(self, user_id: uuid.UUID) -> None: ...
 
 

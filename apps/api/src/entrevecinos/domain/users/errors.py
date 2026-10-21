@@ -4,6 +4,14 @@ class EmailAlreadyRegistered(Exception):
         self.email = email
 
 
+class EmailPendingVerification(Exception):
+    """El correo pertenece a una cuenta registrada que aún no lo ha validado."""
+
+    def __init__(self, email: str) -> None:
+        super().__init__(f"Email pending verification: {email}")
+        self.email = email
+
+
 class InvalidCredentials(Exception):
     """Correo o contraseña incorrectos, o cuenta que no puede iniciar sesión."""
 

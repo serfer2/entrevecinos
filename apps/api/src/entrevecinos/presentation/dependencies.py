@@ -12,6 +12,7 @@ from entrevecinos.application.users.email_verification import EmailVerificationI
 from entrevecinos.application.users.get_current_user import GetCurrentUser
 from entrevecinos.application.users.ports import EmailSender
 from entrevecinos.application.users.register_user import RegisterUser
+from entrevecinos.application.users.resend_email_verification import ResendEmailVerification
 from entrevecinos.application.users.verify_email import VerifyEmail
 from entrevecinos.domain.users.entities import User
 from entrevecinos.domain.users.errors import NotAuthenticated
@@ -117,6 +118,14 @@ def get_register_user(
     users: UserRepositoryDep, hasher: PasswordHasherDep, verification: EmailVerificationIssuerDep
 ) -> RegisterUser:
     return RegisterUser(users, hasher, verification)
+
+
+def get_resend_email_verification(
+    users: UserRepositoryDep,
+    verifications: EmailVerificationRepositoryDep,
+    issuer: EmailVerificationIssuerDep,
+) -> ResendEmailVerification:
+    return ResendEmailVerification(users, verifications, issuer)
 
 
 def get_verify_email(
