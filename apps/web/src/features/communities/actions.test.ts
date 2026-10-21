@@ -50,6 +50,15 @@ describe("createCommunity", () => {
     });
   });
 
+  it("avisa si ya hay una comunidad pendiente (409) y conserva los valores", async () => {
+    userApiFetch.mockResolvedValue({ ok: false, error: { status: 409, detail: "x" } });
+
+    expect(await createCommunity(undefined, form(filled))).toEqual({
+      formError: "Ya tienes una comunidad pendiente de aprobación.",
+      values: filled,
+    });
+  });
+
   it("comprueba la sesión antes de hacer nada", async () => {
     requireUser.mockRejectedValue(new Error("NEXT_REDIRECT:/iniciar-sesion?motivo=sesion-caducada"));
 

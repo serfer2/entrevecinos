@@ -24,7 +24,16 @@ MEMBERSHIP_STATUS = Enum("pending", "approved", "rejected", "blocked", name="mem
 
 class CommunityModel(Base):
     __tablename__ = "community"
-    __table_args__ = (CheckConstraint("length(trim(name)) > 0", name="name_not_blank"),)
+    __table_args__ = (
+        CheckConstraint("length(trim(name)) > 0", name="name_not_blank"),
+        # En el MVP, inactiva = pendiente de aprobación: una sola por creador (migración 0007).
+        Index(
+            "uq_community_one_pending_per_creator",
+            "created_by",
+            unique=True,
+            postgresql_where=text("NOT is_active"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid, primary_key=True, server_default=text("gen_random_uuid()")

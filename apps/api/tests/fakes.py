@@ -16,7 +16,7 @@ from entrevecinos.domain.communities.entities import (
     MyMembership,
     NewCommunity,
 )
-from entrevecinos.domain.communities.errors import MembershipAlreadyExists
+from entrevecinos.domain.communities.errors import MembershipAlreadyExists, PendingCommunityExists
 from entrevecinos.domain.users.entities import NewUser, PlatformRole, User
 from entrevecinos.domain.users.errors import EmailAlreadyRegistered, NotAuthenticated
 
@@ -94,6 +94,8 @@ class InMemoryCommunityRepository:
         self.memberships: dict[tuple[uuid.UUID, uuid.UUID], Membership] = {}
 
     def add(self, community: NewCommunity, admin_id: uuid.UUID, is_active: bool) -> Community:
+        if not is_active and self.has_pending(admin_id):
+            raise PendingCommunityExists
         now = datetime.now(UTC)
         stored = Community(
             id=uuid.uuid4(),
@@ -121,6 +123,11 @@ class InMemoryCommunityRepository:
     def get(self, community_id: uuid.UUID) -> Community | None:
         community = self.communities.get(community_id)
         return community if community and community.is_active else None
+
+    def has_pending(self, created_by: uuid.UUID) -> bool:
+        return any(
+            c.created_by == created_by and not c.is_active for c in self.communities.values()
+        )
 
     def activate(self, community_id: uuid.UUID) -> Community | None:
         if community_id not in self.communities:

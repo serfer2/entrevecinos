@@ -6,6 +6,10 @@ class CommunityNotFound(NotFoundError):
     """La comunidad no existe o está desactivada."""
 
 
+class PendingCommunityExists(Exception):
+    """El usuario ya tiene una comunidad pendiente de aprobación: no puede crear otra."""
+
+
 class MembershipAlreadyExists(Exception):
     """El usuario ya tiene una membresía (en cualquier estado) en la comunidad."""
 

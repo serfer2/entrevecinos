@@ -25,7 +25,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 5. Detalle y contacto | HU-14, HU-15 |
 | 6. Administración mínima | HU-16, HU-17 |
 | 7. Mejora de funcionalidades del MVP | HU-18, HU-19, HU-20 |
-| 8. Mejora de la gestión de comunidades | HU-21, HU-22 |
+| 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23 |
 
 ---
 
@@ -604,3 +604,19 @@ Control sobre las comunidades que se crean: un administrador de plataforma las r
 - **Given** que soy un vecino sin rol de administrador de plataforma
 - **When** creo una comunidad
 - **Then** sigue quedando pendiente de aprobación (HU-21)
+
+### HU-23 Tener una sola comunidad pendiente de aprobación a la vez
+
+**Como** administrador de plataforma, **quiero** que cada vecino tenga como mucho una comunidad pendiente de aprobación, **para** que la lista de revisión no se llene de solicitudes repetidas.
+
+**AC1 — Con una comunidad pendiente**
+
+- **Given** que he creado una comunidad que sigue pendiente de aprobación
+- **When** intento crear otra
+- **Then** se me indica que ya tengo una comunidad pendiente y no se crea
+
+**AC2 — Tras la aprobación**
+
+- **Given** que mi comunidad pendiente ha sido aprobada
+- **When** creo otra comunidad
+- **Then** se crea y queda pendiente de aprobación

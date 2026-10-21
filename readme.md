@@ -162,7 +162,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Crear o seleccionar una comunidad local.
    - Permitir que sus miembros vean los anuncios asociados a ella.
    - Incluir una gestión sencilla de acceso, por ejemplo, aprobación por parte de un administrador.
-   - Las comunidades nuevas quedan pendientes hasta que un administrador de la plataforma las aprueba; las que crea él quedan activas al momento.
+   - Las comunidades nuevas quedan pendientes hasta que un administrador de la plataforma las aprueba; las que crea él quedan activas al momento. Cada usuario puede tener solo una comunidad pendiente a la vez.
 3. **Gestión de anuncios**
    - Crear, editar y eliminar anuncios propios.
    - Marcar los anuncios propios como reservados o finalizados.

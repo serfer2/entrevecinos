@@ -79,9 +79,10 @@ def list_communities(
     description=(
         "El creador queda registrado como `community_admin` con membresía `approved`. La "
         "comunidad se crea pendiente de aprobación (`is_active: false`), salvo si la crea un "
-        "`platform_admin`, que la crea activa. Requiere estar autenticado."
+        "`platform_admin`, que la crea activa. Cada usuario puede tener solo una comunidad "
+        "pendiente: si ya tiene una, responde 409. Requiere estar autenticado."
     ),
-    responses={**UNAUTHORIZED, **VALIDATION_ERROR},
+    responses={**UNAUTHORIZED, **CONFLICT, **VALIDATION_ERROR},
 )
 def create_community(
     body: CommunityCreateRequest, user: CurrentUserDep, communities: CommunityRepositoryDep

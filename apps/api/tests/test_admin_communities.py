@@ -49,9 +49,11 @@ def approve(client: TestClient, account: dict, community_id: object, body: dict 
 def test_lists_pending_communities_oldest_first(
     client: TestClient, neighbour: dict, platform_admin: dict, db_session: Session
 ) -> None:
+    # Cada vecino solo puede tener una comunidad pendiente: hacen falta creadores distintos.
+    other = register(client, "otra@example.com")
     second = create_pending_community(client, neighbour, name="Segunda")
-    active = create_community(client, neighbour, name="Activa")
-    first = create_pending_community(client, neighbour, name="Primera")
+    active = create_community(client, platform_admin, name="Activa")
+    first = create_pending_community(client, other, name="Primera")
     set_creation_order(db_session, first, active, second)
 
     response = client.get(
@@ -68,7 +70,7 @@ def test_lists_all_communities_without_filter(
     client: TestClient, neighbour: dict, platform_admin: dict, db_session: Session
 ) -> None:
     pending = create_pending_community(client, neighbour, name="Pendiente")
-    active = create_community(client, neighbour, name="Activa")
+    active = create_community(client, platform_admin, name="Activa")
     set_creation_order(db_session, pending, active)
 
     response = client.get(

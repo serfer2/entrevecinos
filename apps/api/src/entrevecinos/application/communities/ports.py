@@ -17,8 +17,13 @@ class CommunityRepository(Protocol):
     def add(self, community: NewCommunity, admin_id: uuid.UUID, is_active: bool) -> Community:
         """Guarda la comunidad y la membresía `community_admin`/`approved` de `admin_id`.
 
-        En el MVP, una comunidad inactiva es una comunidad pendiente de aprobación.
+        En el MVP, una comunidad inactiva es una comunidad pendiente de aprobación. Lanza
+        `PendingCommunityExists` si `admin_id` ya tiene una pendiente (también en una carrera).
         """
+        ...
+
+    def has_pending(self, created_by: uuid.UUID) -> bool:
+        """`True` si el usuario creó una comunidad que sigue pendiente de aprobación."""
         ...
 
     def get(self, community_id: uuid.UUID) -> Community | None:

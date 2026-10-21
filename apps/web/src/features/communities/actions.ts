@@ -52,6 +52,9 @@ export async function createCommunity(
       }
       if (Object.keys(fieldErrors).length > 0) return { fieldErrors, values };
     }
+    if (result.error.status === 409) {
+      return { formError: "Ya tienes una comunidad pendiente de aprobación.", values };
+    }
     return { formError: "No se pudo crear la comunidad. Inténtalo de nuevo.", values };
   }
 

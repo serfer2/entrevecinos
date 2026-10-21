@@ -12,7 +12,11 @@ from entrevecinos.domain.communities.entities import (
     MembershipStatus,
     NewCommunity,
 )
-from entrevecinos.domain.communities.errors import CommunityNotFound, MembershipAlreadyExists
+from entrevecinos.domain.communities.errors import (
+    CommunityNotFound,
+    MembershipAlreadyExists,
+    PendingCommunityExists,
+)
 from entrevecinos.domain.users.entities import PlatformRole
 from tests.fakes import InMemoryCommunityRepository, InMemoryMembershipRepository
 from tests.test_community_access import make_user
@@ -42,6 +46,29 @@ def test_platform_admin_creates_an_active_community() -> None:
 
     assert community.is_active is True
     assert repository.memberships[(community.id, creator.id)].role is MembershipRole.COMMUNITY_ADMIN
+
+
+def test_only_one_pending_community_per_creator() -> None:
+    repository = InMemoryCommunityRepository()
+    creator = make_user()
+    create = CreateCommunity(repository)
+    pending = create.execute(NewCommunity(name="Primera"), creator=creator)
+
+    with pytest.raises(PendingCommunityExists):
+        create.execute(NewCommunity(name="Segunda"), creator=creator)
+
+    repository.activate(pending.id)
+    assert create.execute(NewCommunity(name="Segunda"), creator=creator).is_active is False
+
+
+def test_platform_admin_is_not_limited_by_pending_communities() -> None:
+    repository = InMemoryCommunityRepository()
+    creator = make_user(PlatformRole.PLATFORM_ADMIN)
+    create = CreateCommunity(repository)
+
+    create.execute(NewCommunity(name="Primera"), creator=creator)
+
+    assert create.execute(NewCommunity(name="Segunda"), creator=creator).is_active is True
 
 
 def test_get_returns_active_community() -> None:

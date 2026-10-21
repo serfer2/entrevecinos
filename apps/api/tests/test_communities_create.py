@@ -6,7 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from entrevecinos.infrastructure.db.models import CommunityMembershipModel, CommunityModel
-from tests.api_helpers import create_community, register
+from tests.api_helpers import (
+    approve_community,
+    create_community,
+    create_pending_community,
+    register,
+)
 
 pytestmark = pytest.mark.db
 
@@ -62,6 +67,24 @@ def test_pending_community_is_hidden_until_approved(client: TestClient, account:
     assert [(m["community"]["id"], m["community"]["is_active"]) for m in mine] == [
         (community["id"], False)
     ]
+
+
+def test_only_one_pending_community_per_user(
+    client: TestClient, account: dict, db_session: Session
+) -> None:
+    first = create_pending_community(client, account, name="Primera")
+
+    rejected = client.post("/v1/communities", json={"name": "Segunda"}, headers=account["headers"])
+
+    assert rejected.status_code == 409
+    assert rejected.json() == {"detail": "Ya tienes una comunidad pendiente de aprobación."}
+    assert len(db_session.scalars(select(CommunityModel)).all()) == 1
+
+    approve_community(client, first["id"])
+    second = client.post("/v1/communities", json={"name": "Segunda"}, headers=account["headers"])
+
+    assert second.status_code == 201
+    assert second.json()["is_active"] is False
 
 
 def test_blank_optional_fields_are_null(client: TestClient, account: dict) -> None:

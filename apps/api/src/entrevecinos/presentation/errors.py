@@ -8,6 +8,7 @@ from entrevecinos.domain.communities.errors import (
     MembershipAlreadyReviewed,
     MembershipChangeRejected,
     MembershipNotApproved,
+    PendingCommunityExists,
 )
 from entrevecinos.domain.errors import NotFoundError, PermissionDenied
 from entrevecinos.domain.listings.errors import (
@@ -79,6 +80,15 @@ async def membership_already_exists_handler(
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
         content={"detail": "Ya tienes una membresía en esta comunidad.", "status": exc.status},
+    )
+
+
+async def pending_community_exists_handler(
+    request: Request, exc: PendingCommunityExists
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={"detail": "Ya tienes una comunidad pendiente de aprobación."},
     )
 
 
@@ -174,6 +184,7 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(NotAuthenticated, not_authenticated_handler)
     app.add_exception_handler(NotFoundError, not_found_handler)
     app.add_exception_handler(MembershipAlreadyExists, membership_already_exists_handler)
+    app.add_exception_handler(PendingCommunityExists, pending_community_exists_handler)
     app.add_exception_handler(PermissionDenied, permission_denied_handler)
     app.add_exception_handler(ImageTooLarge, image_too_large_handler)
     app.add_exception_handler(UnsupportedImageType, unsupported_image_type_handler)
