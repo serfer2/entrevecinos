@@ -1,3 +1,4 @@
+from datetime import timedelta
 from functools import lru_cache
 from typing import Annotated
 
@@ -7,8 +8,12 @@ from sqlalchemy.orm import Session
 
 from entrevecinos.application.authorization.community_access import CommunityAccess
 from entrevecinos.application.users.authenticate_user import AuthenticateUser
+from entrevecinos.application.users.email_verification import EmailVerificationIssuer
 from entrevecinos.application.users.get_current_user import GetCurrentUser
+from entrevecinos.application.users.ports import EmailSender
 from entrevecinos.application.users.register_user import RegisterUser
+from entrevecinos.application.users.resend_email_verification import ResendEmailVerification
+from entrevecinos.application.users.verify_email import VerifyEmail
 from entrevecinos.domain.users.entities import User
 from entrevecinos.domain.users.errors import NotAuthenticated
 from entrevecinos.infrastructure.communities.sqlalchemy_community_repository import (
@@ -24,6 +29,7 @@ from entrevecinos.infrastructure.listings.sqlalchemy_category_repository import 
 from entrevecinos.infrastructure.listings.sqlalchemy_listing_repository import (
     SqlAlchemyListingRepository,
 )
+from entrevecinos.infrastructure.mail.smtp_email_sender import SmtpEmailSender
 from entrevecinos.infrastructure.media.sqlalchemy_media_repository import (
     SqlAlchemyMediaRepository,
 )
@@ -31,6 +37,9 @@ from entrevecinos.infrastructure.security.jwt_tokens import JwtTokenService
 from entrevecinos.infrastructure.security.password_hasher import Argon2PasswordHasher
 from entrevecinos.infrastructure.settings import Settings, get_settings
 from entrevecinos.infrastructure.storage.s3_object_storage import S3ObjectStorage
+from entrevecinos.infrastructure.users.sqlalchemy_email_verification_repository import (
+    SqlAlchemyEmailVerificationRepository,
+)
 from entrevecinos.infrastructure.users.sqlalchemy_user_repository import SqlAlchemyUserRepository
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -67,10 +76,64 @@ PasswordHasherDep = Annotated[Argon2PasswordHasher, Depends(get_password_hasher)
 TokenServiceDep = Annotated[JwtTokenService, Depends(get_token_service)]
 
 
+def get_email_verification_repository(session: SessionDep) -> SqlAlchemyEmailVerificationRepository:
+    return SqlAlchemyEmailVerificationRepository(session)
+
+
+EmailVerificationRepositoryDep = Annotated[
+    SqlAlchemyEmailVerificationRepository, Depends(get_email_verification_repository)
+]
+
+
+def get_email_sender(settings: SettingsDep) -> EmailSender:
+    return SmtpEmailSender(
+        settings.smtp_host,
+        settings.smtp_port,
+        settings.mail_from,
+        username=settings.smtp_username,
+        password=settings.smtp_password,
+        starttls=settings.smtp_starttls,
+    )
+
+
+EmailSenderDep = Annotated[EmailSender, Depends(get_email_sender)]
+
+
+def get_email_verification_issuer(
+    verifications: EmailVerificationRepositoryDep, settings: SettingsDep
+) -> EmailVerificationIssuer:
+    return EmailVerificationIssuer(
+        verifications,
+        settings.web_public_url,
+        timedelta(hours=settings.email_verification_ttl_hours),
+    )
+
+
+EmailVerificationIssuerDep = Annotated[
+    EmailVerificationIssuer, Depends(get_email_verification_issuer)
+]
+
+
 def get_register_user(
-    users: UserRepositoryDep, hasher: PasswordHasherDep, tokens: TokenServiceDep
+    users: UserRepositoryDep, hasher: PasswordHasherDep, verification: EmailVerificationIssuerDep
 ) -> RegisterUser:
-    return RegisterUser(users, hasher, tokens)
+    return RegisterUser(users, hasher, verification)
+
+
+def get_resend_email_verification(
+    users: UserRepositoryDep,
+    verifications: EmailVerificationRepositoryDep,
+    issuer: EmailVerificationIssuerDep,
+) -> ResendEmailVerification:
+    return ResendEmailVerification(users, verifications, issuer)
+
+
+def get_verify_email(
+    users: UserRepositoryDep,
+    verifications: EmailVerificationRepositoryDep,
+    tokens: TokenServiceDep,
+) -> VerifyEmail:
+    return VerifyEmail(users, verifications, tokens)
 
 
 def get_authenticate_user(

@@ -1,9 +1,10 @@
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
-from entrevecinos.domain.users.entities import NewUser, User
+from entrevecinos.domain.users.entities import EmailVerification, NewUser, User
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +23,14 @@ class UserRepository(Protocol):
         ...
 
     def add(self, user: NewUser, password_hash: str) -> User:
-        """Guarda el usuario. Lanza `EmailAlreadyRegistered` si el correo ya existe."""
+        """Guarda el usuario inactivo y sin validar su correo.
+
+        Lanza `EmailAlreadyRegistered` si el correo ya existe.
+        """
+        ...
+
+    def mark_email_verified(self, user_id: uuid.UUID) -> User:
+        """Marca el correo como validado y activa la cuenta."""
         ...
 
     def update_password_hash(self, user_id: uuid.UUID, password_hash: str) -> None: ...
@@ -52,4 +60,32 @@ class TokenIssuer(Protocol):
 class TokenService(TokenIssuer, Protocol):
     def decode(self, token: str) -> uuid.UUID:
         """Id del usuario del token. Lanza `NotAuthenticated` si el token no es válido."""
+        ...
+
+
+class EmailVerificationRepository(Protocol):
+    def replace(self, user_id: uuid.UUID, token_hash: str, expires_at: datetime) -> None:
+        """Guarda el enlace nuevo y borra los anteriores del usuario: solo vale el último."""
+        ...
+
+    def get(self, token_hash: str) -> EmailVerification | None: ...
+
+    def last_created_at(self, user_id: uuid.UUID) -> datetime | None:
+        """Fecha del enlace vigente más reciente del usuario, o `None` si no tiene ninguno."""
+        ...
+
+    def delete_for_user(self, user_id: uuid.UUID) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class OutgoingEmail:
+    to: str
+    subject: str
+    text: str
+    html: str
+
+
+class EmailSender(Protocol):
+    def send(self, email: OutgoingEmail) -> None:
+        """Envía el correo. Lanza una excepción si el servidor no lo acepta."""
         ...

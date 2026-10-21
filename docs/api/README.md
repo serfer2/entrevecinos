@@ -55,7 +55,7 @@ npx @redocly/cli preview-docs openapi.yaml
 
 ## Cambios
 
-Cambios compatibles del contrato durante el desarrollo del MVP:
+Cambios del contrato durante el desarrollo del MVP (compatibles salvo que se indique):
 
 | Ticket | Cambio |
 |---|---|
@@ -65,13 +65,18 @@ Cambios compatibles del contrato durante el desarrollo del MVP:
 | TK-030 | `q` del listado: vacío equivale a no enviarlo; menos de 2 caracteres → 422; se ignoran las palabras de un carácter. |
 | TK-038 | `ListingOwner.email` (obligatorio): canal de contacto del MVP junto con `phone`. |
 | TK-044 | `updateListingStatus`: transiciones del autor (`active` ↔ `reserved`, → `completed` final) y 409 para transiciones no permitidas. |
+| TK-050 | `createCommunity` crea la comunidad con `is_active: false` (pendiente de aprobación). `adminListCommunities` y `adminUpdateCommunity` pasan al MVP (`x-mvp: true`) para listar las pendientes y aprobarlas; `adminUpdateCommunity` solo admite `is_active: true`. |
+| TK-052 | `createCommunity`: las comunidades que crea un `platform_admin` se crean activas (`is_active: true`). |
+| TK-053 | `createCommunity`: 409 si el usuario ya tiene una comunidad pendiente de aprobación. |
+| TK-058 | **Incompatible:** `registerUser` crea la cuenta inactiva y responde `RegistrationResponse` (`email`, `verification_expires_at`) sin token. Nuevo `verifyEmail` (`POST /auth/email-verification`): `200` con `AuthResponse`, `400`/`410` con `VerificationError`. `loginUser`: `403` con `code: email_not_verified` si la cuenta no ha validado su correo. |
+| TK-059 | `registerUser`: el `409` usa `RegistrationConflict` (`Error` + `code`): `email_in_use` o `email_pending_verification`. Nuevo `resendEmailVerification` (`POST /auth/email-verification/resend`): siempre `202`. |
 
 ## Resumen de endpoints
 
 | Grupo | Operaciones | MVP |
 |---|---|---|
 | Sistema | `GET /health` | Sí |
-| Autenticación | `POST /auth/register`, `POST /auth/token` | Sí |
+| Autenticación | `POST /auth/register`, `POST /auth/email-verification`, `POST /auth/email-verification/resend`, `POST /auth/token` | Sí |
 | Usuarios | `GET/PATCH/DELETE /users/me`, `GET /users/me/memberships`, `GET /users/me/listings` | Sí |
 | Categorías | `GET/POST /categories`, `PATCH /categories/{category_id}` | Sí |
 | Comunidades | `GET/POST /communities`, `GET/PATCH /communities/{community_id}` | Sí |
@@ -82,4 +87,5 @@ Cambios compatibles del contrato durante el desarrollo del MVP:
 | Notificaciones | `GET /notifications`, `PATCH /notifications/{notification_id}`, `POST /notifications/read-all` | No |
 | Perfil profesional | `GET /professionals`, `GET /professionals/{user_id}`, `GET/PUT/DELETE /users/me/professional-profile`, servicios e imágenes del perfil | No |
 | Denuncias | `POST /listings/{listing_id}/reports`, `GET /communities/{community_id}/reports`, `GET/PATCH /reports/{report_id}` | No |
-| Administración | `GET /admin/users`, `PATCH /admin/users/{user_id}`, `GET /admin/communities`, `PATCH /admin/communities/{community_id}` | No |
+| Administración | `GET /admin/communities`, `PATCH /admin/communities/{community_id}` (aprobación de comunidades) | Sí |
+| Administración | `GET /admin/users`, `PATCH /admin/users/{user_id}` | No |

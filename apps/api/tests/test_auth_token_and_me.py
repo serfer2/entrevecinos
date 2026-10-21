@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from entrevecinos.infrastructure.db.models import UserModel
 from entrevecinos.infrastructure.security.jwt_tokens import JwtTokenService
+from tests.api_helpers import register
 from tests.conftest import TEST_JWT_SECRET
 
 pytestmark = pytest.mark.db
@@ -20,12 +21,7 @@ AUTH_ERROR = {"detail": "Autenticación requerida."}
 
 @pytest.fixture
 def registered(client: TestClient) -> dict[str, object]:
-    response = client.post(
-        "/v1/auth/register",
-        json={"email": "vecino@example.com", "password": PASSWORD, "full_name": "Alex Vecino"},
-    )
-    assert response.status_code == 201
-    return response.json()
+    return register(client, "vecino@example.com")
 
 
 def login(client: TestClient, email: str, password: str = PASSWORD):

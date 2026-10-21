@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiFetch, cookieSet, redirect } = vi.hoisted(() => ({
+const { apiFetch, cookieSet, postLoginPath, redirect } = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   cookieSet: vi.fn(),
+  postLoginPath: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT:${url}`);
   }),
@@ -11,6 +12,7 @@ const { apiFetch, cookieSet, redirect } = vi.hoisted(() => ({
 vi.mock("@/lib/api/server", () => ({ apiFetch }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ set: cookieSet }) }));
 vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("./destination", () => ({ postLoginPath }));
 
 import { login } from "./actions";
 
@@ -40,24 +42,48 @@ describe("login", () => {
     );
     expect(apiFetch).toHaveBeenCalledWith("/auth/token", { method: "POST", body: credentials });
     expect(cookieSet).toHaveBeenCalledWith("ev_session", "jwt", expect.objectContaining({ httpOnly: true }));
+    expect(postLoginPath).not.toHaveBeenCalled();
   });
 
   it.each(["https://evil.example", "//evil.example", ""])(
-    "ignora next=%s y redirige a /inicio",
+    "ignora next=%s y redirige al destino según las comunidades",
     async (next) => {
       apiFetch.mockResolvedValue(success);
+      postLoginPath.mockResolvedValue("/comunidades");
 
       await expect(login(undefined, form({ ...credentials, next }))).rejects.toThrow(
-        "NEXT_REDIRECT:/inicio",
+        "NEXT_REDIRECT:/comunidades",
       );
+      expect(postLoginPath).toHaveBeenCalledWith("jwt");
     },
   );
+
+  it("redirige a la comunidad que devuelve postLoginPath", async () => {
+    apiFetch.mockResolvedValue(success);
+    postLoginPath.mockResolvedValue("/comunidades/c1");
+
+    await expect(login(undefined, form(credentials))).rejects.toThrow("NEXT_REDIRECT:/comunidades/c1");
+  });
 
   it("muestra un error genérico con 401 y conserva solo el correo", async () => {
     apiFetch.mockResolvedValue({ ok: false, error: { status: 401, detail: "x" } });
 
     expect(await login(undefined, form(credentials))).toEqual({
       formError: "Correo o contraseña incorrectos.",
+      values: { email: "vecino@example.com" },
+    });
+    expect(cookieSet).not.toHaveBeenCalled();
+  });
+
+  it("con 403 email_not_verified pide validar el correo", async () => {
+    apiFetch.mockResolvedValue({
+      ok: false,
+      error: { status: 403, detail: "x", payload: { detail: "x", code: "email_not_verified" } },
+    });
+
+    expect(await login(undefined, form(credentials))).toEqual({
+      formError: "Tienes que validar tu correo electrónico antes de iniciar sesión.",
+      emailNotVerified: true,
       values: { email: "vecino@example.com" },
     });
     expect(cookieSet).not.toHaveBeenCalled();

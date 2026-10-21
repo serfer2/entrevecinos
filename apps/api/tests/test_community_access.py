@@ -38,7 +38,7 @@ def setup():
     communities = InMemoryCommunityRepository()
     memberships = InMemoryMembershipRepository(communities)
     admin = make_user()
-    community = communities.add(NewCommunity(name="X"), admin.id)
+    community = communities.add(NewCommunity(name="X"), admin.id, is_active=True)
     return CommunityAccess(communities, memberships), memberships, community, admin
 
 

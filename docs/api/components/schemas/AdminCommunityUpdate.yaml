@@ -4,3 +4,4 @@ required: [is_active]
 properties:
   is_active:
     type: boolean
+    description: En el MVP solo se admite `true` (aprobar una comunidad pendiente).

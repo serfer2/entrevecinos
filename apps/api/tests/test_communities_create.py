@@ -6,7 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from entrevecinos.infrastructure.db.models import CommunityMembershipModel, CommunityModel
-from tests.api_helpers import create_community, register
+from tests.api_helpers import (
+    approve_community,
+    create_community,
+    create_pending_community,
+    register,
+)
 
 pytestmark = pytest.mark.db
 
@@ -16,7 +21,7 @@ def account(client: TestClient) -> dict:
     return register(client, "vecino@example.com")
 
 
-def test_creates_community_with_creator_as_approved_admin(
+def test_creates_pending_community_with_creator_as_approved_admin(
     client: TestClient, account: dict, db_session: Session
 ) -> None:
     response = client.post(
@@ -34,13 +39,52 @@ def test_creates_community_with_creator_as_approved_admin(
         None,
     )
     assert body["created_by"] == account["user"]["id"]
-    assert body["is_active"] is True
+    assert body["is_active"] is False
     membership = db_session.scalars(select(CommunityMembershipModel)).one()
     assert str(membership.community_id) == body["id"]
     assert str(membership.user_id) == account["user"]["id"]
     assert (membership.role, membership.status) == ("community_admin", "approved")
     assert membership.joined_at is not None
     assert str(membership.reviewed_by) == account["user"]["id"]
+
+
+def test_pending_community_is_hidden_until_approved(client: TestClient, account: dict) -> None:
+    community = client.post(
+        "/v1/communities", json={"name": "Los Olivos"}, headers=account["headers"]
+    ).json()
+    other = register(client, "otra@example.com")
+
+    detail = client.get(f"/v1/communities/{community['id']}", headers=account["headers"])
+    search = client.get("/v1/communities", headers=other["headers"])
+    request = client.post(
+        f"/v1/communities/{community['id']}/memberships", headers=other["headers"]
+    )
+    mine = client.get("/v1/users/me/memberships", headers=account["headers"]).json()["items"]
+
+    assert detail.status_code == 404
+    assert search.json()["items"] == []
+    assert request.status_code == 404
+    assert [(m["community"]["id"], m["community"]["is_active"]) for m in mine] == [
+        (community["id"], False)
+    ]
+
+
+def test_only_one_pending_community_per_user(
+    client: TestClient, account: dict, db_session: Session
+) -> None:
+    first = create_pending_community(client, account, name="Primera")
+
+    rejected = client.post("/v1/communities", json={"name": "Segunda"}, headers=account["headers"])
+
+    assert rejected.status_code == 409
+    assert rejected.json() == {"detail": "Ya tienes una comunidad pendiente de aprobación."}
+    assert len(db_session.scalars(select(CommunityModel)).all()) == 1
+
+    approve_community(client, first["id"])
+    second = client.post("/v1/communities", json={"name": "Segunda"}, headers=account["headers"])
+
+    assert second.status_code == 201
+    assert second.json()["is_active"] is False
 
 
 def test_blank_optional_fields_are_null(client: TestClient, account: dict) -> None:

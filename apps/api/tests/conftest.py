@@ -18,6 +18,9 @@ for _name, _value in {
     "STORAGE_BUCKET": "test-bucket",
     "STORAGE_ACCESS_KEY": "test-access-key",
     "STORAGE_SECRET_KEY": "test-secret-key",
+    "SMTP_HOST": "mail",
+    "MAIL_FROM": "EntreVecinos <no-reply@entrevecinos.test>",
+    "WEB_PUBLIC_URL": "http://localhost:3000",
 }.items():
     os.environ.setdefault(_name, _value)
 
@@ -99,15 +102,28 @@ def object_storage():
 
 
 @pytest.fixture
-def client(db_session: Session, object_storage) -> TestClient:
+def email_sender():
+    """Correos enviados durante la prueba, en memoria."""
+    from tests.fakes import FakeEmailSender
+
+    return FakeEmailSender()
+
+
+@pytest.fixture
+def client(db_session: Session, object_storage, email_sender) -> TestClient:
     """Cliente HTTP cuya sesión de base de datos es la transacción de la prueba."""
     from entrevecinos.infrastructure.db.session import get_session
-    from entrevecinos.presentation.dependencies import get_object_storage, get_password_hasher
+    from entrevecinos.presentation.dependencies import (
+        get_email_sender,
+        get_object_storage,
+        get_password_hasher,
+    )
     from entrevecinos.presentation.main import create_app
 
     app = create_app(make_settings())
     app.dependency_overrides[get_session] = lambda: db_session
     app.dependency_overrides[get_object_storage] = lambda: object_storage
+    app.dependency_overrides[get_email_sender] = lambda: email_sender
     # Argon2id con un coste mínimo: el algoritmo es el mismo, pero las pruebas no esperan.
     app.dependency_overrides[get_password_hasher] = lambda: FAST_HASHER
     return TestClient(app)

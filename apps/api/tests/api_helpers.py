@@ -5,25 +5,82 @@ from fastapi.testclient import TestClient
 PASSWORD = "UnaClaveSegura123!"
 
 
-def register(
+def sent_emails(client: TestClient):
+    """`FakeEmailSender` de la app de la prueba."""
+    from entrevecinos.presentation.dependencies import get_email_sender
+
+    return client.app.dependency_overrides[get_email_sender]()
+
+
+def register_pending(
     client: TestClient, email: str, full_name: str = "Alex Vecino", phone: str | None = None
 ) -> dict:
-    """Registra una cuenta y devuelve el `AuthResponse` con `headers` listos para usar."""
+    """Registra una cuenta sin validar su correo y devuelve la `RegistrationResponse`."""
     response = client.post(
         "/v1/auth/register",
         json={"email": email, "password": PASSWORD, "full_name": full_name, "phone": phone},
     )
     assert response.status_code == 201, response.text
+    return response.json()
+
+
+def verify_email(client: TestClient, email: str):
+    token = sent_emails(client).last_token(email.strip().lower())
+    return client.post("/v1/auth/email-verification", json={"token": token})
+
+
+def register(
+    client: TestClient, email: str, full_name: str = "Alex Vecino", phone: str | None = None
+) -> dict:
+    """Registra una cuenta, valida su correo y devuelve el `AuthResponse` con `headers`."""
+    register_pending(client, email, full_name, phone)
+    response = verify_email(client, email)
+    assert response.status_code == 200, response.text
     account = response.json()
     account["headers"] = {"Authorization": f"Bearer {account['access_token']}"}
     return account
 
 
-def create_community(client: TestClient, owner: dict, **fields: object) -> dict:
+def create_pending_community(client: TestClient, owner: dict, **fields: object) -> dict:
     body = {"name": "Urbanización Los Olivos", **fields}
     response = client.post("/v1/communities", json=body, headers=owner["headers"])
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def approve_community(client: TestClient, community_id: str) -> dict:
+    """Aprueba la comunidad directamente en la sesión de la prueba (sin pasar por la API)."""
+    import uuid
+
+    from entrevecinos.infrastructure.db.models import CommunityModel
+    from entrevecinos.infrastructure.db.session import get_session
+
+    session = client.app.dependency_overrides[get_session]()
+    community = session.get(CommunityModel, uuid.UUID(community_id))
+    community.is_active = True
+    session.flush()
+    return community_json(client, community_id)
+
+
+def community_json(client: TestClient, community_id: str) -> dict:
+    import uuid
+
+    from entrevecinos.infrastructure.communities.sqlalchemy_community_repository import (
+        community_to_domain,
+    )
+    from entrevecinos.infrastructure.db.models import CommunityModel
+    from entrevecinos.infrastructure.db.session import get_session
+    from entrevecinos.presentation.v1.schemas.communities import CommunityResponse
+
+    session = client.app.dependency_overrides[get_session]()
+    model = session.get(CommunityModel, uuid.UUID(community_id))
+    return CommunityResponse.from_domain(community_to_domain(model)).model_dump(mode="json")
+
+
+def create_community(client: TestClient, owner: dict, **fields: object) -> dict:
+    """Crea una comunidad y la aprueba: la mayoría de pruebas necesitan una comunidad activa."""
+    community = create_pending_community(client, owner, **fields)
+    return approve_community(client, community["id"])
 
 
 def request_access(client: TestClient, account: dict, community_id: str):

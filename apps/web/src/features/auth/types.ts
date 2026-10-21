@@ -17,3 +17,9 @@ export type AuthResponse = {
   expires_in: number;
   user: ApiUser;
 };
+
+/** Esquema `RegistrationResponse` de la API. */
+export type RegistrationResponse = {
+  email: string;
+  verification_expires_at: string;
+};

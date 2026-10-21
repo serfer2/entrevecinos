@@ -8,10 +8,11 @@ Historias del MVP definido en la sección 1.2 del `readme.md`. Las inferencias q
 - **Vecino**: usuario registrado con sesión iniciada.
 - **Miembro**: vecino con acceso aprobado a una comunidad.
 - **Administrador de comunidad**: persona que gestiona los miembros y los anuncios de su comunidad.
+- **Administrador de plataforma** (`platform_admin`): persona que aprueba las comunidades nuevas y puede gestionar cualquier comunidad. Se nombra directamente en la base de datos (asumido).
 
 ## Fuera de alcance
 
-No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Tampoco la recuperación de contraseña ni el cierre de sesión, que no aparecen en el README.
+No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Tampoco la recuperación de contraseña, que no aparece en el README.
 
 ## Índice
 
@@ -23,6 +24,10 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 4. Explorar y encontrar anuncios | HU-10, HU-11, HU-12, HU-13 |
 | 5. Detalle y contacto | HU-14, HU-15 |
 | 6. Administración mínima | HU-16, HU-17 |
+| 7. Mejora de funcionalidades del MVP | HU-18, HU-19, HU-20 |
+| 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23 |
+| 9. Cierre de sesión | HU-24 |
+| 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
 
 ---
 
@@ -36,13 +41,13 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 
 - **Given** que no tengo cuenta y estoy en el formulario de registro
 - **When** introduzco mi nombre, un correo válido no registrado y una contraseña válida y envío el formulario
-- **Then** se crea mi cuenta y accedo a la aplicación con la sesión iniciada (asumido)
+- **Then** se crea mi cuenta, pendiente de validar el correo, y veo un aviso de que he recibido un correo de confirmación; la sesión se inicia al abrir el enlace (ver HU-25)
 
 **AC2 — Correo ya registrado**
 
 - **Given** que ya existe una cuenta con el correo `vecino@example.com`
 - **When** intento registrarme con ese mismo correo
-- **Then** veo un mensaje que indica que el correo ya está en uso y no se crea ninguna cuenta
+- **Then** veo un mensaje que indica que el correo ya está en uso y no se crea ninguna cuenta; si la cuenta está pendiente de validación, el mensaje lo indica y me ofrece recibir de nuevo el correo (ver HU-26)
 
 **AC3 — Datos inválidos**
 
@@ -56,9 +61,15 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 
 **AC1 — Acceso correcto**
 
-- **Given** que tengo una cuenta
+- **Given** que tengo una cuenta con el correo validado
 - **When** introduzco mi correo y mi contraseña correctos
 - **Then** accedo a la aplicación con mi sesión iniciada
+
+**AC4 — Correo sin validar**
+
+- **Given** que mi cuenta todavía no ha validado el correo y no soy administrador de la plataforma
+- **When** introduzco mi correo y mi contraseña correctos
+- **Then** no se inicia la sesión, veo que tengo que validar mi correo y puedo pedir otro correo de validación (ver HU-25 y HU-26)
 
 **AC2 — Credenciales incorrectas**
 
@@ -116,7 +127,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 
 **AC3 — Comunidad disponible para otros**
 
-- **Given** que he creado una comunidad
+- **Given** que he creado una comunidad y ha sido aprobada (HU-21)
 - **When** otro vecino busca comunidades
 - **Then** puede encontrar la mía y solicitar el acceso
 
@@ -485,3 +496,251 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 - **Given** que soy miembro sin rol de administrador
 - **When** intento retirar el anuncio de otro vecino
 - **Then** no tengo esa opción
+
+---
+
+## Épica 7 — Mejora de funcionalidades del MVP
+
+Mejoras sobre las funcionalidades ya implementadas en las épicas 1 a 6. No añade las funcionalidades posteriores al MVP descritas en «Fuera de alcance» (asumido).
+
+### HU-18 Acceder a la aplicación desde la página principal
+
+**Como** visitante o vecino, **quiero** que la dirección principal de EntreVecinos me lleve a una pantalla desde la que pueda empezar a usarla, **para** no quedarme en una página sin salida.
+
+**AC1 — Sin sesión**
+
+- **Given** que no tengo la sesión iniciada
+- **When** abro la dirección principal de la aplicación
+- **Then** llego al formulario de inicio de sesión, desde el que puedo ir al registro
+
+**AC2 — Con sesión**
+
+- **Given** que tengo la sesión iniciada
+- **When** abro la dirección principal de la aplicación
+- **Then** llego a mi página de inicio
+
+### HU-19 Buscar comunidades al registrarme o iniciar sesión si no pertenezco a ninguna
+
+**Como** vecino que todavía no pertenece a ninguna comunidad, **quiero** llegar a la lista de comunidades al registrarme o al iniciar sesión, **para** encontrar la mía y solicitar el acceso sin pasos intermedios.
+
+**AC1 — Sin comunidades**
+
+- **Given** que no soy miembro aprobado de ninguna comunidad (asumido: una solicitud pendiente, rechazada o un bloqueo no cuentan)
+- **When** inicio sesión
+- **Then** llego a la lista de comunidades existentes
+
+**AC2 — Registro**
+
+- **Given** que acabo de crear mi cuenta
+- **When** termino el registro
+- **Then** llego a la lista de comunidades existentes
+
+**AC3 — Destino solicitado**
+
+- **Given** que el inicio de sesión me lo pidió una ruta protegida
+- **When** inicio sesión
+- **Then** vuelvo a esa ruta en lugar de a la lista de comunidades (asumido)
+
+### HU-20 Entrar en mi comunidad al iniciar sesión si solo pertenezco a una
+
+**Como** miembro de una sola comunidad, **quiero** llegar directamente a ella al iniciar sesión, **para** ver sus anuncios sin pasos intermedios.
+
+**AC1 — Una comunidad**
+
+- **Given** que soy miembro aprobado de una sola comunidad
+- **When** inicio sesión
+- **Then** llego a esa comunidad
+
+**AC2 — Varias comunidades**
+
+- **Given** que soy miembro aprobado de dos o más comunidades
+- **When** inicio sesión
+- **Then** llego a mi página de inicio, con la lista de mis comunidades (asumido)
+
+**AC3 — Destino solicitado**
+
+- **Given** que el inicio de sesión me lo pidió una ruta protegida
+- **When** inicio sesión
+- **Then** vuelvo a esa ruta en lugar de a mi comunidad (asumido)
+
+---
+
+## Épica 8 — Mejora de la gestión de comunidades
+
+Control sobre las comunidades que se crean: un administrador de plataforma las revisa antes de que estén disponibles.
+
+### HU-21 Aprobar las comunidades nuevas antes de activarlas
+
+**Como** administrador de plataforma, **quiero** aprobar las comunidades que crean los vecinos antes de que estén activas, **para** evitar comunidades duplicadas o falsas.
+
+**AC1 — Comunidad pendiente**
+
+- **Given** que soy un vecino con la sesión iniciada
+- **When** creo una comunidad
+- **Then** queda pendiente de aprobación: no aparece en las búsquedas, nadie puede entrar en ella ni solicitar el acceso, y yo la veo en mis comunidades como pendiente
+
+**AC2 — Revisión**
+
+- **Given** que soy administrador de plataforma
+- **When** abro la lista de comunidades pendientes
+- **Then** veo las comunidades por aprobar, de la más antigua a la más reciente, con su nombre, descripción, ubicación y fecha de creación (asumido)
+
+**AC3 — Aprobación**
+
+- **Given** que soy administrador de plataforma y hay una comunidad pendiente
+- **When** la apruebo
+- **Then** queda activa: aparece en las búsquedas y su creador entra en ella como administrador
+
+**AC4 — Restricción**
+
+- **Given** que no soy administrador de plataforma
+- **When** intento ver las comunidades pendientes o aprobar una
+- **Then** no tengo acceso a esa función
+
+### HU-22 Activar al momento las comunidades que crea un administrador de plataforma
+
+**Como** administrador de plataforma, **quiero** que las comunidades que creo queden activas al momento, **para** no tener que aprobar mis propias comunidades.
+
+**AC1 — Comunidad activa**
+
+- **Given** que soy administrador de plataforma
+- **When** creo una comunidad
+- **Then** queda activa, aparece en las búsquedas y entro en ella como su administrador
+
+**AC2 — Vecinos**
+
+- **Given** que soy un vecino sin rol de administrador de plataforma
+- **When** creo una comunidad
+- **Then** sigue quedando pendiente de aprobación (HU-21)
+
+### HU-23 Tener una sola comunidad pendiente de aprobación a la vez
+
+**Como** administrador de plataforma, **quiero** que cada vecino tenga como mucho una comunidad pendiente de aprobación, **para** que la lista de revisión no se llene de solicitudes repetidas.
+
+**AC1 — Con una comunidad pendiente**
+
+- **Given** que he creado una comunidad que sigue pendiente de aprobación
+- **When** intento crear otra
+- **Then** se me indica que ya tengo una comunidad pendiente y no se crea
+
+**AC2 — Tras la aprobación**
+
+- **Given** que mi comunidad pendiente ha sido aprobada
+- **When** creo otra comunidad
+- **Then** se crea y queda pendiente de aprobación
+
+---
+
+## Épica 9 — Cierre de sesión
+
+### HU-24 Cerrar sesión
+
+**Como** vecino con la sesión iniciada, **quiero** cerrar mi sesión, **para** que nadie más pueda usar mi cuenta desde este navegador, por ejemplo en un equipo compartido.
+
+**AC1 — Acceso visible**
+
+- **Given** que tengo la sesión iniciada
+- **When** estoy en cualquier página de la zona privada
+- **Then** tengo a mano la opción «Cerrar sesión» en la cabecera, junto a «Mi perfil» (asumido)
+
+**AC2 — Cierre de sesión**
+
+- **Given** que tengo la sesión iniciada
+- **When** pulso «Cerrar sesión»
+- **Then** mi sesión termina y voy a la raíz del sitio, que me lleva al inicio de sesión
+
+**AC3 — Sin acceso tras cerrar**
+
+- **Given** que he cerrado la sesión
+- **When** intento abrir una página privada, también con el botón «Atrás» del navegador
+- **Then** se me pide iniciar sesión
+
+---
+
+## Épica 10 — Validación del correo electrónico
+
+Las cuentas nuevas solo se activan cuando su titular demuestra que controla la dirección de correo con la que se registró.
+
+### HU-25 Validar mi correo electrónico al registrarme
+
+**Como** visitante que se registra, **quiero** validar mi dirección de correo con un enlace que recibo por email, **para** que mi cuenta quede activa y nadie pueda registrarse con un correo que no es suyo.
+
+**AC1 — Correo de validación**
+
+- **Given** que no tengo cuenta y completo el registro con datos válidos
+- **When** envío el formulario
+- **Then** mi cuenta se crea sin activar, recibo un correo con un enlace de validación y, en lugar de entrar en la aplicación, veo un aviso de que me hemos enviado ese correo
+
+**AC2 — Validación**
+
+- **Given** que he recibido el correo de validación hace menos de 24 horas
+- **When** visito el enlace
+- **Then** mi cuenta queda activa, entro con la sesión iniciada y llego a la lista de comunidades
+
+**AC3 — Enlace caducado**
+
+- **Given** que el enlace de validación tiene más de 24 horas
+- **When** lo visito
+- **Then** veo que ha caducado, mi cuenta sigue sin activar y puedo pedir un correo nuevo (HU-26)
+
+**AC4 — Cuenta sin validar**
+
+- **Given** que no he validado mi correo
+- **When** intento iniciar sesión con mi correo y mi contraseña correctos
+- **Then** no entro y veo que tengo que validar mi correo, con la opción de recibir de nuevo el mensaje (asumido)
+
+**AC5 — Administrador de plataforma**
+
+- **Given** que mi cuenta es de administrador de plataforma
+- **When** inicio sesión sin haber validado mi correo
+- **Then** entro con normalidad
+
+### HU-26 Recibir de nuevo el correo de validación
+
+**Como** vecino que no ha validado su correo, **quiero** pedir que me envíen de nuevo el mensaje de validación, **para** activar mi cuenta si no me llegó, lo borré o caducó.
+
+**AC1 — Registro con un correo pendiente**
+
+- **Given** que ya me registré con un correo que sigue pendiente de validación
+- **When** intento registrarme de nuevo con ese correo
+- **Then** veo un error que me indica que el correo está pendiente de validación y la opción de recibir de nuevo el mensaje
+
+**AC2 — Reenvío**
+
+- **Given** que tengo una cuenta pendiente de validación
+- **When** pido recibir de nuevo el mensaje
+- **Then** recibo un correo nuevo con un enlace válido durante 24 horas y los enlaces anteriores dejan de funcionar
+
+**AC3 — Sin revelar cuentas**
+
+- **Given** que pido el reenvío para un correo que no existe o ya está validado
+- **When** envío la petición
+- **Then** veo el mismo aviso que en el caso anterior y no se envía ningún correo (asumido)
+
+### HU-27 Entender por qué no funciona un enlace de validación antiguo
+
+**Como** vecino que ha pedido varios correos de validación, **quiero** que, si abro un enlace que ya no vale, se me explique el motivo real, **para** saber qué hacer en lugar de creer que mi cuenta ya está activa.
+
+**AC1 — Enlace sustituido por otro más reciente**
+
+- **Given** que mi cuenta sigue pendiente de validación y he recibido un correo de validación más reciente
+- **When** abro el enlace de un correo anterior sin tener la sesión iniciada
+- **Then** veo que ese enlace ya no es válido porque te hemos enviado uno más reciente, con la opción de recibir de nuevo el mensaje, y no se me dice que mi correo está validado
+
+**AC2 — Cuenta ya validada**
+
+- **Given** que ya validé mi correo
+- **When** abro de nuevo el mismo enlace o el de un correo anterior
+- **Then** veo «Tu correo ya está validado. Inicia sesión.» en el inicio de sesión, o entro en la aplicación si tengo la sesión iniciada, como hasta ahora
+
+**AC3 — Enlace desconocido**
+
+- **Given** un enlace cuyo token no corresponde a ningún correo de validación enviado
+- **When** lo abro
+- **Then** veo «El enlace de validación no es válido.» y no se me dice que mi correo está validado
+
+**AC4 — Sin revelar cuentas**
+
+- **Given** un token que no se ha enviado nunca por correo
+- **When** se usa
+- **Then** la respuesta no revela si un correo está registrado ni su estado (asumido)

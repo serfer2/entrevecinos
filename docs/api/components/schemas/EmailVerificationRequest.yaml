@@ -1,0 +1,9 @@
+type: object
+additionalProperties: false
+required: [token]
+properties:
+  token:
+    type: string
+    minLength: 1
+    maxLength: 256
+    description: Token del enlace de validación recibido por correo.

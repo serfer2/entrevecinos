@@ -14,8 +14,16 @@ from entrevecinos.domain.communities.entities import (
 
 
 class CommunityRepository(Protocol):
-    def add(self, community: NewCommunity, admin_id: uuid.UUID) -> Community:
-        """Guarda la comunidad y la membresía `community_admin`/`approved` de `admin_id`."""
+    def add(self, community: NewCommunity, admin_id: uuid.UUID, is_active: bool) -> Community:
+        """Guarda la comunidad y la membresía `community_admin`/`approved` de `admin_id`.
+
+        En el MVP, una comunidad inactiva es una comunidad pendiente de aprobación. Lanza
+        `PendingCommunityExists` si `admin_id` ya tiene una pendiente (también en una carrera).
+        """
+        ...
+
+    def has_pending(self, created_by: uuid.UUID) -> bool:
+        """`True` si el usuario creó una comunidad que sigue pendiente de aprobación."""
         ...
 
     def get(self, community_id: uuid.UUID) -> Community | None:
@@ -24,6 +32,14 @@ class CommunityRepository(Protocol):
 
     def search(self, filters: CommunitySearch, page: PageRequest) -> PageResult[Community]:
         """Comunidades activas que cumplen los filtros, ordenadas por nombre."""
+        ...
+
+    def list_all(self, is_active: bool | None, page: PageRequest) -> PageResult[Community]:
+        """Todas las comunidades (o las de `is_active`), de la más antigua a la más reciente."""
+        ...
+
+    def activate(self, community_id: uuid.UUID) -> Community | None:
+        """Activa la comunidad (esté o no activa), o `None` si no existe."""
         ...
 
 

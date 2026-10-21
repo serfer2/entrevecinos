@@ -49,7 +49,13 @@ post:
   tags: [Comunidades]
   operationId: createCommunity
   summary: Crear una comunidad
-  description: El creador queda registrado como `community_admin` con membresía `approved`. Requiere estar autenticado.
+  description: >-
+    El creador queda registrado como `community_admin` con membresía `approved`. La comunidad se crea
+    con `is_active: false`, pendiente de aprobación por un `platform_admin` (`PATCH
+    /admin/communities/{community_id}`): hasta entonces no aparece en las búsquedas ni admite
+    solicitudes ni anuncios. Las que crea un `platform_admin` se crean con `is_active: true`. Cada
+    usuario puede tener solo una comunidad pendiente: si ya tiene una, responde 409. Requiere estar
+    autenticado.
   x-mvp: true
   requestBody:
     required: true
@@ -71,5 +77,7 @@ post:
             $ref: ../components/schemas/Community.yaml
     "401":
       $ref: ../components/responses/Unauthorized.yaml
+    "409":
+      $ref: ../components/responses/Conflict.yaml
     "422":
       $ref: ../components/responses/ValidationError.yaml

@@ -353,6 +353,102 @@ Esto es el refinement de los tickets creados para las épicas 02 a 06.
 Haz commit de los tickets y la documentación
 ```
 
+**Prompt 6:** Mejora de usabilidad: redirect root to login or home
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Funcionalidades del MVP ya están implementadas. Faltan algunas mejoras básicas de usabilidad
+
+```
+- Crea una nueva épica para "mejora de funcionalidades del MVP"
+- Cuando levanto el servicio con make dev, no encuentro forma alguna de interactuar con el servicio. Sólo una página en blanco con un H1 con el nombre del sitio. Crea una historia de usuario con los tickets necesarios para solucionarlo.
+```
+
+**NOTA**
+
+El agente crea le épica 07 y el ticket 047. La solución implementada se resume:
+
+```
+Cambio: / ahora redirige según la sesión:
+- con sesión válida, va a /inicio;
+- sin sesión, o si la API falla, va a /iniciar-sesion. Es el mismo criterio que ya usa esa página.
+```
+
+**Prompt 7:** Mejora de usabilidad: redirect inicio a comunidades
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Funcionalidades del MVP ya están implementadas. Faltan algunas mejoras básicas de usabilidad
+
+```
+En la épica EP-07, crea las siguientes historias de usuario con sus corespondientes tickets:
+- Si tras hacer login, el usuario no pertenece a ninguna comunidad, debe ser redirigido a la lista de comunidades existentes.
+- Si tras hacer login, el usuario pertenece a una sola comunidad, debe ser redirigido a dicha comunidad.
+
+Esto forma parte del MVP. Actualiza la documentación si es necesario.
+Implementa las hisotrias de usuario/tickets y haz un commit por cada HU una vez que haya sido implementada.
+```
+
+**Prompt 8:** Mejora de gestión: creación de comunidades
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** MVP listo, pero detectamos fallos en la gestión de comunidades.
+
+```
+Crea una épica nueva para mejora de gestión de comunidades.
+Para dicha épica, crea las siguientes historias de usuario con sus corespondientes tickets:
+- Cuando un usuario crea una comunidad, esta no será activa hasta que un platform_admin la apruebe.
+- Las comunidades creadas por un platform_admin son aprobadas (activas) automáticamente.
+- Un usuario no puede pedir crear una nueva comunidad si ya tiene una comunidad pendiente se ser aprobada.
+
+Esto forma parte del MVP. Actualiza la documentación si es necesario.
+Implementa las hisotrias de usuario/tickets y haz un commit por cada HU una vez que haya sido implementada.
+```
+
+**Prompt 9:** Logout
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** El MVP no incluía el log out
+
+```
+Crea una épica nueva para el "log out".
+Para dicha épica, crea una historia de usuario con sus corespondientes tickets:
+- Un usuario registrado y logeado puede hacer cierre de sesión (log out). Al cerrar sesión va al raíz del sitio. En cuanto a UI y usabilidad, añade el cierre de sesión donde más convenga, de acuerdo con las buenas prácticas del sector 
+
+Esto forma parte del MVP. Actualiza la documentación si es necesario.
+Implementa la hisotria de usuario y haz un solo commit que incluya los cambios en la documentación
+```
+
+**Prompt 9:** Validación del email
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** El MVP no incluía la validación de la dirección de correo electrónico
+
+```
+Crea una épica nueva para "validación de email".
+Para dicha épica, crea una o varias historias de usuario con sus corespondientes tickets para cumplir con las siguientes condiciones:
+- Cuando un usuario se registra, tiene que validar su dirección de correo electrónico. Para ello, el sistema le envía un email con un enlace de validación. En lugar de activar la cuenta automáticamente, el usuario ve un aviso de que ha recibido un email de confirmación.
+- Una cuenta de usuario con una dirección de email que no ha sido validada, no puede estar activa, salvo que sea platform_admin.
+- Un intento de registro con una cuenta de email que está pendiente de validación, devolverá error y dará la opción a recibir de nuevo el mensaje de validación.
+- Los mensajes de validación tienen una caducidad de 24 horas.
+- Cuando un usuario visita el enlace de validación, la cuenta de usuario queda activa y es redirigido a la lista de comunidades, como ocurría antes de implementar la validación de email.
+
+Esto forma parte del MVP. Crea uno o varios tickets para actualizar la documentación. No implementes los cambios, quiero revisar los tickets primero.
+```
+
+**Prompt 10:** Validación del email (refinement)
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Los tickets para validación de correo electrónico han sido creados pero no refinados
+
+```
+Aplica este refinement para los siguientes tickets
+- TK-056: también se debe actualizar el `.env` con las variables nuevas necesarias.
+
+Implementa las historias de usuario y haz un commit por cada HU
+```
+
+**Prompt 11:** Fix de comportamiento de link de validación expirado
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** La validación de email funciona pero los links expirados dan falso OK
+
+```
+Si alguien abre un enlace antiguo que fue reemplazado por uno enviado nuevamente, y no tiene una sesión activa, verá el mensaje «Tu correo electrónico ya está validado. Inicia sesión», a pesar de que la cuenta sigue en estado pendiente. Es necesario corregir esto para que se muestre un mensaje de error adecuado.
+Crea una historia de usuario con los tickets necesarios para ello
+```
+
 #### 6.1 Implementación de tickets de trabajo
 
 **Prompt 1:** Implementar infra de desarrollo
@@ -383,12 +479,148 @@ Claude propone ir creando las specs en openspec a partir de los ficheros de tick
 Implementa los tickets que falten por implementar. Revisa los que ya han sido implementados y asegúrate de que todos queden hechos
 ```
 
+##### Importante
+
+En esta fase, se implementan los tickets de las 6 primeras épicas (hasta el Tk-049). Las épicas posteriores, junto con sus historias de usuario y tickets, se han ido implementando a la vez que se iban creando y refinando.
+
 ---
 
 ### 7. Pull Requests
 
-**Prompt 1:**
+**Prompt 1:** 
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Completada la implementación de la primera versión funcional del MVP
+
+```
+Abre la PR hacia main
+```
+
+**Nota**
+
+Al no tener el cliente de `gh`instalado con el token de seguridad configurado, Claude propone que la abra yo a mano en el siguiente contenido.
+
+#### Título
+
+```
+feat: implementar el MVP de EntreVecinos (TK-001 a TK-046)
+```
+
+#### Contenido
+
+~~~markdown
+## Resumen
+
+Implementación completa del MVP de EntreVecinos: los 46 tickets de `docs/product/tickets/` (infraestructura y épicas 1 a 6, incluida HU-09b). Cada ticket tiene su cambio de OpenSpec archivado en `openspec/changes/archive/` y un commit propio.
+
+### Infraestructura
+- PostgreSQL 16, API FastAPI y web Next.js 16 en Docker Compose, con `Makefile` (TK-001…TK-004).
+- Almacenamiento de imágenes en MinIO con bucket privado y usuario de mínimos privilegios (TK-019). Usa la compilación comunitaria `pgsty/minio` con versión fija (AGPLv3), porque las imágenes oficiales ya no están en Docker Hub.
+- Content-Security-Policy con nonce por petición (TK-046).
+- `GET /v1/health`, usado por el healthcheck de la API.
+
+### Funcionalidad
+- **Épica 1:** registro, inicio de sesión (JWT en cookie `httpOnly`) y perfil.
+- **Épica 2:** crear y buscar comunidades, solicitar el acceso y revisar las solicitudes; política única de permisos `CommunityAccess`.
+- **Épica 3:** publicar anuncios con hasta 10 fotos (URL prefirmadas servidas por `/media/<id>`), editar, eliminar, y reservar o finalizar (HU-09b).
+- **Épica 4:** listado paginado, búsqueda de texto completo en español sin tildes, filtros por tipo y categoría, orden por fecha o precio y selector de comunidad.
+- **Épica 5:** detalle con galería y contacto con el anunciante (teléfono y correo, solo para miembros aprobados).
+- **Épica 6:** bloquear, desbloquear y expulsar miembros (los anuncios del bloqueado se ocultan), y retirar o restaurar anuncios.
+
+### Cambios de contrato (`docs/api`, compatibles)
+- `CommunityCreate`/`CommunityUpdate.description` (2000) y `ListingCreate`/`ListingUpdate.description` (5000).
+- `EUR` por defecto cuando hay precio sin moneda.
+- `q` de la búsqueda con un mínimo de 2 caracteres.
+- `MembershipError` y las respuestas `MembershipForbidden` (403) y `MembershipConflict` (409).
+- `ListingOwner.email` obligatorio.
+- Transiciones de estado del autor, con 409 para las no permitidas.
+
+### Migraciones
+`0001` users · `0002` community · `0003` unaccent · `0004` category/listing/media · `0005` búsqueda · `0006` auditoría de retirada.
+
+## Cómo probar
+
+```bash
+cp .env.example .env      # un .env existente necesita las variables de «Almacenamiento»
+make dev
+COMPOSE="docker compose --env-file .env -f infra/docker-compose.yml"
+$COMPOSE run --rm api pytest
+$COMPOSE exec web npm run lint && $COMPOSE exec web npm run typecheck && $COMPOSE exec web npm run test
+```
+
+Resultado: 392 pruebas de API (más `ruff` y `alembic check`) y 293 de web, todas en verde; el build de producción compila.
+
+## Notas
+- **BREAKING (entorno local):** desaparecen el volumen `api_assets` y `ASSETS_DIR`. El volumen antiguo se puede borrar con `docker volume rm entrevecinos_api_assets`.
+- El servicio `api` monta `docs/api` en solo lectura para la prueba que compara el esquema con el contrato.
+- Operaciones del contrato marcadas como MVP pero sin historia ni ticket, y no implementadas: `POST`/`PATCH /categories`, `PATCH /communities/{id}`, `DELETE /media/{id}`, `GET /users/me/listings`, `DELETE /users/me` y el cambio de rol de un miembro.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+~~~
 
 **Prompt 2:**
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** EL proyecto está listo para la 2a entrega 
+
+```
+Haz git push y prepara una PR. No hagas la PR (gh client y el token necesario no están instalados). Sólo dame el título y el body de la PR para que yo la abra en Github
+```
+
+**Nota**
+
+El agente genera el siguiente contenido:
+
+#### Título
+
+```
+feat: mejoras del MVP, aprobación de comunidades, cierre de sesión y validación del correo
+```
+
+#### Contenido
+
+~~~markdown
+## Resumen
+
+Segunda tanda de funcionalidad sobre el MVP: épicas 7 a 10 (TK-047 a TK-062) y los tickets de la HU-27, pendientes de implementar. Cada ticket tiene su cambio de OpenSpec archivado en `openspec/changes/archive/` y las especificaciones de `openspec/specs/` están sincronizadas.                                                                                ### Épica 7 — Mejoras del MVP- `/` redirige a `/inicio` con sesión y a `/iniciar-sesion` sin ella (TK-047).  - Tras el registro o el inicio de sesión: sin comunidades → lista de comunidades; con una sola → esacomunidad (TK-048, TK-049).                                                     ### Épica 8 — Gestión de comunidades                                            - Las comunidades nuevas quedan pendientes hasta que un `platform_admin` las aprueba desde`/admin/comunidades` (TK-050, TK-051).                                          - Las que crea un `platform_admin` quedan activas al momento (TK-052).- Una sola comunidad pendiente por usuario: `409` y aviso en la web (TK-053, TK-### Épica 9 — Cierre de sesión                                                  - Botón «Cerrar sesión» en la cabecera privada (*Server Action* por `POST`, borra la *cookie* y va a`/`) (TK-055).                                                                  ### Épica 10 — Validación del correo                                            - **Mailpit** en Docker Compose como buzón de desarrollo (`http://localhost:8025`) y envío por SMTPdesde la API (TK-056).                                                          - El registro crea la cuenta **inactiva** y envía un enlace válido 24 horas; abrirlo activa la cuenta,inicia la sesión y lleva a `/comunidades`. Sin validar no se puede iniciar sesión (`403 email_not_verified`), salvo un `platform_admin`. Una restricción de la base de datos garantiza la regla (TK-057, TK-058, TK-060).
+- Reenvío del correo de validación desde el registro, el enlace caducado y el inicio de sesión. Siempre responde `202`, para no revelar qué correos existen, y como mucho envía un correo por minuto (TK-059, TK-061).
+- Documentación actualizada: `readme.md`, historias, `infra/`, `apps/api` y `apps/web` (TK-062).
+- `/verificar-correo/error` enlaza siempre con la raíz.
+
+### HU-27 (solo tickets)
+TK-063 a TK-065 corrigen el mensaje «Tu correo ya está validado» que aparece al abrir un enlace
+sustituido por un reenvío cuando la cuenta sigue pendiente. Están documentados y **pendientes de
+implementar**.
+
+### Cambios de contrato (`docs/api`)
+- **Incompatible:** `registerUser` responde `RegistrationResponse` (`email`, `verification_expires_at`) en lugar de un JWT (TK-058).
+- Nuevos `verifyEmail` (`POST /auth/email-verification`) y `resendEmailVerification` (`POST /auth/email-verification/resend`) (TK-058, TK-059).
+- `loginUser`: `403` con `code: email_not_verified` (TK-058).
+- `registerUser`: el `409` lleva `code` `email_in_use` o `email_pending_verification` (TK-059).
+- `createCommunity` crea la comunidad pendiente de aprobación (salvo un `platform_admin`) y responde `409` si el usuario ya tiene una pendiente (TK-050, TK-052, TK-053).
+- `adminListCommunities` y `adminUpdateCommunity` pasan al MVP (TK-050).
+
+### Migraciones
+`0007` una comunidad pendiente por usuario · `0008` validación del correo (`users.email_verified_at`, `ck_users_active_requires_verified_email`, tabla `email_verification`). Las cuentas existentes se dan por validadas.
+
+## Cómo probar
+
+```bash
+# Un .env existente necesita las variables de «Correo (SMTP)» de .env.example
+make dev
+COMPOSE="docker compose --env-file .env -f infra/docker-compose.yml"
+$COMPOSE run --rm -v "$PWD/apps/api/tests:/app/tests" api python -m pytest -q
+$COMPOSE exec web npm run lint && $COMPOSE exec web npm run typecheck && $COMPOSE exec web npm run test
+```
+
+1. Regístrate en http://localhost:3000/registro y abre el correo en http://localhost:8025. El enlace te lleva a `/comunidades` con la sesión iniciada.
+2. Con otra cuenta sin validar, inicia sesión: verás el aviso y el botón de reenvío.
+
+Resultado: 461 pruebas de API (más `ruff`, `alembic check` y `redocly lint`) y 339 de web, todas en verde. El flujo de validación y reenvío está comprobado de extremo a extremo con Mailpit.
+
+## Notas
+- **BREAKING (entorno):** los `.env` existentes necesitan `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `MAIL_FROM`, `WEB_PUBLIC_URL`, `EMAIL_VERIFICATION_TTL_HOURS` y `MAIL_UI_HOST_PORT`. Sin ellas, la API no arranca. Comprobación: `diff <(grep -o '^[A-Z_]*=' .env.example | sort) <(grep -o '^[A-Z_]*=' .env | sort)`.
+- En producción, `SMTP_STARTTLS=true` y `WEB_PUBLIC_URL` con `https` son obligatorios (validados en `Settings`).
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+~~~
 
 **Prompt 3:**

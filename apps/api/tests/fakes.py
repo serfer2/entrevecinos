@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
 
-from entrevecinos.application.users.ports import AccessToken
+from entrevecinos.application.users.ports import AccessToken, OutgoingEmail
 from entrevecinos.domain.communities.entities import (
     Community,
     Membership,
@@ -16,8 +16,8 @@ from entrevecinos.domain.communities.entities import (
     MyMembership,
     NewCommunity,
 )
-from entrevecinos.domain.communities.errors import MembershipAlreadyExists
-from entrevecinos.domain.users.entities import NewUser, PlatformRole, User
+from entrevecinos.domain.communities.errors import MembershipAlreadyExists, PendingCommunityExists
+from entrevecinos.domain.users.entities import EmailVerification, NewUser, PlatformRole, User
 from entrevecinos.domain.users.errors import EmailAlreadyRegistered, NotAuthenticated
 
 
@@ -52,12 +52,58 @@ class InMemoryUserRepository:
             full_name=user.full_name,
             phone=user.phone,
             platform_role=PlatformRole.USER,
-            is_active=True,
+            is_active=False,
             created_at=datetime.now(UTC),
         )
         self.users[stored.id] = stored
         self.password_hashes[stored.id] = password_hash
         return stored
+
+    def mark_email_verified(self, user_id: uuid.UUID) -> User:
+        self.users[user_id] = dataclasses.replace(
+            self.users[user_id], is_active=True, email_verified_at=datetime.now(UTC)
+        )
+        return self.users[user_id]
+
+
+class InMemoryEmailVerificationRepository:
+    def __init__(self) -> None:
+        self.verifications: dict[str, EmailVerification] = {}
+
+    def replace(self, user_id: uuid.UUID, token_hash: str, expires_at: datetime) -> None:
+        self.delete_for_user(user_id)
+        self.verifications[token_hash] = EmailVerification(
+            user_id=user_id, expires_at=expires_at, created_at=datetime.now(UTC)
+        )
+
+    def get(self, token_hash: str) -> EmailVerification | None:
+        return self.verifications.get(token_hash)
+
+    def last_created_at(self, user_id: uuid.UUID) -> datetime | None:
+        dates = [v.created_at for v in self.verifications.values() if v.user_id == user_id]
+        return max(dates, default=None)
+
+    def delete_for_user(self, user_id: uuid.UUID) -> None:
+        self.verifications = {
+            token_hash: verification
+            for token_hash, verification in self.verifications.items()
+            if verification.user_id != user_id
+        }
+
+
+class FakeEmailSender:
+    """Guarda los correos en lugar de enviarlos."""
+
+    def __init__(self) -> None:
+        self.sent: list[OutgoingEmail] = []
+
+    def send(self, email: OutgoingEmail) -> None:
+        self.sent.append(email)
+
+    def last_token(self, to: str) -> str:
+        """Token del último enlace de validación enviado a `to`."""
+        email = next(e for e in reversed(self.sent) if e.to == to)
+        return email.text.split("token=", 1)[1].split()[0]
 
 
 class FakePasswordHasher:
@@ -93,7 +139,9 @@ class InMemoryCommunityRepository:
         self.communities: dict[uuid.UUID, Community] = {}
         self.memberships: dict[tuple[uuid.UUID, uuid.UUID], Membership] = {}
 
-    def add(self, community: NewCommunity, admin_id: uuid.UUID) -> Community:
+    def add(self, community: NewCommunity, admin_id: uuid.UUID, is_active: bool) -> Community:
+        if not is_active and self.has_pending(admin_id):
+            raise PendingCommunityExists
         now = datetime.now(UTC)
         stored = Community(
             id=uuid.uuid4(),
@@ -102,7 +150,7 @@ class InMemoryCommunityRepository:
             postal_code=community.postal_code,
             city=community.city,
             created_by=admin_id,
-            is_active=True,
+            is_active=is_active,
             created_at=now,
         )
         self.communities[stored.id] = stored
@@ -121,6 +169,19 @@ class InMemoryCommunityRepository:
     def get(self, community_id: uuid.UUID) -> Community | None:
         community = self.communities.get(community_id)
         return community if community and community.is_active else None
+
+    def has_pending(self, created_by: uuid.UUID) -> bool:
+        return any(
+            c.created_by == created_by and not c.is_active for c in self.communities.values()
+        )
+
+    def activate(self, community_id: uuid.UUID) -> Community | None:
+        if community_id not in self.communities:
+            return None
+        self.communities[community_id] = dataclasses.replace(
+            self.communities[community_id], is_active=True
+        )
+        return self.communities[community_id]
 
 
 class InMemoryMembershipRepository:

@@ -12,7 +12,7 @@ vi.mock("@/lib/api/server", () => ({ apiFetch }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ set: cookieSet }) }));
 vi.mock("next/navigation", () => ({ redirect }));
 
-import { signup } from "./actions";
+import { resendVerification, signup } from "./actions";
 
 function form(values: Record<string, string>) {
   const data = new FormData();
@@ -33,15 +33,16 @@ describe("signup", () => {
     vi.clearAllMocks();
   });
 
-  it("crea la sesión y redirige a /inicio con 201", async () => {
+  it("con 201 devuelve el correo de validación sin crear la sesión", async () => {
     apiFetch.mockResolvedValue({
       ok: true,
       status: 201,
-      data: { access_token: "jwt", expires_in: 86400, token_type: "Bearer", user: {} },
+      data: { email: "vecino@example.com", verification_expires_at: "2026-10-22T10:00:00Z" },
     });
 
-    await expect(signup(undefined, form(validForm))).rejects.toThrow("NEXT_REDIRECT:/inicio");
+    const state = await signup(undefined, form(validForm));
 
+    expect(state).toEqual({ verificationSentTo: "vecino@example.com" });
     expect(apiFetch).toHaveBeenCalledWith("/auth/register", {
       method: "POST",
       body: {
@@ -51,11 +52,8 @@ describe("signup", () => {
         phone: null,
       },
     });
-    expect(cookieSet).toHaveBeenCalledWith(
-      "ev_session",
-      "jwt",
-      expect.objectContaining({ httpOnly: true, sameSite: "lax", path: "/", maxAge: 86400 }),
-    );
+    expect(cookieSet).not.toHaveBeenCalled();
+    expect(redirect).not.toHaveBeenCalled();
   });
 
   it("no llama a la API si los datos no son válidos", async () => {
@@ -75,6 +73,36 @@ describe("signup", () => {
 
     expect(state).toEqual({ fieldErrors: { email: "Este correo ya está en uso." }, values: keptValues });
     expect(cookieSet).not.toHaveBeenCalled();
+  });
+
+  it("con 409 email_pending_verification ofrece el reenvío", async () => {
+    apiFetch.mockResolvedValue({
+      ok: false,
+      error: {
+        status: 409,
+        detail: "Este correo está pendiente de validación.",
+        payload: { code: "email_pending_verification" },
+      },
+    });
+
+    const state = await signup(undefined, form(validForm));
+
+    expect(state).toEqual({
+      fieldErrors: { email: "Este correo está pendiente de validación." },
+      pendingVerification: true,
+      values: keptValues,
+    });
+  });
+
+  it("con 409 email_in_use no ofrece el reenvío", async () => {
+    apiFetch.mockResolvedValue({
+      ok: false,
+      error: { status: 409, detail: "x", payload: { code: "email_in_use" } },
+    });
+
+    const state = await signup(undefined, form(validForm));
+
+    expect(state).toEqual({ fieldErrors: { email: "Este correo ya está en uso." }, values: keptValues });
   });
 
   it("traduce los campos de un 422", async () => {
@@ -98,6 +126,32 @@ describe("signup", () => {
     expect(state).toEqual({
       formError: "No se pudo crear la cuenta. Inténtalo de nuevo.",
       values: keptValues,
+    });
+  });
+});
+
+describe("resendVerification", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("con 202 indica que se ha enviado", async () => {
+    apiFetch.mockResolvedValue({ ok: true, status: 202, data: { detail: "x" } });
+
+    const state = await resendVerification(undefined, form({ email: "vecino@example.com" }));
+
+    expect(state).toEqual({ sent: true });
+    expect(apiFetch).toHaveBeenCalledWith("/auth/email-verification/resend", {
+      method: "POST",
+      body: { email: "vecino@example.com" },
+    });
+  });
+
+  it.each([0, 422, 500])("con estado %i muestra un error", async (status) => {
+    apiFetch.mockResolvedValue({ ok: false, error: { status, detail: null } });
+
+    expect(await resendVerification(undefined, form({ email: "vecino@example.com" }))).toEqual({
+      error: "No se pudo reenviar el correo. Inténtalo de nuevo.",
     });
   });
 });

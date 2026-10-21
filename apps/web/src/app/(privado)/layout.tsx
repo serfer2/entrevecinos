@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { NavLink } from "@/components/nav/NavLink";
+import { logout } from "@/features/auth/actions";
 
 /**
  * Cabecera común de la zona privada. No comprueba la sesión: lo hace cada página con
@@ -18,7 +19,7 @@ export default function PrivateLayout({ children }: { children: ReactNode }) {
           <Link href="/inicio" className="text-lg font-semibold text-emerald-800">
             EntreVecinos
           </Link>
-          <ul className="flex flex-wrap gap-1">
+          <ul className="flex flex-wrap items-center gap-1">
             <li>
               <NavLink href="/comunidades" section="/comunidades">
                 Comunidades
@@ -26,6 +27,17 @@ export default function PrivateLayout({ children }: { children: ReactNode }) {
             </li>
             <li>
               <NavLink href="/perfil">Mi perfil</NavLink>
+            </li>
+            <li>
+              {/* POST: un enlace GET permitiría cerrar la sesión desde otra web o con un prefetch. */}
+              <form action={logout}>
+                <button
+                  type="submit"
+                  className="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-900"
+                >
+                  Cerrar sesión
+                </button>
+              </form>
             </li>
           </ul>
         </nav>

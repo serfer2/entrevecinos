@@ -1,0 +1,12 @@
+type: object
+description: Cuenta creada e inactiva hasta que se valide el correo. No incluye token de acceso.
+required: [email, verification_expires_at]
+properties:
+  email:
+    type: string
+    format: email
+    description: Correo al que se ha enviado el enlace de validación.
+  verification_expires_at:
+    type: string
+    format: date-time
+    description: Caducidad del enlace de validación (24 horas tras el registro).

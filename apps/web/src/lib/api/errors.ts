@@ -25,3 +25,9 @@ export function membershipStatusOf(error: ApiError): string | null {
   const status = error.payload?.status;
   return typeof status === "string" ? status : null;
 }
+
+/** `code` de un error de la API que lo incluye (p. ej. `email_not_verified`), si viene. */
+export function errorCodeOf(error: ApiError): string | null {
+  const code = error.payload?.code;
+  return typeof code === "string" ? code : null;
+}

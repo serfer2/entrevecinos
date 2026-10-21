@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 from alembic import command
-from sqlalchemy import Engine, inspect
+from sqlalchemy import Engine, func, inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,9 @@ pytestmark = pytest.mark.db
 
 
 def make_user(db_session: Session, email: str = "vecino@example.com") -> UserModel:
-    user = UserModel(email=email, password_hash="hash", full_name="Alex Vecino")
+    user = UserModel(
+        email=email, password_hash="hash", full_name="Alex Vecino", email_verified_at=func.now()
+    )
     db_session.add(user)
     db_session.flush()
     return user
@@ -66,6 +68,16 @@ def test_duplicate_membership_is_rejected(db_session: Session) -> None:
         db_session.flush()
 
 
+def test_one_inactive_community_per_creator(db_session: Session) -> None:
+    user = make_user(db_session)
+    make_community(db_session, user, is_active=False)
+    make_community(db_session, user, city="Madrid")
+    make_community(db_session, user, city="Sevilla")
+
+    with pytest.raises(IntegrityError, match="uq_community_one_pending_per_creator"):
+        make_community(db_session, user, is_active=False)
+
+
 @pytest.mark.parametrize("name", ["", "   "])
 def test_blank_community_name_is_rejected(db_session: Session, name: str) -> None:
     user = make_user(db_session)
@@ -109,3 +121,16 @@ def test_migration_0002_is_reversible(db_engine: Engine) -> None:
     with db_engine.begin() as connection:
         command.upgrade(alembic_config(connection), "head")
         assert inspect(connection).has_table("community_membership")
+
+
+def test_migration_0007_is_reversible(db_engine: Engine) -> None:
+    def indexes(connection) -> set[str]:
+        return {index["name"] for index in inspect(connection).get_indexes("community")}
+
+    with db_engine.begin() as connection:
+        command.downgrade(alembic_config(connection), "0006")
+        assert "uq_community_one_pending_per_creator" not in indexes(connection)
+
+    with db_engine.begin() as connection:
+        command.upgrade(alembic_config(connection), "head")
+        assert "uq_community_one_pending_per_creator" in indexes(connection)

@@ -61,6 +61,17 @@ class CommunityResponse(BaseModel):
         )
 
 
+class AdminCommunityUpdateRequest(BaseModel):
+    """Subconjunto implementado de `AdminCommunityUpdate`: aprobar (activar).
+
+    Desactivar no tiene historia en el MVP, donde inactiva significa pendiente: se rechaza con 422.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    is_active: Literal[True]
+
+
 class UserSummaryResponse(BaseModel):
     """Esquema `UserSummary` del contrato."""
 

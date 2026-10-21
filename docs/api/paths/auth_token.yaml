@@ -27,5 +27,23 @@ post:
         application/json:
           schema:
             $ref: ../components/schemas/Error.yaml
+    "403":
+      description: >-
+        Credenciales correctas, pero la cuenta no ha validado su correo (no aplica a un
+        `platform_admin`). Solo se responde tras comprobar la contraseña.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../components/schemas/Error.yaml
+              - type: object
+                required: [code]
+                properties:
+                  code:
+                    type: string
+                    enum: [email_not_verified]
+          example:
+            detail: "Tienes que validar tu correo electrónico antes de iniciar sesión."
+            code: email_not_verified
     "422":
       $ref: ../components/responses/ValidationError.yaml

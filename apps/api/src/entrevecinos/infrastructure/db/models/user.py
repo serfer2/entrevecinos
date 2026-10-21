@@ -2,11 +2,13 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    CHAR,
     Boolean,
     CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     String,
     Uuid,
     func,
@@ -24,6 +26,11 @@ class UserModel(Base):
     __table_args__ = (
         CheckConstraint("email = lower(email)", name="email_lowercase"),
         CheckConstraint("length(trim(full_name)) > 0", name="full_name_not_blank"),
+        # Una cuenta activa tiene el correo validado, salvo la de un platform_admin.
+        CheckConstraint(
+            "NOT is_active OR email_verified_at IS NOT NULL OR platform_role = 'platform_admin'",
+            name="active_requires_verified_email",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -44,3 +51,16 @@ class UserModel(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.statement_timestamp()
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class EmailVerificationModel(Base):
+    """Enlace de validación del correo. Solo se guarda el SHA-256 del token."""
+
+    __tablename__ = "email_verification"
+    __table_args__ = (Index(None, "user_id"),)
+
+    token_hash: Mapped[str] = mapped_column(CHAR(64), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

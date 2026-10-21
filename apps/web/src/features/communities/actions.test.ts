@@ -30,8 +30,16 @@ describe("createCommunity", () => {
     requireUser.mockResolvedValue({ id: "u1" });
   });
 
-  it("crea la comunidad y redirige a su página", async () => {
-    userApiFetch.mockResolvedValue({ ok: true, status: 201, data: { id: "c1" } });
+  it("crea la comunidad y, si queda pendiente, avisa en /inicio", async () => {
+    userApiFetch.mockResolvedValue({ ok: true, status: 201, data: { id: "c1", is_active: false } });
+
+    await expect(createCommunity(undefined, form(filled))).rejects.toThrow(
+      "NEXT_REDIRECT:/inicio?comunidad-pendiente=1",
+    );
+  });
+
+  it("crea la comunidad y, si ya está activa, redirige a su página", async () => {
+    userApiFetch.mockResolvedValue({ ok: true, status: 201, data: { id: "c1", is_active: true } });
 
     await expect(createCommunity(undefined, form(filled))).rejects.toThrow(
       "NEXT_REDIRECT:/comunidades/c1",
@@ -39,6 +47,15 @@ describe("createCommunity", () => {
     expect(userApiFetch).toHaveBeenCalledWith("/communities", {
       method: "POST",
       body: { name: "Los Olivos", description: null, city: "Majadahonda", postal_code: "28220" },
+    });
+  });
+
+  it("avisa si ya hay una comunidad pendiente (409) y conserva los valores", async () => {
+    userApiFetch.mockResolvedValue({ ok: false, error: { status: 409, detail: "x" } });
+
+    expect(await createCommunity(undefined, form(filled))).toEqual({
+      formError: "Ya tienes una comunidad pendiente de aprobación.",
+      values: filled,
     });
   });
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { requireUser } from "@/features/auth/dal";
 import { MEMBERSHIP_STATUS_LABELS } from "@/features/communities/components/MembershipAction";
 import { getMyMemberships } from "@/features/communities/data";
+import { PENDING_COMMUNITIES_PATH } from "@/features/platform-admin/paths";
 import { firstParam, type SearchParams } from "@/lib/search-params";
 
 export const metadata: Metadata = { title: "Inicio · EntreVecinos" };
@@ -22,6 +23,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Este anuncio ya no estaba disponible.
         </p>
+      )}
+      {firstParam(query, "comunidad-pendiente") === "1" && (
+        <p role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          Hemos recibido tu comunidad. Un administrador la revisará antes de activarla.
+        </p>
+      )}
+      {user.platform_role === "platform_admin" && (
+        <Link href={PENDING_COMMUNITIES_PATH} className="self-start font-medium text-emerald-800 underline">
+          Comunidades pendientes de aprobación
+        </Link>
       )}
 
       <section aria-labelledby="my-communities" className="flex flex-col gap-3">
@@ -44,13 +55,23 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <ul className="flex flex-col divide-y divide-gray-200 rounded-md border border-gray-200">
             {memberships.map(({ community, status }) => (
               <li key={community.id} className="flex items-center justify-between gap-3 p-4">
-                <Link
-                  href={`/comunidades/${community.id}`}
-                  className="font-medium text-emerald-800 underline"
-                >
-                  {community.name}
-                </Link>
-                <span className="text-sm text-gray-600">{MEMBERSHIP_STATUS_LABELS[status]}</span>
+                {community.is_active ? (
+                  <>
+                    <Link
+                      href={`/comunidades/${community.id}`}
+                      className="font-medium text-emerald-800 underline"
+                    >
+                      {community.name}
+                    </Link>
+                    <span className="text-sm text-gray-600">{MEMBERSHIP_STATUS_LABELS[status]}</span>
+                  </>
+                ) : (
+                  // Pendiente de aprobación: su página todavía no existe para nadie.
+                  <>
+                    <span className="font-medium text-gray-900">{community.name}</span>
+                    <span className="text-sm font-medium text-amber-800">Pendiente de aprobación</span>
+                  </>
+                )}
               </li>
             ))}
           </ul>

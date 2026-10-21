@@ -2,11 +2,11 @@
 
 import { redirect } from "next/navigation";
 
-import { invalidBodyFields } from "@/lib/api/errors";
+import { errorCodeOf, invalidBodyFields } from "@/lib/api/errors";
 import { apiFetch } from "@/lib/api/server";
 
+import { postLoginPath } from "./destination";
 import { safeNextPath } from "./redirect";
-import { HOME_PATH } from "./routes";
 import {
   fieldErrorsOf,
   LOGIN_MESSAGES,
@@ -16,8 +16,8 @@ import {
   signupSchema,
   type SignupField,
 } from "./schemas";
-import { createSession } from "./session";
-import type { AuthResponse } from "./types";
+import { createSession, deleteSession } from "./session";
+import type { AuthResponse, RegistrationResponse } from "./types";
 
 export type SignupState =
   | {
@@ -25,6 +25,10 @@ export type SignupState =
       formError?: string;
       /** Valores a conservar en el formulario. Nunca incluye la contraseña. */
       values?: { full_name: string; email: string; phone: string };
+      /** Cuenta creada: correo al que se ha enviado el enlace de validación. */
+      verificationSentTo?: string;
+      /** El correo pertenece a una cuenta pendiente de validar: se ofrece el reenvío. */
+      pendingVerification?: boolean;
     }
   | undefined;
 
@@ -45,13 +49,20 @@ export async function signup(_state: SignupState, formData: FormData): Promise<S
     return { fieldErrors: fieldErrorsOf<SignupField>(parsed.error), values };
   }
 
-  const result = await apiFetch<AuthResponse>("/auth/register", {
+  const result = await apiFetch<RegistrationResponse>("/auth/register", {
     method: "POST",
     body: parsed.data,
   });
 
   if (!result.ok) {
     if (result.error.status === 409) {
+      if (errorCodeOf(result.error) === "email_pending_verification") {
+        return {
+          fieldErrors: { email: "Este correo está pendiente de validación." },
+          pendingVerification: true,
+          values,
+        };
+      }
       return { fieldErrors: { email: "Este correo ya está en uso." }, values };
     }
     if (result.error.status === 422) {
@@ -66,8 +77,8 @@ export async function signup(_state: SignupState, formData: FormData): Promise<S
     return { formError: "No se pudo crear la cuenta. Inténtalo de nuevo.", values };
   }
 
-  await createSession(result.data.access_token, result.data.expires_in);
-  redirect(HOME_PATH);
+  // La cuenta se activa al abrir el enlace del correo (/verificar-correo): aún no hay sesión.
+  return { verificationSentTo: result.data.email };
 }
 
 export type LoginState =
@@ -76,6 +87,8 @@ export type LoginState =
       formError?: string;
       /** Valores a conservar en el formulario. Nunca incluye la contraseña. */
       values?: { email: string };
+      /** Credenciales correctas, pero falta validar el correo. */
+      emailNotVerified?: boolean;
     }
   | undefined;
 
@@ -97,6 +110,13 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
       // Mensaje genérico: no revela si falló el correo o la contraseña.
       return { formError: "Correo o contraseña incorrectos.", values };
     }
+    if (result.error.status === 403 && errorCodeOf(result.error) === "email_not_verified") {
+      return {
+        formError: "Tienes que validar tu correo electrónico antes de iniciar sesión.",
+        emailNotVerified: true,
+        values,
+      };
+    }
     if (result.error.status === 422) {
       const fieldErrors: Partial<Record<LoginField, string>> = {};
       for (const field of invalidBodyFields(result.error)) {
@@ -108,5 +128,27 @@ export async function login(_state: LoginState, formData: FormData): Promise<Log
   }
 
   await createSession(result.data.access_token, result.data.expires_in);
-  redirect(safeNextPath(formData.get("next")) ?? HOME_PATH);
+  redirect(safeNextPath(formData.get("next")) ?? (await postLoginPath(result.data.access_token)));
+}
+
+export type ResendVerificationState = { sent?: boolean; error?: string } | undefined;
+
+/** Pide otro enlace de validación. La API responde igual exista o no la cuenta pendiente. */
+export async function resendVerification(
+  _state: ResendVerificationState,
+  formData: FormData,
+): Promise<ResendVerificationState> {
+  const result = await apiFetch("/auth/email-verification/resend", {
+    method: "POST",
+    body: { email: text(formData, "email") },
+  });
+  if (!result.ok) return { error: "No se pudo reenviar el correo. Inténtalo de nuevo." };
+  return { sent: true };
+}
+
+/** Cierra la sesión y va a la raíz, que lleva al inicio de sesión. Se envía por POST. */
+export async function logout(): Promise<void> {
+  // Borrar la cookie en una Server Action invalida también la caché del router del cliente.
+  await deleteSession();
+  redirect("/");
 }

@@ -2,8 +2,10 @@ get:
   tags: [Administración]
   operationId: adminListCommunities
   summary: Listar todas las comunidades
-  description: Solo `platform_admin`. Incluye las comunidades desactivadas.
-  x-mvp: false
+  description: >-
+    Solo `platform_admin`. Incluye las comunidades inactivas, que en el MVP son las pendientes de
+    aprobación (`is_active=false`). De la más antigua a la más reciente.
+  x-mvp: true
   parameters:
     - name: is_active
       in: query

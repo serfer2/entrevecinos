@@ -73,6 +73,41 @@ def test_short_jwt_secret_fails() -> None:
         make_settings(jwt_secret="too-short")
 
 
+@pytest.mark.parametrize("variable", ["SMTP_HOST", "WEB_PUBLIC_URL", "MAIL_FROM"])
+def test_missing_mail_settings_fail(monkeypatch: pytest.MonkeyPatch, variable: str) -> None:
+    monkeypatch.delenv(variable, raising=False)
+
+    with pytest.raises(ValidationError, match=variable.lower()):
+        make_settings()
+
+
+def test_mail_settings_defaults() -> None:
+    settings = make_settings()
+
+    assert settings.smtp_host == "mail"
+    assert settings.email_verification_ttl_hours == 24
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"smtp_starttls": False, "web_public_url": "https://entrevecinos.example"}, "STARTTLS"),
+        ({"smtp_starttls": True, "web_public_url": "http://entrevecinos.example"}, "https"),
+    ],
+)
+def test_production_requires_secure_mail(overrides: dict, message: str) -> None:
+    with pytest.raises(ValidationError, match=message):
+        make_settings(environment="production", **overrides)
+
+
+def test_production_accepts_secure_mail() -> None:
+    settings = make_settings(
+        environment="production", smtp_starttls=True, web_public_url="https://entrevecinos.example"
+    )
+
+    assert settings.environment == "production"
+
+
 def test_permission_errors_map_to_403() -> None:
     from fastapi.testclient import TestClient
 

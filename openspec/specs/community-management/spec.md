@@ -4,11 +4,19 @@
 Creación y consulta de comunidades (`POST /v1/communities`, `GET /v1/communities/{id}`).
 ## Requirements
 ### Requirement: Crear una comunidad
-`POST /v1/communities` SHALL crear la comunidad del usuario autenticado y registrarlo como `community_admin` con membresía `approved` y `joined_at`, respondiendo `201` con el esquema `Community`.
+`POST /v1/communities` SHALL crear la comunidad del usuario autenticado y registrarlo como `community_admin` con membresía `approved` y `joined_at`, respondiendo `201` con el esquema `Community`. La comunidad SHALL crearse con `is_active: false` (pendiente de aprobación), salvo si el creador es `platform_admin`, en cuyo caso SHALL crearse con `is_active: true`. Mientras está pendiente, la comunidad MUST NOT aparecer en `GET /v1/communities` y su detalle, sus solicitudes y sus anuncios SHALL responder `404`.
 
 #### Scenario: Creación correcta
 - **WHEN** un usuario autenticado envía `{"name": "Urbanización Los Olivos", "city": "Majadahonda", "postal_code": "28220"}`
-- **THEN** recibe `201` con `created_by` igual a su id y existe su membresía `community_admin`/`approved`
+- **THEN** recibe `201` con `created_by` igual a su id e `is_active: false`, y existe su membresía `community_admin`/`approved`
+
+#### Scenario: Comunidad pendiente oculta
+- **WHEN** otro usuario busca comunidades o solicita el acceso a una comunidad pendiente
+- **THEN** no la encuentra y la solicitud responde `404`
+
+#### Scenario: Creada por un administrador de plataforma
+- **WHEN** un `platform_admin` crea una comunidad
+- **THEN** recibe `201` con `is_active: true` y la comunidad aparece en `GET /v1/communities`
 
 ### Requirement: Validación de la comunidad
 `name` MUST tener de 1 a 120 caracteres tras recortar espacios; `description` (máximo 2000), `postal_code` (16) y `city` (120) son opcionales y `""` equivale a `null`. Datos inválidos SHALL responder `422` sin crear nada.
@@ -30,4 +38,15 @@ Ambos endpoints MUST responder `401` sin token.
 #### Scenario: Sin token
 - **WHEN** se llama sin `Authorization`
 - **THEN** la respuesta es `401`
+
+### Requirement: Una comunidad pendiente por usuario
+`POST /v1/communities` MUST responder `409` con «Ya tienes una comunidad pendiente de aprobación.» y no crear nada cuando el usuario ya creó una comunidad que sigue pendiente; tras su aprobación SHALL poder crear otra. El límite no se aplica a un `platform_admin`, cuyas comunidades nacen activas.
+
+#### Scenario: Segunda comunidad pendiente
+- **WHEN** un usuario con una comunidad pendiente crea otra
+- **THEN** recibe `409` y no se crea la comunidad
+
+#### Scenario: Tras la aprobación
+- **WHEN** su comunidad pendiente se aprueba y crea otra
+- **THEN** recibe `201` con `is_active: false`
 

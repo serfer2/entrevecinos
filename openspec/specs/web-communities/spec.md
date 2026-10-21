@@ -4,10 +4,14 @@
 Pantallas de comunidades y navegación de la zona privada.
 ## Requirements
 ### Requirement: Crear una comunidad desde la interfaz
-La página `/comunidades/nueva` SHALL mostrar un formulario (nombre, descripción, ciudad y código postal) que crea la comunidad y lleva a `/comunidades/<id>`, donde se muestra su nombre.
+La página `/comunidades/nueva` SHALL mostrar un formulario (nombre, descripción, ciudad y código postal) que avisa de la revisión por un administrador y crea la comunidad. Si queda pendiente, SHALL llevar a `/inicio` con «Hemos recibido tu comunidad. Un administrador la revisará antes de activarla.»; si queda activa, a `/comunidades/<id>`, donde se muestra su nombre.
 
-#### Scenario: Creación correcta
-- **WHEN** el vecino escribe el nombre y pulsa «Crear comunidad»
+#### Scenario: Creación pendiente
+- **WHEN** un vecino escribe el nombre y pulsa «Crear comunidad»
+- **THEN** llega a `/inicio` con el aviso y ve la comunidad en «Mis comunidades» como «Pendiente de aprobación», sin enlace
+
+#### Scenario: Creación activa
+- **WHEN** la API devuelve la comunidad con `is_active: true`
 - **THEN** llega a `/comunidades/<id>` con el nombre de la comunidad
 
 ### Requirement: Nombre obligatorio
@@ -44,4 +48,15 @@ Pulsar «Solicitar acceso» SHALL registrar la solicitud y mostrar «Solicitud p
 #### Scenario: Pendiente
 - **WHEN** abro la comunidad con la solicitud pendiente
 - **THEN** veo «Tu solicitud está pendiente de aprobación…» y ningún anuncio
+
+### Requirement: Aviso de comunidad pendiente
+Si el usuario ya tiene una comunidad pendiente de aprobación, `/comunidades/nueva` SHALL mostrar «Ya tienes una comunidad pendiente de aprobación: «{nombre}». Podrás crear otra cuando un administrador la revise.» en lugar del formulario; si la API responde `409` al crear, el formulario SHALL mostrar «Ya tienes una comunidad pendiente de aprobación.» conservando los valores.
+
+#### Scenario: Con una comunidad pendiente
+- **WHEN** un vecino con una comunidad pendiente abre `/comunidades/nueva`
+- **THEN** ve el aviso con su nombre y no ve el formulario
+
+#### Scenario: Tras la aprobación
+- **WHEN** su comunidad se aprueba y vuelve a `/comunidades/nueva`
+- **THEN** ve el formulario
 

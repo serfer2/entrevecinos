@@ -3,13 +3,6 @@
 ## Purpose
 Proyecto web Next.js 16 (`apps/web/`) y su servicio `web` en `infra/docker-compose.yml`.
 ## Requirements
-### Requirement: Página marcador en Compose
-El servicio `web` SHALL construirse desde `apps/web/Dockerfile` (etapa `dev`), depender de `api` sano, estar solo en la red `edge`, publicar `${WEB_PORT:-3000}` y mostrar una página marcador con el nombre del proyecto.
-
-#### Scenario: Arranque del contenedor
-- **WHEN** se ejecuta `docker compose --env-file .env -f infra/docker-compose.yml up -d --build web`
-- **THEN** el contenedor `web` queda `healthy` y `http://localhost:3000` devuelve 200 con el texto `EntreVecinos`
-
 ### Requirement: Tailwind con recarga en caliente
 Las clases de TailwindCSS SHALL aplicarse a la página y los cambios en `apps/web/src` SHALL reflejarse sin reiniciar el contenedor.
 
@@ -41,4 +34,11 @@ La etapa `prod` SHALL generarse con `output: 'standalone'`, ejecutarse con un us
 #### Scenario: Revisión de la estructura
 - **WHEN** se revisa `apps/web/src` y se ejecutan `npm run lint` y `npm run typecheck`
 - **THEN** existen las carpetas indicadas, versionadas con `.gitkeep`, y ambos comandos terminan sin errores
+
+### Requirement: Servicio web en Compose
+El servicio `web` SHALL construirse desde `apps/web/Dockerfile` (etapa `dev`), depender de `api` sano, estar solo en la red `edge` y publicar `${WEB_PORT:-3000}`; su raíz SHALL llevar a una pantalla de la aplicación (ver `web-session`).
+
+#### Scenario: Arranque del contenedor
+- **WHEN** se ejecuta `docker compose --env-file .env -f infra/docker-compose.yml up -d --build web`
+- **THEN** el contenedor `web` queda `healthy` y `http://localhost:3000` redirige a `/iniciar-sesion`, que devuelve 200
 

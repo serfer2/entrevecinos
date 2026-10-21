@@ -7,7 +7,7 @@ from entrevecinos.application.users.ports import (
     UserRepository,
 )
 from entrevecinos.domain.users.entities import User
-from entrevecinos.domain.users.errors import InvalidCredentials
+from entrevecinos.domain.users.errors import EmailNotVerified, InvalidCredentials
 from entrevecinos.domain.users.value_objects import normalize_email
 
 
@@ -30,7 +30,12 @@ class AuthenticateUser:
         # Se verifica siempre (con un hash ficticio si el correo no existe) para que el
         # tiempo de respuesta no revele qué correos están registrados.
         valid, new_hash = self._hasher.verify_and_update(command.password, password_hash)
-        if user is None or not valid or not user.can_authenticate:
+        if user is None or not valid:
+            raise InvalidCredentials
+        # Solo se distingue tras comprobar la contraseña: no revela qué correos existen.
+        if user.email_verification_pending:
+            raise EmailNotVerified
+        if not user.can_authenticate:
             raise InvalidCredentials
 
         if new_hash is not None:

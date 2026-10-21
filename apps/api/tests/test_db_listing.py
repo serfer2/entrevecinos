@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 from alembic import command
-from sqlalchemy import Engine, inspect, select
+from sqlalchemy import Engine, func, inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -35,7 +35,12 @@ INITIAL_SLUGS = {
 
 @pytest.fixture
 def owner(db_session: Session) -> UserModel:
-    user = UserModel(email="vecino@example.com", password_hash="hash", full_name="Alex Vecino")
+    user = UserModel(
+        email="vecino@example.com",
+        password_hash="hash",
+        full_name="Alex Vecino",
+        email_verified_at=func.now(),
+    )
     db_session.add(user)
     db_session.flush()
     return user
