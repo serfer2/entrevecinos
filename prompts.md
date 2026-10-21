@@ -446,7 +446,7 @@ Implementa las historias de usuario y haz un commit por cada HU
 
 ```
 Si alguien abre un enlace antiguo que fue reemplazado por uno enviado nuevamente, y no tiene una sesión activa, verá el mensaje «Tu correo electrónico ya está validado. Inicia sesión», a pesar de que la cuenta sigue en estado pendiente. Es necesario corregir esto para que se muestre un mensaje de error adecuado.
-Crea una historia de usuario con los tickets necesarios para ello
+Crea una historia de usuario con los tickets necesarios para ello e impleméntala.
 ```
 
 #### 6.1 Implementación de tickets de trabajo
