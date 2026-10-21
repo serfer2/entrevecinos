@@ -1,8 +1,11 @@
-// Marcador: se sustituirá al implementar el frontend.
-export default function Home() {
-  return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-3xl font-semibold">EntreVecinos</h1>
-    </main>
-  );
+import { redirect } from "next/navigation";
+
+import { getCurrentUser } from "@/features/auth/dal";
+import { HOME_PATH, LOGIN_PATH } from "@/features/auth/routes";
+
+// La raíz no tiene contenido propio: con sesión lleva al inicio y sin ella, al inicio de sesión.
+export default async function Home() {
+  // Si la API falla, se trata como sin sesión (igual que en /iniciar-sesion).
+  const user = await getCurrentUser().catch(() => null);
+  redirect(user ? HOME_PATH : LOGIN_PATH);
 }

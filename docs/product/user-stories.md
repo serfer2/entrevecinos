@@ -23,6 +23,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 4. Explorar y encontrar anuncios | HU-10, HU-11, HU-12, HU-13 |
 | 5. Detalle y contacto | HU-14, HU-15 |
 | 6. Administración mínima | HU-16, HU-17 |
+| 7. Mejora de funcionalidades del MVP | HU-18 |
 
 ---
 
@@ -485,3 +486,25 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 - **Given** que soy miembro sin rol de administrador
 - **When** intento retirar el anuncio de otro vecino
 - **Then** no tengo esa opción
+
+---
+
+## Épica 7 — Mejora de funcionalidades del MVP
+
+Mejoras sobre las funcionalidades ya implementadas en las épicas 1 a 6. No añade las funcionalidades posteriores al MVP descritas en «Fuera de alcance» (asumido).
+
+### HU-18 Acceder a la aplicación desde la página principal
+
+**Como** visitante o vecino, **quiero** que la dirección principal de EntreVecinos me lleve a una pantalla desde la que pueda empezar a usarla, **para** no quedarme en una página sin salida.
+
+**AC1 — Sin sesión**
+
+- **Given** que no tengo la sesión iniciada
+- **When** abro la dirección principal de la aplicación
+- **Then** llego al formulario de inicio de sesión, desde el que puedo ir al registro
+
+**AC2 — Con sesión**
+
+- **Given** que tengo la sesión iniciada
+- **When** abro la dirección principal de la aplicación
+- **Then** llego a mi página de inicio

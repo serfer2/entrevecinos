@@ -36,12 +36,13 @@ docs/product/tickets/
 | `EP-05-detalle-y-contacto/HU-15-contactar-con-el-anunciante/` | TK-038 datos de contacto (contrato `ListingOwner.email`) · TK-039 contactar con el anunciante |
 | `EP-06-administracion-minima/HU-16-gestionar-los-miembros-de-mi-comunidad/` | TK-040 backend bloquear y expulsar · TK-041 gestión de miembros |
 | `EP-06-administracion-minima/HU-17-retirar-anuncios-problematicos/` | TK-042 backend retirar y restaurar anuncios · TK-043 retirar desde el detalle |
+| `EP-07-mejora-de-funcionalidades-del-mvp/HU-18-acceder-a-la-aplicacion-desde-la-pagina-principal/` | TK-047 redirigir la raíz al inicio de sesión o al inicio |
 
 ## Orden de implementación recomendado
 
 Respeta las dependencias de cada ticket (campo **Depende de**). Los números de migración (`0002`…`0006`) asumen este orden.
 
-**Estado:** todos los tickets (TK-001 a TK-046) están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket.
+**Estado:** todos los tickets (TK-001 a TK-047) están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket.
 
 | Bloque | Orden |
 |---|---|
@@ -54,5 +55,6 @@ Respeta las dependencias de cada ticket (campo **Depende de**). Los números de 
 | Contacto | TK-038 → TK-039 |
 | Administración | TK-040 → TK-041 → TK-042 → TK-043 |
 | Reservar y finalizar | TK-044 → TK-045 |
+| Épica 7 — Mejoras | TK-047 |
 
 El detalle del anuncio (TK-036/TK-037) se adelanta a la edición y la eliminación de la interfaz porque es su punto de entrada. La CSP (TK-046) va justo después de TK-023, en cuanto se sirven imágenes desde el almacenamiento. Reservar y finalizar (TK-044/TK-045) va al final porque amplía el endpoint de estado de TK-042.
