@@ -164,6 +164,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Permitir que sus miembros vean los anuncios asociados a ella.
    - Incluir una gestión sencilla de acceso, por ejemplo, aprobación por parte de un administrador.
    - Las comunidades nuevas quedan pendientes hasta que un administrador de la plataforma las aprueba; las que crea él quedan activas al momento. Cada usuario puede tener solo una comunidad pendiente a la vez.
+   - El administrador de la plataforma accede a cualquier comunidad sin solicitar acceso: ve sus anuncios, publica en ella y la gestiona.
 3. **Gestión de anuncios**
    - Crear, editar y eliminar anuncios propios.
    - Marcar los anuncios propios como reservados o finalizados.
@@ -175,10 +176,10 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Filtrar por comunidad y tipo de publicación.
    - Ordenar por fecha o precio.
 5. **Detalle y contacto**
-   - Consultar la información completa del anuncio y del anunciante.
+   - Consultar la información completa del anuncio y del anunciante, con sus fotografías ampliables a pantalla completa.
    - Contactar con quien publicó el anuncio. Para el MVP puede bastar un canal de contacto directo; la mensajería interna puede añadirse cuando el flujo básico esté validado.
 6. **Administración mínima**
-   - Contar con una persona administradora que pueda gestionar miembros y retirar anuncios problemáticos.
+   - Contar con una persona administradora que pueda gestionar miembros y ocultar anuncios problemáticos.
  
 Quedan para una fase posterior el perfil profesional, las notificaciones automáticas, el sistema completo de denuncias y el panel avanzado de administración.
 
@@ -188,7 +189,16 @@ Quedan para una fase posterior el perfil profesional, las notificaciones automá
 
 > Proporciona imágenes y/o videotutorial mostrando la experiencia del usuario desde que aterriza en la aplicación, pasando por todas las funcionalidades principales.
 
-**Pendiente**. Se proporcionará una vez completado el desarrollo del frontend.
+**Pendiente** (imágenes y videotutorial). Se proporcionará una vez completado el desarrollo del frontend.
+
+La Épica 11 (HU-28 a HU-32, TK-066 a TK-072) fija la identidad visual y mejora el uso de la web:
+
+- **Identidad cercana a la naturaleza:** verde musgo para las acciones, neutros cálidos de piedra y tierra, ocre para avisos y terracota para errores, sobre un fondo claro, con contraste AA. Tipografías Figtree (texto) y Fraunces (títulos), autoalojadas, y un logotipo con un brote. Los colores se definen una sola vez en `apps/web/src/styles/globals.css`.
+- **Sencillez:** espacios amplios, paneles blancos sobre el fondo, pocos elementos decorativos e iconos solo cuando ayudan a entender una acción (búsqueda, ubicación, ampliar).
+- **Anuncios fáciles de explorar:** tarjetas que destacan fotografía, título y precio, con el tipo y «Reservado» sobre la imagen; búsqueda, filtros y orden agrupados en un panel.
+- **Fotografías a pantalla completa** en el detalle, con botones, teclado y gestos táctiles.
+- **Adaptable:** de una a cuatro columnas según el ancho; en móvil la cabecera no queda fija. Comprobado también en Firefox.
+- **Accesibilidad:** foco visible, diálogos modales que atrapan el foco y animaciones desactivadas con `prefers-reduced-motion`.
 
 ---
 

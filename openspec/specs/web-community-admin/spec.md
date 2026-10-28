@@ -18,11 +18,15 @@ Gestión de la comunidad desde la interfaz (solicitudes, miembros y moderación)
 - **THEN** la solicitud desaparece de la lista y el solicitante ve «Entrar» en su búsqueda
 
 ### Requirement: Permiso restringido
-El enlace «Gestionar comunidad» SHALL mostrarse solo a `community_admin`, y la página MUST mostrar «No tienes permisos para gestionar esta comunidad.» cuando la API responde `403`.
+El enlace «Gestionar comunidad» SHALL mostrarse solo a `community_admin` aprobado y a `platform_admin`, y la página MUST mostrar «No tienes permisos para gestionar esta comunidad.» cuando la API responde `403`.
 
 #### Scenario: Miembro sin rol
 - **WHEN** un miembro sin rol escribe la URL de gestión
 - **THEN** ve el aviso de permisos
+
+#### Scenario: Administrador de plataforma
+- **WHEN** un `platform_admin` sin membresía abre la comunidad
+- **THEN** ve «Gestionar comunidad»
 
 ### Requirement: Gestión de miembros
 La gestión de la comunidad SHALL tener las pestañas «Solicitudes» y «Miembros». `/comunidades/<id>/gestion/miembros` MUST listar los miembros con su rol y estado, filtrables por estado, con «Bloquear» y «Expulsar» (con confirmación) y «Desbloquear» según la fila; tras cada acción se muestra «<nombre> ha sido bloqueado/desbloqueado/expulsado.» o el motivo del rechazo.

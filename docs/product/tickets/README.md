@@ -46,12 +46,17 @@ docs/product/tickets/
 | `EP-10-validacion-del-correo-electronico/HU-25-validar-mi-correo-electronico-al-registrarme/` | TK-056 envío de correo y Mailpit · TK-057 BD de la validación · TK-058 backend registro y validación · TK-060 aviso y validación desde el enlace |
 | `EP-10-validacion-del-correo-electronico/HU-26-recibir-de-nuevo-el-correo-de-validacion/` | TK-059 backend correo pendiente y reenvío · TK-061 reenviar el correo de validación |
 | `EP-10-validacion-del-correo-electronico/HU-27-entender-por-que-no-funciona-un-enlace-de-validacion-antiguo/` | TK-063 BD enlaces usados y sustituidos · TK-064 backend motivo del enlace no válido · TK-065 mensaje del enlace sustituido |
+| `EP-11-experiencia-de-usuario/HU-28-usar-una-interfaz-sencilla-clara-y-con-identidad-propia/` | TK-066 tema visual y tipografía · TK-067 rediseño de páginas y componentes |
+| `EP-11-experiencia-de-usuario/HU-29-usar-los-formularios-correctamente-en-cualquier-navegador/` | TK-068 campos de formulario en Firefox |
+| `EP-11-experiencia-de-usuario/HU-30-ver-las-fotografias-de-un-anuncio-a-pantalla-completa/` | TK-069 visor de imágenes a pantalla completa |
+| `EP-11-experiencia-de-usuario/HU-31-acceder-como-administrador-de-plataforma-a-cualquier-comunidad/` | TK-070 acceso del `platform_admin` en la web · TK-071 backend anuncios del `platform_admin` |
+| `EP-11-experiencia-de-usuario/HU-32-entender-que-hace-la-moderacion-de-un-anuncio/` | TK-072 «Ocultar anuncio» en lugar de «Retirar anuncio» |
 
 ## Orden de implementación recomendado
 
 Respeta las dependencias de cada ticket (campo **Depende de**). Los números de migración (`0002`…`0009`) asumen este orden.
 
-**Estado:** los tickets TK-001 a TK-055 están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket. También están implementados los de la Épica 10 (TK-056 a TK-062), con un commit por historia y otro para la documentación. TK-063 a TK-065 (HU-27) también están implementados, con un cambio de OpenSpec archivado por ticket y un commit para la historia.
+**Estado:** los tickets TK-001 a TK-055 están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket. También están implementados los de la Épica 10 (TK-056 a TK-062), con un commit por historia y otro para la documentación. TK-063 a TK-065 (HU-27) también están implementados, con un cambio de OpenSpec archivado por ticket y un commit para la historia. Los de la Épica 11 (TK-066 a TK-072) están implementados en un único commit de experiencia de usuario, con las especificaciones de `openspec/specs/` actualizadas directamente, sin cambios de OpenSpec archivados.
 
 | Bloque | Orden |
 |---|---|
@@ -68,5 +73,6 @@ Respeta las dependencias de cada ticket (campo **Depende de**). Los números de 
 | Épica 8 — Gestión de comunidades | TK-050 → TK-051 → TK-052 → TK-053 → TK-054 |
 | Épica 9 — Cierre de sesión | TK-055 |
 | Épica 10 — Validación del correo | TK-056 → TK-057 → TK-058 → TK-059 → TK-060 → TK-061 → TK-062 → TK-063 → TK-064 → TK-065 |
+| Épica 11 — Experiencia de usuario | TK-066 → TK-067 → TK-068 → TK-069 → TK-070 → TK-071 → TK-072 |
 
 El detalle del anuncio (TK-036/TK-037) se adelanta a la edición y la eliminación de la interfaz porque es su punto de entrada. La CSP (TK-046) va justo después de TK-023, en cuanto se sirven imágenes desde el almacenamiento. Reservar y finalizar (TK-044/TK-045) va al final porque amplía el endpoint de estado de TK-042.

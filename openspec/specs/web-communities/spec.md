@@ -22,18 +22,22 @@ El formulario MUST mostrar «El nombre de la comunidad es obligatorio.» sin lla
 - **THEN** se ve el error bajo el campo y no hay llamada a la API
 
 ### Requirement: Navegación privada
-Las páginas privadas SHALL mostrar una cabecera con «EntreVecinos», «Comunidades» (enlace a `/comunidades`) y «Mi perfil», con `aria-current="page"` en la sección actual.
+Las páginas privadas SHALL mostrar una cabecera con el logotipo «EntreVecinos», «Comunidades» (enlace a `/comunidades`) y «Mi perfil», con `aria-current="page"` en la sección actual, y un pie de página. La cabecera SHALL quedar fija desde `sm`.
 
 #### Scenario: Sección actual
 - **WHEN** el vecino está en `/perfil`
 - **THEN** el enlace «Mi perfil» tiene `aria-current="page"`
 
 ### Requirement: Buscar comunidades
-`/comunidades` SHALL buscar por nombre, ciudad o código postal con un formulario GET, mostrar los resultados paginados y, para cada uno, la acción según mi membresía: «Solicitar acceso» sin membresía, «Solicitud pendiente», «Entrar» si está aprobada y «Acceso no disponible» si está rechazada o bloqueada.
+`/comunidades` SHALL buscar por nombre, ciudad o código postal con un formulario GET, mostrar los resultados paginados y, para cada uno, la acción según mi membresía: «Solicitar acceso» sin membresía, «Solicitud pendiente», «Entrar» si está aprobada y «Acceso no disponible» si está rechazada o bloqueada. A un `platform_admin` SHALL mostrarle siempre «Entrar».
 
 #### Scenario: Resultado sin membresía
 - **WHEN** busco una comunidad de la que no soy miembro
 - **THEN** veo el botón «Solicitar acceso»
+
+#### Scenario: Administrador de plataforma
+- **WHEN** un `platform_admin` busca comunidades
+- **THEN** ve «Entrar» en todas, sea cual sea su membresía
 
 ### Requirement: Solicitar el acceso
 Pulsar «Solicitar acceso» SHALL registrar la solicitud y mostrar «Solicitud pendiente», también si ya existía una membresía (sin mensaje de error), y la comunidad SHALL aparecer en «Mis comunidades» de `/inicio`.
@@ -43,11 +47,15 @@ Pulsar «Solicitar acceso» SHALL registrar la solicitud y mostrar «Solicitud p
 - **THEN** se muestra el estado actual y no un error
 
 ### Requirement: Sin acceso hasta la aprobación
-`/comunidades/<id>` MUST mostrar solo el nombre y un aviso cuando mi membresía no está aprobada: pendiente, «Solicitar acceso» sin membresía o «No tienes acceso a esta comunidad.» si está rechazada o bloqueada.
+`/comunidades/<id>` MUST mostrar solo el nombre y un aviso cuando mi membresía no está aprobada: pendiente, «Solicitar acceso» sin membresía o «No tienes acceso a esta comunidad.» si está rechazada o bloqueada. Un `platform_admin` SHALL acceder siempre, como un miembro aprobado.
 
 #### Scenario: Pendiente
 - **WHEN** abro la comunidad con la solicitud pendiente
 - **THEN** veo «Tu solicitud está pendiente de aprobación…» y ningún anuncio
+
+#### Scenario: Administrador de plataforma pendiente
+- **WHEN** un `platform_admin` con la solicitud pendiente abre la comunidad
+- **THEN** ve los anuncios, «Publicar anuncio» y «Gestionar comunidad»
 
 ### Requirement: Aviso de comunidad pendiente
 Si el usuario ya tiene una comunidad pendiente de aprobación, `/comunidades/nueva` SHALL mostrar «Ya tienes una comunidad pendiente de aprobación: «{nombre}». Podrás crear otra cuando un administrador la revise.» en lugar del formulario; si la API responde `409` al crear, el formulario SHALL mostrar «Ya tienes una comunidad pendiente de aprobación.» conservando los valores.

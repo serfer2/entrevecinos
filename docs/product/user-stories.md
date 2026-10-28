@@ -28,6 +28,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23 |
 | 9. Cierre de sesión | HU-24 |
 | 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
+| 11. Experiencia de usuario | HU-28, HU-29, HU-30, HU-31, HU-32 |
 
 ---
 
@@ -744,3 +745,113 @@ Las cuentas nuevas solo se activan cuando su titular demuestra que controla la d
 - **Given** un token que no se ha enviado nunca por correo
 - **When** se usa
 - **Then** la respuesta no revela si un correo está registrado ni su estado (asumido)
+
+---
+
+## Épica 11 — Experiencia de usuario
+
+Mejoras de presentación y de uso sobre las funcionalidades existentes, sin añadir funcionalidad de negocio nueva.
+
+### HU-28 Usar una interfaz sencilla, clara y con identidad propia
+
+**Como** vecino, **quiero** una web limpia, legible y con un aspecto que transmita cercanía con la naturaleza, **para** encontrar y publicar anuncios sin esfuerzo y reconocer EntreVecinos como algo propio de mi barrio.
+
+**AC1 — Identidad visual coherente**
+
+- **Given** que navego por cualquier página de la aplicación
+- **When** la veo en un navegador de escritorio, una tableta o un móvil
+- **Then** todas usan la misma paleta (verdes suaves, tonos tierra y fondos claros), la misma tipografía y el mismo logotipo, con un contraste de texto suficiente (AA)
+
+**AC2 — Anuncios fáciles de explorar**
+
+- **Given** que estoy en el listado de mi comunidad
+- **When** recorro los anuncios
+- **Then** cada tarjeta destaca la fotografía, el título y el precio, y muestra el tipo de anuncio y si está reservado
+
+**AC3 — Búsqueda y filtros a mano**
+
+- **Given** que estoy en el listado de mi comunidad
+- **When** quiero buscar o filtrar
+- **Then** encuentro la búsqueda, los filtros y el orden agrupados en un mismo panel, encima de los anuncios
+
+**AC4 — Adaptable**
+
+- **Given** que uso un móvil
+- **When** abro cualquier página
+- **Then** el contenido se reorganiza sin desplazamiento horizontal y la cabecera no ocupa espacio fijo en la pantalla
+
+### HU-29 Usar los formularios correctamente en cualquier navegador
+
+**Como** vecino que usa Firefox, **quiero** que los formularios se vean igual de bien que en otros navegadores, **para** no encontrarme campos descuadrados o desproporcionados.
+
+**AC1 — Búsqueda de comunidades**
+
+- **Given** que uso Firefox en escritorio
+- **When** abro el buscador de comunidades
+- **Then** los campos «Nombre», «Ciudad» y «Código postal» y el botón «Buscar» caben dentro de su panel
+
+**AC2 — Campo de precio**
+
+- **Given** que publico o edito un anuncio
+- **When** veo el campo de precio
+- **Then** tiene un ancho proporcionado a su contenido y el símbolo «€» aparece dentro del campo, alineado con el importe
+
+### HU-30 Ver las fotografías de un anuncio a pantalla completa
+
+**Como** vecino interesado en un anuncio, **quiero** ampliar sus fotografías y pasar de una a otra, **para** ver bien lo que se ofrece.
+
+**AC1 — Ampliar**
+
+- **Given** que estoy en el detalle de un anuncio con fotografías
+- **When** pulso la imagen principal
+- **Then** la veo a pantalla completa, en primer plano, con el número de imagen («2 / 3») y un botón para cerrar
+
+**AC2 — Carrusel**
+
+- **Given** que veo a pantalla completa un anuncio con varias fotografías
+- **When** pulso las flechas laterales, uso las flechas del teclado o deslizo el dedo a izquierda o derecha
+- **Then** paso a la imagen siguiente o anterior, de forma circular
+
+**AC3 — Cerrar**
+
+- **Given** que veo una fotografía a pantalla completa
+- **When** pulso «Cerrar», la tecla Escape o el fondo fuera de la imagen
+- **Then** vuelvo al detalle del anuncio, que muestra la última imagen que he visto
+
+### HU-31 Acceder como administrador de plataforma a cualquier comunidad
+
+**Como** administrador de plataforma, **quiero** entrar en cualquier comunidad sin tener que solicitar acceso, **para** poder supervisarla y publicar en ella.
+
+**AC1 — Sin solicitar acceso**
+
+- **Given** que soy administrador de plataforma
+- **When** busco comunidades
+- **Then** veo «Entrar» en todas ellas, aunque no sea miembro o mi solicitud esté pendiente, rechazada o bloqueada
+
+**AC2 — Anuncios y gestión**
+
+- **Given** que soy administrador de plataforma y no tengo una membresía aprobada en una comunidad
+- **When** entro en ella
+- **Then** veo sus anuncios, la búsqueda y los botones «Publicar anuncio» y «Gestionar comunidad»
+
+**AC3 — Mis anuncios se ven**
+
+- **Given** que soy administrador de plataforma sin membresía aprobada en una comunidad
+- **When** publico un anuncio en ella
+- **Then** aparece en el listado y en la búsqueda para todos sus miembros
+
+### HU-32 Entender qué hace la moderación de un anuncio
+
+**Como** administrador de comunidad, **quiero** que la acción de moderar un anuncio se llame «Ocultar», **para** distinguirla claramente de «Eliminar» y «Marcar como finalizado».
+
+**AC1 — Ocultar**
+
+- **Given** que gestiono una comunidad y abro un anuncio visible
+- **When** veo sus acciones
+- **Then** aparece «Ocultar anuncio» y, al pulsarlo, se me pide confirmar con «¿Ocultar este anuncio?» y el botón «Ocultar»
+
+**AC2 — Textos coherentes**
+
+- **Given** que se ha ocultado un anuncio
+- **When** vuelvo al listado, lo abro como autor o gestor, o el autor intenta editarlo
+- **Then** veo «Anuncio ocultado.», «Este anuncio está oculto y no se muestra en la comunidad.» o «Este anuncio ha sido ocultado por la administración de la comunidad.», y en ningún texto visible aparece «retirar»
