@@ -69,8 +69,8 @@ export const EDIT_MESSAGES = {
   partial: "Los datos se han guardado, pero no las fotografías. Inténtalo de nuevo.",
 } as const;
 
-/** Mensaje de la API cuando el anuncio está bloqueado para el autor (retirado, finalizado…). */
+/** Mensaje de la API cuando el anuncio está bloqueado para el autor (oculto, finalizado…). */
 export function lockedMessage(error: ApiError): string | null {
   const { detail } = error;
-  return typeof detail === "string" && /retirado|finalizado/.test(detail) ? detail : null;
+  return typeof detail === "string" && /ocultado|finalizado/.test(detail) ? detail : null;
 }

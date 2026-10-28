@@ -14,7 +14,7 @@ type ConfirmDialogProps = {
   triggerClassName?: string;
 };
 
-const buttonClass = "rounded-md px-3 py-1.5 text-sm font-medium";
+const buttonClass = "rounded-lg px-3 py-1.5 text-sm font-medium";
 
 /**
  * Botón que pide confirmación antes de enviar su formulario. Con JavaScript abre un `<dialog>`

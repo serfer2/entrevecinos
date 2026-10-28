@@ -149,7 +149,7 @@ def test_hidden_and_deleted(
     response = patch(client, author, listing["id"], {"title": "x"})
     assert response.status_code == 403
     assert response.json() == {
-        "detail": "Este anuncio ha sido retirado por la administración de la comunidad."
+        "detail": "Este anuncio ha sido ocultado por la administración de la comunidad."
     }
 
     db_session.execute(

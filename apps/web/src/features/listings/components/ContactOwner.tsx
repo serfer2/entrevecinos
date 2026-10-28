@@ -22,7 +22,7 @@ export function ContactOwner({ owner, listingTitle, isOwner }: ContactOwnerProps
 
   return (
     <details className="group mt-3">
-      <summary className="inline-flex cursor-pointer list-none rounded-md bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800 [&::-webkit-details-marker]:hidden">
+      <summary className="inline-flex cursor-pointer list-none rounded-lg bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800 [&::-webkit-details-marker]:hidden">
         Contactar con {owner.full_name}
       </summary>
       <ul className="mt-3 flex flex-col gap-2">

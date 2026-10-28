@@ -18,14 +18,19 @@ export function ListingCard({ listing }: { listing: ApiListing }) {
   return (
     <Link
       href={`/anuncios/${listing.id}`}
-      className="flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white hover:border-emerald-600 focus-visible:ring-2 focus-visible:ring-emerald-600"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white no-underline shadow-xs transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md focus-visible:outline-emerald-600 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
     >
-      <div className="relative aspect-[4/3] bg-gray-100">
+      <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element -- URL prefirmada que cambia en cada petición
-          <img src={mediaSrc(cover.url)} alt={listing.title} loading="lazy" className="h-full w-full object-cover" />
+          <img
+            src={mediaSrc(cover.url)}
+            alt={listing.title}
+            loading="lazy"
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+          />
         ) : (
-          <div className="flex h-full items-center justify-center text-gray-400">
+          <div className="flex h-full items-center justify-center bg-emerald-50 text-emerald-300">
             <svg aria-hidden viewBox="0 0 24 24" className="h-10 w-10" fill="none" stroke="currentColor" strokeWidth="1.5">
               <rect x="3" y="5" width="18" height="14" rx="2" />
               <circle cx="9" cy="10" r="1.5" />
@@ -33,20 +38,22 @@ export function ListingCard({ listing }: { listing: ApiListing }) {
             </svg>
           </div>
         )}
+        <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2.5 py-0.5 text-xs font-semibold text-emerald-900 shadow-xs">
+          {LISTING_TYPE_LABELS[listing.type]}
+        </span>
         {listing.status === "reserved" && (
-          <span className="absolute left-2 top-2 rounded bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white">
+          <span className="absolute right-2 top-2 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 shadow-xs">
             Reservado
           </span>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-1 p-3">
-        <span className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-          {LISTING_TYPE_LABELS[listing.type]}
-        </span>
-        <h3 className="line-clamp-2 font-medium text-gray-900">{listing.title}</h3>
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1 text-sm">
-          <span className="font-semibold text-gray-900">{price}</span>
-          <time dateTime={listing.published_at} className="text-gray-600">
+      <div className="flex flex-1 flex-col gap-2 p-4">
+        <h3 className="line-clamp-2 font-medium leading-snug text-gray-900 group-hover:text-emerald-900">
+          {listing.title}
+        </h3>
+        <div className="mt-auto flex items-baseline justify-between gap-2">
+          <span className="text-lg font-semibold text-emerald-800">{price}</span>
+          <time dateTime={listing.published_at} className="text-xs text-gray-600">
             {formatPublishedAt(listing.published_at)}
           </time>
         </div>

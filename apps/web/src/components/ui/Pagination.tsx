@@ -9,7 +9,7 @@ type PaginationProps = {
 };
 
 const linkClass =
-  "rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50";
+  "rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-emerald-800 no-underline hover:border-emerald-600 hover:bg-emerald-50";
 
 /** Navegación «Anterior / Siguiente» de un listado paginado. No se muestra con una sola página. */
 export function Pagination({ page, pageSize, total, hrefFor }: PaginationProps) {

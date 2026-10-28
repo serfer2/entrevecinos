@@ -42,11 +42,12 @@ export async function CommunityListings({ communityId, search }: CommunityListin
     return (
       <div className="flex flex-col gap-4">
         {controls}
-        <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-gray-300 p-6">
-          <p className="text-gray-700">Todavía no hay anuncios en esta comunidad.</p>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/60 px-6 py-12 text-center">
+          <p className="font-display text-xl text-emerald-900">Todavía no hay anuncios en esta comunidad.</p>
+          <p className="text-gray-700">¿Tienes algo que ya no usas o que puedas ofrecer a tus vecinos?</p>
           <Link
             href={`/comunidades/${communityId}/anuncios/nuevo`}
-            className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800"
+            className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white no-underline hover:bg-emerald-800"
           >
             Publica el primero
           </Link>
@@ -79,7 +80,7 @@ export async function CommunityListings({ communityId, search }: CommunityListin
           {filtering ? "Limpiar filtros" : "Ver todos los anuncios"}
         </Link>
       )}
-      <ul className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <ul className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
         {listings.items.map((listing) => (
           <li key={listing.id}>
             <ListingCard listing={listing} />

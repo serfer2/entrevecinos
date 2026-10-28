@@ -18,7 +18,7 @@ export function AccessNotice({ communityId, membership }: AccessNoticeProps) {
   return (
     <section aria-label="Acceso a la comunidad" className="flex flex-col items-start gap-3">
       {membership ? (
-        <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
+        <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
           {NOTICES[membership.status as keyof typeof NOTICES]}
         </p>
       ) : (

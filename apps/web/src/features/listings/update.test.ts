@@ -108,7 +108,7 @@ describe("updateListing", () => {
       "Solo quien publicó el anuncio puede editarlo.",
     );
 
-    const retired = "Este anuncio ha sido retirado por la administración de la comunidad.";
+    const retired = "Este anuncio ha sido ocultado por la administración de la comunidad.";
     userApiFetch.mockResolvedValueOnce(ok(current)).mockResolvedValueOnce(fail(403, retired));
     expect((await updateListing(listingId, undefined, form({ title: "Otro" })))?.formError).toBe(retired);
   });

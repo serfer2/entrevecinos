@@ -14,7 +14,7 @@ export type ListingActionsProps = {
 };
 
 const secondary =
-  "rounded-md border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50";
+  "rounded-lg border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50";
 
 function StatusButton({ listingId, status, label }: { listingId: string; status: ListingStatus; label: string }) {
   return (
@@ -40,8 +40,8 @@ export function ListingActions({ listing, isOwner, canModerate }: ListingActions
   return (
     <div className="flex flex-col gap-3">
       {hidden && (isOwner || canModerate) && (
-        <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Este anuncio está retirado y no se muestra en la comunidad.
+        <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Este anuncio está oculto y no se muestra en la comunidad.
         </p>
       )}
       <div className="flex flex-wrap gap-2" aria-label="Acciones del anuncio" role="group">
@@ -83,10 +83,10 @@ export function ListingActions({ listing, isOwner, canModerate }: ListingActions
         {canModerate && !hidden && (
           <ConfirmDialog
             action={moderateListing}
-            triggerLabel="Retirar anuncio"
-            title="¿Retirar este anuncio?"
+            triggerLabel="Ocultar anuncio"
+            title="¿Ocultar este anuncio?"
             message="Dejará de mostrarse en la comunidad. Podrás restaurarlo más tarde."
-            confirmLabel="Retirar"
+            confirmLabel="Ocultar"
           >
             <input type="hidden" name="listing_id" value={listing.id} />
             <input type="hidden" name="status" value="hidden" />

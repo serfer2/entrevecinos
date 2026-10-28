@@ -1,1 +1,96 @@
 @import "tailwindcss";
+
+/*
+ * Identidad visual de EntreVecinos: barrio, huerto y plaza. Los componentes usan las paletas
+ * `emerald`, `gray`, `amber` y `red` de Tailwind; aquí se redefinen con tonos naturales para que
+ * todo el sitio cambie desde un solo sitio:
+ *   - emerald → verde musgo (acción principal, enlaces, estado actual).
+ *   - gray    → neutros cálidos de piedra y tierra (texto, bordes, fondos).
+ *   - amber   → ocre (avisos y anuncios reservados).
+ *   - red     → terracota (errores y acciones destructivas).
+ * Los tonos 600+ mantienen contraste AA sobre blanco y sobre el fondo de página (gray-50).
+ */
+@theme {
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-heading), ui-serif, Georgia, serif;
+
+  --color-emerald-50: #f1f5ec;
+  --color-emerald-100: #e0ead6;
+  --color-emerald-200: #c3d6b2;
+  --color-emerald-300: #9fbd87;
+  --color-emerald-400: #7ca163;
+  --color-emerald-500: #5f8648;
+  --color-emerald-600: #4b6d39;
+  --color-emerald-700: #3d5a2f;
+  --color-emerald-800: #314927;
+  --color-emerald-900: #283c21;
+  --color-emerald-950: #142010;
+
+  --color-gray-50: #f8f6f0;
+  --color-gray-100: #f0ece2;
+  --color-gray-200: #e4ddcf;
+  --color-gray-300: #d0c6b3;
+  --color-gray-400: #a99d87;
+  --color-gray-500: #847964;
+  --color-gray-600: #655c4c;
+  --color-gray-700: #4d4639;
+  --color-gray-800: #37322a;
+  --color-gray-900: #25221c;
+  --color-gray-950: #16140f;
+
+  --color-amber-50: #fbf4e4;
+  --color-amber-100: #f5e5c0;
+  --color-amber-200: #ebcd8c;
+  --color-amber-300: #dfb25a;
+  --color-amber-400: #d09a3a;
+  --color-amber-500: #b9822a;
+  --color-amber-600: #996922;
+  --color-amber-700: #7c541d;
+  --color-amber-800: #66451a;
+  --color-amber-900: #533917;
+  --color-amber-950: #2f1f0a;
+
+  --color-red-50: #fbf0ec;
+  --color-red-100: #f6ddd4;
+  --color-red-200: #ecbcab;
+  --color-red-300: #df957d;
+  --color-red-400: #cf6f53;
+  --color-red-500: #bd5537;
+  --color-red-600: #a8462c;
+  --color-red-700: #8d3a25;
+  --color-red-800: #733120;
+  --color-red-900: #5e2a1d;
+  --color-red-950: #33130b;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-gray-50 font-sans text-gray-900 antialiased;
+  }
+
+  h1,
+  h2 {
+    @apply font-display tracking-tight text-balance;
+  }
+
+  a {
+    @apply underline-offset-4 decoration-1;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-emerald-600;
+  }
+
+  /* Con un diálogo modal abierto (visor de imágenes, confirmaciones) la página no se desplaza. */
+  html:has(dialog[open]:modal) {
+    overflow: hidden;
+  }
+
+  ::selection {
+    @apply bg-emerald-200 text-emerald-950;
+  }
+}

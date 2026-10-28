@@ -171,6 +171,19 @@ def test_expel_hides_listings_and_allows_new_request(
     assert request_access(client, member, community["id"]).status_code == 201
 
 
+def test_platform_admin_listings_are_shown_without_approved_membership(
+    client: TestClient, db_session: Session, neighbour: dict, community: dict
+) -> None:
+    platform_admin = register(client, "plataforma@example.com", full_name="Pilar Plataforma")
+    make_platform_admin(db_session, platform_admin)
+    assert request_access(client, platform_admin, community["id"]).status_code == 201
+    listing = publish_ok(client, platform_admin, community["id"], title="Anuncio de la plataforma")
+
+    assert listing_titles(client, neighbour, community["id"]) == ["Anuncio de la plataforma"]
+    detail = client.get(f"/v1/listings/{listing['id']}", headers=neighbour["headers"])
+    assert detail.status_code == 200
+
+
 def test_member_can_leave_but_not_remove_others(
     client: TestClient, member: dict, neighbour: dict, community: dict
 ) -> None:

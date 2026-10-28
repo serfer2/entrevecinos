@@ -47,9 +47,13 @@ export function ListingForm({
 
   return (
     // La clave fuerza a recrear los campos no controlados con los valores devueltos por la acción.
-    <form key={JSON.stringify(state?.values ?? null)} action={formAction} className="flex flex-col gap-5">
+    <form
+      key={JSON.stringify(state?.values ?? null)}
+      action={formAction}
+      className="flex flex-col gap-5 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6"
+    >
       {state?.formError && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
           {state.formError}
         </p>
       )}
@@ -90,7 +94,7 @@ export function ListingForm({
           {LISTING_TYPES.map((value) => (
             <label
               key={value}
-              className="flex cursor-pointer items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm has-[:checked]:border-emerald-700 has-[:checked]:bg-emerald-50"
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm has-[:checked]:border-emerald-700 has-[:checked]:bg-emerald-50"
             >
               <input
                 type="radio"
@@ -111,21 +115,17 @@ export function ListingForm({
         )}
       </fieldset>
 
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <TextField
-            name="price"
-            label="Precio (opcional)"
-            inputMode="decimal"
-            maxLength={12}
-            hint={type === "free" ? "Normalmente sin precio." : "En euros. Déjalo vacío si no tiene precio."}
-            defaultValue={values.price}
-            error={errors.price}
-          />
-        </div>
-        <span aria-hidden className="pb-2 text-gray-700">
-          €
-        </span>
+      <div className="max-w-xs">
+        <TextField
+          name="price"
+          label="Precio (opcional)"
+          inputMode="decimal"
+          maxLength={12}
+          suffix="€"
+          hint={type === "free" ? "Normalmente sin precio." : "En euros. Déjalo vacío si no tiene precio."}
+          defaultValue={values.price}
+          error={errors.price}
+        />
       </div>
 
       {withImages && (
@@ -140,7 +140,7 @@ export function ListingForm({
       <button
         type="submit"
         disabled={pending || uploading}
-        className="self-start rounded-md bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
+        className="self-start rounded-lg bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
       >
         {pending ? pendingLabel : submitLabel}
       </button>

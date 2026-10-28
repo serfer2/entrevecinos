@@ -111,7 +111,7 @@ def test_editable_rules() -> None:
     hidden = dataclasses.replace(listing, status=ListingStatus.HIDDEN)
     with pytest.raises(ListingLocked) as error:
         EditableListing(Access(), Listings(hidden)).require(author, listing.id)
-    assert "retirado" in error.value.detail
+    assert "ocultado" in error.value.detail
 
 
 def test_update_only_sent_fields() -> None:

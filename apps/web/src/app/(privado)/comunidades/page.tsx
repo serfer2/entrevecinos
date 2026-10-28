@@ -15,7 +15,7 @@ type CommunitiesPageProps = {
 };
 
 export default async function CommunitiesPage({ searchParams }: CommunitiesPageProps) {
-  await requireUser();
+  const user = await requireUser();
   const search = parseCommunitySearch(await searchParams);
   const [results, memberships] = await Promise.all([
     searchCommunities(search),
@@ -26,13 +26,17 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-gray-900">Buscar comunidades</h1>
+        <h1 className="text-3xl font-semibold text-gray-900">Buscar comunidades</h1>
         <Link href="/comunidades/nueva" className="font-medium text-emerald-800 underline">
           Crear una comunidad
         </Link>
       </div>
 
-      <form method="get" role="search" className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end">
+      <form
+        method="get"
+        role="search"
+        className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-xs sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end sm:p-5"
+      >
         <TextField name="q" label="Nombre" type="search" maxLength={160} defaultValue={search.q} />
         <TextField name="city" label="Ciudad" maxLength={120} defaultValue={search.city} />
         <TextField
@@ -44,7 +48,7 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
         />
         <button
           type="submit"
-          className="rounded-md bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800"
+          className="rounded-lg bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800"
         >
           Buscar
         </button>
@@ -62,11 +66,11 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
             </Link>
           </p>
         ) : (
-          <ul className="flex flex-col divide-y divide-gray-200 rounded-md border border-gray-200">
+          <ul className="flex flex-col divide-y divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-white">
             {results.items.map((community) => (
               <li
                 key={community.id}
-                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
                   <p className="font-medium text-gray-900">{community.name}</p>
@@ -75,7 +79,11 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
                       "Sin ubicación"}
                   </p>
                 </div>
-                <MembershipAction communityId={community.id} status={statusOf.get(community.id)} />
+                <MembershipAction
+                  communityId={community.id}
+                  status={statusOf.get(community.id)}
+                  isPlatformAdmin={user.platform_role === "platform_admin"}
+                />
               </li>
             ))}
           </ul>

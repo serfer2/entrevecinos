@@ -24,7 +24,7 @@ export function NavLink({ href, children, section, className }: NavLinkProps) {
       aria-current={current ? "page" : undefined}
       className={
         className ??
-        "rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-900 aria-[current=page]:bg-emerald-100 aria-[current=page]:text-emerald-900"
+        "rounded-full px-3 py-2 text-sm font-medium text-gray-700 no-underline hover:bg-emerald-50 hover:text-emerald-900 aria-[current=page]:bg-emerald-100 aria-[current=page]:text-emerald-900"
       }
     >
       {children}

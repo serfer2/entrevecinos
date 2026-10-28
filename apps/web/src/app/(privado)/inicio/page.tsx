@@ -18,14 +18,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900">Hola, {user.full_name}</h1>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-3xl font-semibold text-gray-900">Hola, {user.full_name}</h1>
+        <p className="text-gray-600">Esto es lo que pasa en tus comunidades.</p>
+      </div>
       {firstParam(query, "no-disponible") === "1" && (
-        <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Este anuncio ya no estaba disponible.
         </p>
       )}
       {firstParam(query, "comunidad-pendiente") === "1" && (
-        <p role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+        <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
           Hemos recibido tu comunidad. Un administrador la revisará antes de activarla.
         </p>
       )}
@@ -36,7 +39,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       )}
 
       <section aria-labelledby="my-communities" className="flex flex-col gap-3">
-        <h2 id="my-communities" className="text-lg font-medium text-gray-900">
+        <h2 id="my-communities" className="text-xl font-semibold text-gray-900">
           Mis comunidades
         </h2>
         {memberships.length === 0 ? (
@@ -52,9 +55,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             .
           </p>
         ) : (
-          <ul className="flex flex-col divide-y divide-gray-200 rounded-md border border-gray-200">
+          <ul className="flex flex-col divide-y divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-white">
             {memberships.map(({ community, status }) => (
-              <li key={community.id} className="flex items-center justify-between gap-3 p-4">
+              <li key={community.id} className="flex items-center justify-between gap-3 px-5 py-4 hover:bg-emerald-50/50">
                 {community.is_active ? (
                   <>
                     <Link

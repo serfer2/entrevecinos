@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { AuthShell } from "@/components/ui/AuthShell";
 import { login, resendVerification } from "@/features/auth/actions";
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { getCurrentUser } from "@/features/auth/dal";
@@ -28,9 +29,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const notice = NOTICES[String(params.motivo)];
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-12">
-      <h1 className="mb-6 text-2xl font-semibold text-gray-900">Inicia sesión</h1>
+    <AuthShell title="Inicia sesión" intro="Vuelve a tu comunidad y mira qué hay cerca.">
       <LoginForm action={login} resendAction={resendVerification} next={next} notice={notice} />
-    </main>
+    </AuthShell>
   );
 }

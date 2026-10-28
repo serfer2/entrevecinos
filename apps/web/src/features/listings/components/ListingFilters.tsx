@@ -33,23 +33,42 @@ export function ListingFilters({ communityId, search, categories }: ListingFilte
   const categoryLabel = categories.find((c) => c.id === search.categoryId)?.name ?? null;
 
   return (
-    <GetForm role="search" action={`/comunidades/${communityId}`} className="flex flex-col gap-3">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] lg:items-end">
+    <GetForm
+      role="search"
+      action={`/comunidades/${communityId}`}
+      className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-xs sm:p-5"
+    >
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
         <div className="flex min-w-0 flex-col gap-1">
           <label htmlFor="listing-search" className="text-sm font-medium text-gray-900">
             Buscar anuncios
           </label>
-          <input
-            id="listing-search"
-            type="search"
-            name="q"
-            minLength={MIN_QUERY_LENGTH}
-            maxLength={MAX_QUERY_LENGTH}
-            defaultValue={search.qInput}
-            aria-invalid={search.qTooShort ? true : undefined}
-            aria-describedby={search.qTooShort ? errorId : undefined}
-            className="rounded-md border border-gray-300 px-3 py-2 text-base text-gray-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/30 aria-invalid:border-red-600"
-          />
+          <div className="relative">
+            <svg
+              aria-hidden
+              viewBox="0 0 24 24"
+              className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            >
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m20 20-3.9-3.9" />
+            </svg>
+            <input
+              id="listing-search"
+              type="search"
+              name="q"
+              minLength={MIN_QUERY_LENGTH}
+              maxLength={MAX_QUERY_LENGTH}
+              defaultValue={search.qInput}
+              aria-invalid={search.qTooShort ? true : undefined}
+              aria-describedby={search.qTooShort ? errorId : undefined}
+              placeholder="Bici, clases, herramientas…"
+              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-base text-gray-900 placeholder:text-gray-500 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/30 aria-invalid:border-red-600"
+            />
+          </div>
         </div>
         <AutoSubmitSelect
           name="type"
@@ -72,7 +91,10 @@ export function ListingFilters({ communityId, search, categories }: ListingFilte
           defaultValue={search.order}
           aria-describedby={isPriceOrder(search.order) ? "listing-order-note" : undefined}
         />
-        <button type="submit" className="rounded-md bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800">
+        <button
+          type="submit"
+          className="rounded-lg bg-emerald-700 px-5 py-2 font-medium text-white hover:bg-emerald-800 sm:col-span-2 lg:col-span-1"
+        >
           Aplicar
         </button>
       </div>
