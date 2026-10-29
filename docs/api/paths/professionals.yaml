@@ -3,6 +3,7 @@ get:
   operationId: listProfessionals
   summary: Buscar profesionales
   description: >-
+    **Versión futura:** no implementada en el MVP.
     Perfiles profesionales activos de usuarios con membresía aprobada en alguna de las comunidades del usuario
     autenticado (o solo en la indicada por `community_id`).
   x-mvp: false

@@ -4,7 +4,8 @@ get:
   tags: [Perfil profesional]
   operationId: getProfessionalProfile
   summary: Obtener el perfil profesional de un usuario
-  description: Requiere compartir al menos una comunidad aprobada con el usuario. 404 si no tiene perfil activo.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Requiere compartir al menos una comunidad aprobada con el usuario. 404 si no tiene perfil activo.
   x-mvp: false
   responses:
     "200":

@@ -27,8 +27,9 @@ delete:
   tags: [Media]
   operationId: deleteMedia
   summary: Eliminar una imagen
-  description: Solo quien la subió. Falla si el fichero sigue asociado a un anuncio, perfil o avatar.
-  x-mvp: true
+  description: >-
+    **Versión futura:** no implementada en el MVP. Solo quien la subió. Falla si el fichero sigue asociado a un anuncio, perfil o avatar.
+  x-mvp: false
   responses:
     "204":
       description: Imagen eliminada.

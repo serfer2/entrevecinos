@@ -1,5 +1,4 @@
 import uuid
-from pathlib import Path
 
 import pytest
 import yaml
@@ -8,15 +7,14 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from entrevecinos.infrastructure.db.models import CommunityMembershipModel
-from tests.api_helpers import create_community, join, publish_ok, register, request_access
-
-
-def contract_dir() -> Path | None:
-    """`docs/api` del repositorio, o su montaje en el contenedor (`/docs/api`)."""
-    here = Path(__file__).resolve()
-    candidates = [Path("/docs/api"), *(parent / "docs" / "api" for parent in here.parents)]
-    return next((path for path in candidates if (path / "openapi.yaml").is_file()), None)
-
+from tests.api_helpers import (
+    contract_dir,
+    create_community,
+    join,
+    publish_ok,
+    register,
+    request_access,
+)
 
 OWNER_EMAIL = "anunciante@example.com"
 OWNER_PHONE = "600123456"

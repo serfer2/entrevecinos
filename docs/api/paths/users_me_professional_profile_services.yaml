@@ -2,7 +2,8 @@ post:
   tags: [Perfil profesional]
   operationId: createProfessionalService
   summary: Añadir un servicio a mi perfil profesional
-  description: Requiere haber creado el perfil profesional.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Requiere haber creado el perfil profesional.
   x-mvp: false
   requestBody:
     required: true

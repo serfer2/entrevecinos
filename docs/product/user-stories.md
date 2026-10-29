@@ -13,7 +13,7 @@ Historias del MVP definido en la sección 1.2 del `readme.md`. Las inferencias q
 
 ## Fuera de alcance
 
-No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Tampoco la recuperación de contraseña, que no aparece en el README.
+No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Tampoco la recuperación de contraseña, que no aparece en el README. Las entidades y operaciones de la API de estas funcionalidades están marcadas como versión futura en el modelo de datos (`readme.md` §3.2) y en el contrato (`x-mvp: false` en `docs/api/`).
 
 ## Índice
 
@@ -30,7 +30,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 9. Cierre de sesión | HU-24 |
 | 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
 | 11. Experiencia de usuario | HU-28, HU-29, HU-30, HU-31, HU-32 |
-| 12. Documentación técnica | HU-33 |
+| 12. Documentación técnica | HU-33, HU-34 |
 
 ---
 
@@ -891,3 +891,31 @@ La documentación técnica describe la arquitectura tal y como está implementad
 - **Given** el diagrama actualizado
 - **When** se renderiza en GitHub
 - **Then** se muestra sin errores
+
+### HU-34 Distinguir qué parte del modelo de datos y de la API pertenece al MVP
+
+**Como** desarrollador, **quiero** que el modelo de datos, el contrato de la API y el resto de la documentación indiquen qué entidades y operaciones forman parte del MVP y cuáles quedan para versiones futuras, **para** saber qué está implementado sin tener que contrastarlo con el código.
+
+**AC1 — Entidades y rutas coherentes**
+
+- **Given** el modelo de datos del `readme.md` (§3) y el contrato de `docs/api/`
+- **When** comparo sus entidades con las rutas del contrato
+- **Then** cada entidad del MVP tiene sus rutas del MVP, y las rutas de entidades que no son del MVP están marcadas como pendientes de versiones futuras
+
+**AC2 — Contrato marcado**
+
+- **Given** el contrato de `docs/api/`
+- **When** consulto cualquier operación
+- **Then** `x-mvp: true` significa que está implementada en el MVP y `x-mvp: false` que queda para una versión futura, sin excepciones
+
+**AC3 — Resto de la documentación**
+
+- **Given** el `readme.md` y `docs/api/README.md`
+- **When** leo el modelo de datos o el resumen de endpoints
+- **Then** cada entidad y cada grupo de operaciones indica si pertenece al MVP o a una versión futura
+
+**AC4 — Comprobación automática**
+
+- **Given** que alguien añade o quita un endpoint de la API o cambia `x-mvp` en el contrato
+- **When** se ejecutan las pruebas de la API
+- **Then** fallan si las operaciones implementadas no coinciden con las marcadas como MVP

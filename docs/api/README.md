@@ -24,7 +24,7 @@ Nombres de fichero de `paths/`: los segmentos de la ruta separados por `_`, sin 
 
 - **Autenticación:** `bearerAuth` (JWT) aplicado globalmente; los endpoints públicos (`/health`, `/auth/*`) declaran `security: []`.
 - **Roles:** cada operación indica en su descripción quién puede invocarla (usuario autenticado, miembro aprobado, `community_admin`/`moderator`, `platform_admin`).
-- **`x-mvp`:** `true` para operaciones del MVP (README §1.2), `false` para fases posteriores (mensajería, notificaciones, perfil profesional, denuncias, administración de plataforma).
+- **`x-mvp`:** `true` si la operación está implementada en el MVP (README §1.2) y `false` si queda para una versión futura; la descripción de las futuras empieza por «**Versión futura:** no implementada en el MVP.». Las pruebas de la API comprueban que las operaciones `x-mvp: true` son exactamente las implementadas.
 - **`operationId`:** único, en camelCase (`listCommunityListings`).
 - **Paginación:** `page` / `page_size`; respuesta `{items, page, page_size, total}` (`PageMeta` + `items`).
 - **Errores:** `{"detail": "..."}` (`Error`); 422 con el formato de validación de FastAPI (`ValidationError`).
@@ -71,22 +71,36 @@ Cambios del contrato durante el desarrollo del MVP (compatibles salvo que se ind
 | TK-058 | **Incompatible:** `registerUser` crea la cuenta inactiva y responde `RegistrationResponse` (`email`, `verification_expires_at`) sin token. Nuevo `verifyEmail` (`POST /auth/email-verification`): `200` con `AuthResponse`, `400`/`410` con `VerificationError`. `loginUser`: `403` con `code: email_not_verified` si la cuenta no ha validado su correo. |
 | TK-059 | `registerUser`: el `409` usa `RegistrationConflict` (`Error` + `code`): `email_in_use` o `email_pending_verification`. Nuevo `resendEmailVerification` (`POST /auth/email-verification/resend`): siempre `202`. |
 | TK-064 | `verifyEmail`: el `400` distingue `verification_invalid`, `email_already_verified` y `verification_superseded` (con `email`). Compatible para clientes que solo miran el estado. |
+| TK-074 | `x-mvp` pasa a significar «implementada en el MVP». `deleteCurrentUser`, `listMyListings`, `createCategory`, `updateCategory`, `updateCommunity` y `deleteMedia` pasan a `x-mvp: false` (versión futura): no las usa ninguna historia del MVP. |
 
 ## Resumen de endpoints
 
-| Grupo | Operaciones | MVP |
-|---|---|---|
-| Sistema | `GET /health` | Sí |
-| Autenticación | `POST /auth/register`, `POST /auth/email-verification`, `POST /auth/email-verification/resend`, `POST /auth/token` | Sí |
-| Usuarios | `GET/PATCH/DELETE /users/me`, `GET /users/me/memberships`, `GET /users/me/listings` | Sí |
-| Categorías | `GET/POST /categories`, `PATCH /categories/{category_id}` | Sí |
-| Comunidades | `GET/POST /communities`, `GET/PATCH /communities/{community_id}` | Sí |
-| Membresías | `GET/POST /communities/{community_id}/memberships`, `PATCH/DELETE .../memberships/{user_id}` | Sí |
-| Anuncios | `GET/POST /communities/{community_id}/listings`, `GET/PATCH/DELETE /listings/{listing_id}`, `PATCH .../status`, `PUT .../images` | Sí |
-| Media | `POST /media`, `GET/DELETE /media/{asset_id}` | Sí |
-| Mensajería | `POST /listings/{listing_id}/conversations`, `GET /conversations`, `GET/PATCH /conversations/{conversation_id}`, `GET/POST .../messages`, `POST .../read`, `DELETE /messages/{message_id}` | No |
-| Notificaciones | `GET /notifications`, `PATCH /notifications/{notification_id}`, `POST /notifications/read-all` | No |
-| Perfil profesional | `GET /professionals`, `GET /professionals/{user_id}`, `GET/PUT/DELETE /users/me/professional-profile`, servicios e imágenes del perfil | No |
-| Denuncias | `POST /listings/{listing_id}/reports`, `GET /communities/{community_id}/reports`, `GET/PATCH /reports/{report_id}` | No |
-| Administración | `GET /admin/communities`, `PATCH /admin/communities/{community_id}` (aprobación de comunidades) | Sí |
-| Administración | `GET /admin/users`, `PATCH /admin/users/{user_id}` | No |
+El contrato tiene 59 operaciones: 27 del MVP (`x-mvp: true`) y 32 de versiones futuras (`x-mvp: false`).
+
+### MVP (implementado)
+
+| Grupo | Operaciones |
+|---|---|
+| Sistema | `GET /health` |
+| Autenticación | `POST /auth/register`, `POST /auth/email-verification`, `POST /auth/email-verification/resend`, `POST /auth/token` |
+| Usuarios | `GET/PATCH /users/me`, `GET /users/me/memberships` |
+| Categorías | `GET /categories` |
+| Comunidades | `GET/POST /communities`, `GET /communities/{community_id}` |
+| Membresías | `GET/POST /communities/{community_id}/memberships`, `PATCH/DELETE .../memberships/{user_id}` |
+| Anuncios | `GET/POST /communities/{community_id}/listings`, `GET/PATCH/DELETE /listings/{listing_id}`, `PATCH .../status`, `PUT .../images` |
+| Media | `POST /media`, `GET /media/{asset_id}` |
+| Administración | `GET /admin/communities`, `PATCH /admin/communities/{community_id}` (aprobación de comunidades) |
+
+### Versiones futuras
+
+| Grupo | Operaciones |
+|---|---|
+| Usuarios | `DELETE /users/me`, `GET /users/me/listings` |
+| Categorías | `POST /categories`, `PATCH /categories/{category_id}` |
+| Comunidades | `PATCH /communities/{community_id}` |
+| Media | `DELETE /media/{asset_id}` |
+| Mensajería | `POST /listings/{listing_id}/conversations`, `GET /conversations`, `GET/PATCH /conversations/{conversation_id}`, `GET/POST .../messages`, `POST .../read`, `DELETE /messages/{message_id}` |
+| Notificaciones | `GET /notifications`, `PATCH /notifications/{notification_id}`, `POST /notifications/read-all` |
+| Perfil profesional | `GET /professionals`, `GET /professionals/{user_id}`, `GET/PUT/DELETE /users/me/professional-profile`, servicios e imágenes del perfil |
+| Denuncias | `POST /listings/{listing_id}/reports`, `GET /communities/{community_id}/reports`, `GET/PATCH /reports/{report_id}` |
+| Administración | `GET /admin/users`, `PATCH /admin/users/{user_id}` |

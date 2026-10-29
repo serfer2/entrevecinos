@@ -181,7 +181,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
 6. **Administración mínima**
    - Contar con una persona administradora que pueda gestionar miembros y ocultar anuncios problemáticos.
  
-Quedan para una fase posterior el perfil profesional, las notificaciones automáticas, el sistema completo de denuncias y el panel avanzado de administración.
+Quedan para una fase posterior el perfil profesional, las notificaciones automáticas, el sistema completo de denuncias y el panel avanzado de administración. Sus entidades del modelo de datos (§3.2) y sus operaciones de la API (`x-mvp: false` en [`docs/api/`](docs/api/README.md)) ya están diseñadas y marcadas como versión futura, igual que las de la mensajería interna.
 
 ---
 
@@ -563,7 +563,7 @@ erDiagram
     }
 
     CONVERSATION {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID listing_id FK "NOT NULL; FK a listing.id"
         UUID buyer_id FK "NOT NULL; FK a user.id"
         UUID seller_id FK "NOT NULL; FK a user.id; CHECK buyer_id <> seller_id"
@@ -573,7 +573,7 @@ erDiagram
     }
 
     MESSAGE {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID conversation_id FK "NOT NULL; FK a conversation.id"
         UUID sender_id FK "NOT NULL; FK a user.id"
         TEXT body "NOT NULL; no vacío"
@@ -583,7 +583,7 @@ erDiagram
     }
 
     NOTIFICATION {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID recipient_id FK "NOT NULL; FK a user.id"
         UUID message_id FK "NULL; FK a message.id"
         notification_type type "NOT NULL"
@@ -593,7 +593,7 @@ erDiagram
     }
 
     PROFESSIONAL_PROFILE {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID user_id FK, UK "NOT NULL; FK a user.id; un perfil por usuario"
         TEXT description "NOT NULL"
         VARCHAR service_area "VARCHAR(160); NOT NULL"
@@ -604,7 +604,7 @@ erDiagram
     }
 
     PROFESSIONAL_SERVICE {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID professional_profile_id FK "NOT NULL; FK a professional_profile.id"
         VARCHAR name "VARCHAR(120); NOT NULL"
         TEXT description "NULL"
@@ -612,13 +612,13 @@ erDiagram
     }
 
     PROFESSIONAL_PROFILE_IMAGE {
-        UUID professional_profile_id PK, FK "NOT NULL; FK a professional_profile.id"
+        UUID professional_profile_id PK, FK "Versión futura; NOT NULL; FK a professional_profile.id"
         UUID asset_id PK, FK "NOT NULL; FK a media_asset.id"
         SMALLINT position "NOT NULL; DEFAULT 0; CHECK position >= 0"
     }
 
     REPORT {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID listing_id FK "NOT NULL; FK a listing.id"
         UUID reporter_id FK "NOT NULL; FK a user.id"
         report_reason reason "NOT NULL"
@@ -663,10 +663,29 @@ erDiagram
     USER o|--o{ REPORT : "revisa"
 ```
 
+El MVP implementa 8 entidades: `user` (tabla `users`), `email_verification`, `community`, `community_membership`, `category`, `listing`, `media_asset` y `listing_image`. Las otras 7 (`conversation`, `message`, `notification`, `professional_profile`, `professional_service`, `professional_profile_image` y `report`) están diseñadas para versiones futuras: su primer atributo lo indica en el diagrama y todavía no tienen tabla.
+
 
 ### **3.2. Descripción de entidades principales:**
 
-El modelo cubre las funciones descritas en el README: usuarios, comunidades, anuncios, imágenes, mensajería, notificaciones, perfiles profesionales y moderación. Se propone para **PostgreSQL 16**. Las tablas se nombran en singular, igual que las entidades (`community`, `listing`…), salvo la de usuarios, que se llama `users` porque `user` es una palabra reservada de PostgreSQL. Los campos marcados `NOT NULL` no admiten valores nulos; `NULL` indica que el dato es opcional.
+El modelo cubre las funciones descritas en el README: usuarios, comunidades, anuncios e imágenes, que forman el MVP, y mensajería, notificaciones, perfiles profesionales y denuncias, previstas para versiones futuras. La tabla relaciona cada entidad con su alcance y con las operaciones de la API que la usan; en el contrato ([`docs/api/`](docs/api/README.md)), `x-mvp: true` marca las operaciones implementadas en el MVP y `x-mvp: false` las de versiones futuras.
+
+| Entidad | Alcance | Operaciones de la API |
+|---|---|---|
+| `user` | MVP | `POST /auth/register`, `POST /auth/token`, `GET/PATCH /users/me`, `GET /users/me/memberships`. Versión futura: `DELETE /users/me`, `GET /users/me/listings`, `/admin/users` |
+| `email_verification` | MVP | `POST /auth/email-verification`, `POST /auth/email-verification/resend` |
+| `community` | MVP | `GET/POST /communities`, `GET /communities/{community_id}`, `GET /admin/communities`, `PATCH /admin/communities/{community_id}`. Versión futura: `PATCH /communities/{community_id}` |
+| `community_membership` | MVP | `GET/POST /communities/{community_id}/memberships`, `PATCH/DELETE /communities/{community_id}/memberships/{user_id}` |
+| `category` | MVP | `GET /categories`. Versión futura: `POST /categories`, `PATCH /categories/{category_id}` |
+| `listing` | MVP | `GET/POST /communities/{community_id}/listings`, `GET/PATCH/DELETE /listings/{listing_id}`, `PATCH /listings/{listing_id}/status` |
+| `media_asset` | MVP | `POST /media`, `GET /media/{asset_id}`. Versión futura: `DELETE /media/{asset_id}` |
+| `listing_image` | MVP | `PUT /listings/{listing_id}/images` |
+| `conversation`, `message` | Versión futura | Mensajería: `/listings/{listing_id}/conversations`, `/conversations…`, `/messages/{message_id}` |
+| `notification` | Versión futura | Notificaciones: `/notifications…` |
+| `professional_profile`, `professional_service`, `professional_profile_image` | Versión futura | Perfil profesional: `/professionals…`, `/users/me/professional-profile…` |
+| `report` | Versión futura | Denuncias: `/listings/{listing_id}/reports`, `/communities/{community_id}/reports`, `/reports/{report_id}` |
+
+`GET /health` no usa ninguna entidad. Se propone para **PostgreSQL 16**. Las tablas se nombran en singular, igual que las entidades (`community`, `listing`…), salvo la de usuarios, que se llama `users` porque `user` es una palabra reservada de PostgreSQL. Los campos marcados `NOT NULL` no admiten valores nulos; `NULL` indica que el dato es opcional.
 
 #### 1. `user` — Usuario
 
@@ -757,7 +776,7 @@ Guarda metadatos y ubicación del fichero; el binario se almacena en MinIO o en 
 
 La clave compuesta `(listing_id, asset_id)` evita asociar dos veces la misma imagen al mismo anuncio.
 
-#### 8. `conversation` — Conversación
+#### 8. `conversation` — Conversación (versión futura)
 
 Una conversación está vinculada a un anuncio y a sus dos participantes.
 
@@ -771,7 +790,7 @@ Una conversación está vinculada a un anuncio y a sus dos participantes.
 
 Restricciones recomendadas: `CHECK (buyer_id <> seller_id)` y `UNIQUE (listing_id, buyer_id, seller_id)` para evitar conversaciones duplicadas entre los mismos usuarios por el mismo anuncio.
 
-#### 9. `message` — Mensaje
+#### 9. `message` — Mensaje (versión futura)
 
 - `id UUID` — **PK**.
 - `conversation_id UUID` — `NOT NULL`, **FK** → `conversation.id`.
@@ -783,7 +802,7 @@ Restricciones recomendadas: `CHECK (buyer_id <> seller_id)` y `UNIQUE (listing_i
 
 La aplicación debe comprobar que el remitente pertenece a la conversación.
 
-#### 10. `notification` — Notificación
+#### 10. `notification` — Notificación (versión futura)
 
 - `id UUID` — **PK**.
 - `recipient_id UUID` — `NOT NULL`, **FK** → `user.id`.
@@ -793,7 +812,7 @@ La aplicación debe comprobar que el remitente pertenece a la conversación.
 - `created_at TIMESTAMPTZ` — `NOT NULL`.
 - `read_at TIMESTAMPTZ` — `NULL`.
 
-#### 11. `professional_profile` — Perfil profesional
+#### 11. `professional_profile` — Perfil profesional (versión futura)
 
 - `id UUID` — **PK**.
 - `user_id UUID` — `NOT NULL`, `UNIQUE`, **FK** → `user.id`; un perfil profesional por usuario.
@@ -804,7 +823,7 @@ La aplicación debe comprobar que el remitente pertenece a la conversación.
 - `created_at TIMESTAMPTZ` — `NOT NULL`.
 - `updated_at TIMESTAMPTZ` — `NOT NULL`.
 
-#### 12. `professional_service` — Servicio profesional ofrecido
+#### 12. `professional_service` — Servicio profesional ofrecido (versión futura)
 
 - `id UUID` — **PK**.
 - `professional_profile_id UUID` — `NOT NULL`, **FK** → `professional_profile.id`.
@@ -812,13 +831,13 @@ La aplicación debe comprobar que el remitente pertenece a la conversación.
 - `description TEXT` — `NULL`.
 - `is_active BOOLEAN` — `NOT NULL`, `DEFAULT TRUE`.
 
-#### 13. `professional_profile_image` — Imagen de perfil profesional
+#### 13. `professional_profile_image` — Imagen de perfil profesional (versión futura)
 
 - `professional_profile_id UUID` — **PK compuesta**, **FK** → `professional_profile.id`.
 - `asset_id UUID` — **PK compuesta**, **FK** → `media_asset.id`.
 - `position SMALLINT` — `NOT NULL`, `DEFAULT 0`, `CHECK (position >= 0)`.
 
-#### 14. `report` — Denuncia
+#### 14. `report` — Denuncia (versión futura)
 
 - `id UUID` — **PK**.
 - `listing_id UUID` — `NOT NULL`, **FK** → `listing.id`.
@@ -853,10 +872,10 @@ Se recomienda definir estos enums en PostgreSQL:
 - `membership_status`: `pending`, `approved`, `rejected`, `blocked`
 - `listing_type`: `sell`, `wanted`, `offer_service`, `need_service`, `free`, `other`
 - `listing_status`: `draft`, `active`, `reserved`, `completed`, `hidden`, `deleted`
-- `conversation_status`: `open`, `closed`, `archived`
-- `notification_type`: `new_message`, `listing_response`, `system`
-- `report_reason`: `inappropriate`, `fraud`, `prohibited_item`, `spam`, `other`
-- `report_status`: `pending`, `reviewing`, `resolved`, `rejected`
+- `conversation_status`: `open`, `closed`, `archived` (versión futura)
+- `notification_type`: `new_message`, `listing_response`, `system` (versión futura)
+- `report_reason`: `inappropriate`, `fraud`, `prohibited_item`, `spam`, `other` (versión futura)
+- `report_status`: `pending`, `reviewing`, `resolved`, `rejected` (versión futura)
 
 #### Índices recomendados
 
@@ -872,12 +891,12 @@ Las claves primarias y restricciones `UNIQUE` crean índices automáticamente. A
 | `listing` | `(price)` | Ordenar por precio |
 | `listing` | GIN sobre `title` y `description` | Búsqueda de texto completo |
 | `listing_image` | `(asset_id)` | Encontrar anuncios que referencian una imagen |
-| `conversation` | `(listing_id, buyer_id, seller_id)` | Localizar conversaciones de un anuncio |
-| `message` | `(conversation_id, created_at)` | Cargar mensajes en orden cronológico |
-| `notification` | `(recipient_id, read_at, created_at DESC)` | Consultar notificaciones recientes y pendientes |
-| `report` | `(status, created_at)` | Listar denuncias pendientes de revisión |
-| `professional_service` | `(professional_profile_id, is_active)` | Listar servicios activos de un perfil |
-| `professional_profile_image` | `(asset_id)` | Encontrar perfiles que referencian una imagen |
+| `conversation` | `(listing_id, buyer_id, seller_id)` | Localizar conversaciones de un anuncio (versión futura) |
+| `message` | `(conversation_id, created_at)` | Cargar mensajes en orden cronológico (versión futura) |
+| `notification` | `(recipient_id, read_at, created_at DESC)` | Consultar notificaciones recientes y pendientes (versión futura) |
+| `report` | `(status, created_at)` | Listar denuncias pendientes de revisión (versión futura) |
+| `professional_service` | `(professional_profile_id, is_active)` | Listar servicios activos de un perfil (versión futura) |
+| `professional_profile_image` | `(asset_id)` | Encontrar perfiles que referencian una imagen (versión futura) |
 
 Para búsqueda de texto completo, puede crearse una columna `tsvector` generada o un índice GIN sobre una expresión `to_tsvector` que combine título y descripción. Si la mayoría de consultas solo muestran anuncios activos, pueden evaluarse índices parciales con `WHERE status = 'active'`.
 

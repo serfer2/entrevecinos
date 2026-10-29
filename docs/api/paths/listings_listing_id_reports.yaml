@@ -5,6 +5,7 @@ post:
   operationId: reportListing
   summary: Denunciar un anuncio
   description: >-
+    **Versión futura:** no implementada en el MVP.
     Registra una denuncia `pending`. Requiere membresía aprobada en la comunidad del anuncio. Un usuario solo
     puede tener una denuncia abierta por anuncio.
   x-mvp: false

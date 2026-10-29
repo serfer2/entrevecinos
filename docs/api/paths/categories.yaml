@@ -23,8 +23,9 @@ post:
   tags: [Categorías]
   operationId: createCategory
   summary: Crear una categoría
-  description: Solo `platform_admin`.
-  x-mvp: true
+  description: >-
+    **Versión futura:** no implementada en el MVP. Solo `platform_admin`.
+  x-mvp: false
   requestBody:
     required: true
     content:

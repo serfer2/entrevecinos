@@ -21,8 +21,9 @@ patch:
   tags: [Comunidades]
   operationId: updateCommunity
   summary: Actualizar una comunidad
-  description: Solo `community_admin` de la comunidad o `platform_admin`.
-  x-mvp: true
+  description: >-
+    **Versión futura:** no implementada en el MVP. Solo `community_admin` de la comunidad o `platform_admin`.
+  x-mvp: false
   requestBody:
     required: true
     content:

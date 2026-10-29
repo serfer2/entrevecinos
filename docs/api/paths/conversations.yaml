@@ -2,7 +2,8 @@ get:
   tags: [Mensajería]
   operationId: listConversations
   summary: Listar mis conversaciones
-  description: Conversaciones en las que participa el usuario autenticado, ordenadas por última actividad.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Conversaciones en las que participa el usuario autenticado, ordenadas por última actividad.
   x-mvp: false
   parameters:
     - name: status

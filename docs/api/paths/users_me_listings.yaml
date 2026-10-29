@@ -2,8 +2,9 @@ get:
   tags: [Usuarios]
   operationId: listMyListings
   summary: Listar mis anuncios
-  description: Anuncios publicados por el usuario autenticado, de cualquier comunidad y estado visible.
-  x-mvp: true
+  description: >-
+    **Versión futura:** no implementada en el MVP. Anuncios publicados por el usuario autenticado, de cualquier comunidad y estado visible.
+  x-mvp: false
   parameters:
     - name: status
       in: query

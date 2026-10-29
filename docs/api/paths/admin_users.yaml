@@ -2,7 +2,8 @@ get:
   tags: [Administración]
   operationId: adminListUsers
   summary: Listar usuarios de la plataforma
-  description: Solo `platform_admin`.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Solo `platform_admin`.
   x-mvp: false
   parameters:
     - name: q

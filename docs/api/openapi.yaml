@@ -8,7 +8,7 @@ info:
     ## Convenciones
     - **Autenticación:** JWT en `Authorization: Bearer <token>` (`/auth/token`, o `/auth/email-verification` tras registrarse con `/auth/register`). Los endpoints públicos declaran `security: []`.
     - **Autorización (RBAC):** cada operación indica en su descripción el rol necesario: usuario autenticado, miembro aprobado de la comunidad, `community_admin`/`moderator` o `platform_admin`.
-    - **MVP:** la extensión `x-mvp` marca con `true` las operaciones del MVP y con `false` las de fases posteriores.
+    - **MVP:** la extensión `x-mvp` vale `true` en las operaciones implementadas en el MVP y `false` en las pendientes de una versión futura, cuya descripción empieza por «Versión futura».
     - **Paginación:** los listados aceptan `page` y `page_size` y devuelven `{items, page, page_size, total}`.
     - **Errores:** cuerpo `{"detail": "..."}`; los errores de validación (422) siguen el formato estándar de FastAPI.
     - **Imágenes:** se suben con `POST /media` y se asocian después a anuncios, perfiles o al avatar por su `id`.
@@ -40,15 +40,15 @@ tags:
   - name: Media
     description: Subida y lectura de imágenes.
   - name: Mensajería
-    description: Conversaciones privadas entre usuarios, asociadas a anuncios (post-MVP).
+    description: Conversaciones privadas entre usuarios, asociadas a anuncios (versión futura).
   - name: Notificaciones
-    description: Avisos al usuario (post-MVP).
+    description: Avisos al usuario (versión futura).
   - name: Perfil profesional
-    description: Perfiles y servicios profesionales (post-MVP).
+    description: Perfiles y servicios profesionales (versión futura).
   - name: Denuncias
-    description: Denuncia y moderación de anuncios (post-MVP).
+    description: Denuncia y moderación de anuncios (versión futura).
   - name: Administración
-    description: Gestión de la plataforma por `platform_admin` (post-MVP).
+    description: Gestión de la plataforma por `platform_admin`; la aprobación de comunidades es del MVP y la gestión de usuarios, de una versión futura.
 
 paths:
   /health:

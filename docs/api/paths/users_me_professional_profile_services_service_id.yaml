@@ -4,7 +4,8 @@ patch:
   tags: [Perfil profesional]
   operationId: updateProfessionalService
   summary: Actualizar un servicio de mi perfil
-  description: "Actualización parcial; `is_active: false` lo oculta sin borrarlo."
+  description: >-
+    **Versión futura:** no implementada en el MVP. Actualización parcial; `is_active: false` lo oculta sin borrarlo.
   x-mvp: false
   requestBody:
     required: true
@@ -29,6 +30,7 @@ delete:
   tags: [Perfil profesional]
   operationId: deleteProfessionalService
   summary: Eliminar un servicio de mi perfil
+  description: "**Versión futura:** no implementada en el MVP."
   x-mvp: false
   responses:
     "204":

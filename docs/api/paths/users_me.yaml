@@ -50,9 +50,10 @@ delete:
   operationId: deleteCurrentUser
   summary: Eliminar la cuenta propia
   description: >-
+    **Versión futura:** no implementada en el MVP.
     Borrado lógico (`deleted_at`): la cuenta deja de poder iniciar sesión y sus anuncios
     dejan de mostrarse. Requiere estar autenticado.
-  x-mvp: true
+  x-mvp: false
   responses:
     "204":
       description: Cuenta eliminada.
