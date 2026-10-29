@@ -8,6 +8,8 @@ Especificación OpenAPI 3.1 de la API REST (FastAPI). Está dividida en varios f
 docs/api/
 ├── openapi.yaml          # Raíz: info, servers, tags, seguridad global y mapa ruta → fichero
 ├── redocly.yaml          # Reglas de lint
+├── scripts/
+│   └── readme_extract.py # Regenera el extracto de readme.md §4
 ├── paths/                # Un fichero por ruta (todas las operaciones HTTP de esa ruta)
 ├── components/
 │   ├── schemas/          # Un fichero por schema (entidades, *Create, *Update, enums)
@@ -51,6 +53,15 @@ npx @redocly/cli bundle openapi.yaml -o dist/openapi.bundled.yaml
 
 # Previsualizar la documentación en el navegador
 npx @redocly/cli preview-docs openapi.yaml
+```
+
+## Extracto del `readme.md`
+
+`docs/api/openapi.yaml` es la fuente de verdad del contrato. `readme.md` §4 incluye un extracto con `listCommunityListings`, `createListing`, `registerUser` y `loginUser` y los componentes que usan, entre los marcadores `<!-- openapi-extract:start -->` y `<!-- openapi-extract:end -->`. No se edita a mano: tras cambiar alguna de esas operaciones, se regenera a partir del bundle, desde la raíz del repositorio:
+
+```bash
+(cd docs/api && npx @redocly/cli bundle openapi.yaml -o dist/openapi.bundled.yaml)
+python3 docs/api/scripts/readme_extract.py   # requiere PyYAML
 ```
 
 ## Cambios

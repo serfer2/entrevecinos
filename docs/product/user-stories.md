@@ -30,7 +30,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 9. Cierre de sesión | HU-24 |
 | 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
 | 11. Experiencia de usuario | HU-28, HU-29, HU-30, HU-31, HU-32 |
-| 12. Documentación técnica | HU-33, HU-34 |
+| 12. Documentación técnica | HU-33, HU-34, HU-35 |
 
 ---
 
@@ -919,3 +919,19 @@ La documentación técnica describe la arquitectura tal y como está implementad
 - **Given** que alguien añade o quita un endpoint de la API o cambia `x-mvp` en el contrato
 - **When** se ejecutan las pruebas de la API
 - **Then** fallan si las operaciones implementadas no coinciden con las marcadas como MVP
+
+### HU-35 Consultar la API en una única fuente de verdad
+
+**Como** desarrollador, **quiero** que el `readme.md` remita a `docs/api/openapi.yaml` como fuente de verdad de la API y que el fragmento que incluye coincida con él, **para** no encontrarme dos versiones distintas del contrato.
+
+**AC1 — Fuente de verdad**
+
+- **Given** que abro la especificación de la API del `readme.md` (§4)
+- **When** busco el contrato completo
+- **Then** encuentro un enlace a `docs/api/openapi.yaml`, indicado como fuente de verdad, y a cómo validarlo y previsualizarlo
+
+**AC2 — Fragmento coherente**
+
+- **Given** el fragmento de OpenAPI incluido en el `readme.md`
+- **When** lo comparo con las mismas operaciones de `docs/api/`
+- **Then** coinciden en rutas, parámetros, cuerpos, respuestas y esquemas

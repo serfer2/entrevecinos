@@ -906,234 +906,598 @@ Las reglas `ON DELETE` deben definirse explícitamente. Para anuncios y usuarios
 
 ## 4. Especificación de la API
 
-El endpoint de consulta incluye búsqueda, filtros y ordenación; el de creación exige un JWT y una membresía aprobada en la comunidad. El canal de contacto del MVP puede basarse en los datos del anunciante; la mensajería interna queda fuera de estos endpoints iniciales.
+La especificación completa de la API es [`docs/api/openapi.yaml`](docs/api/openapi.yaml) (OpenAPI 3.1), la **fuente de verdad** del contrato. [`docs/api/README.md`](docs/api/README.md) explica su estructura y convenciones, cómo validarla y previsualizarla, y resume qué operaciones son del MVP y cuáles de versiones futuras: `x-mvp: true` marca las implementadas en el MVP y `x-mvp: false` las pendientes, y las pruebas de la API comprueban que coinciden con lo implementado.
 
+Este es un extracto del contrato con tres operaciones del recorrido principal: listar y publicar anuncios en una comunidad, registrarse e iniciar sesión. El listado incluye búsqueda, filtros y ordenación; la publicación exige un JWT y una membresía aprobada en la comunidad. El contacto del MVP usa los datos del anunciante; la mensajería interna es de una versión futura. **Si el extracto y el contrato difieren, prevalece el contrato**; para regenerarlo, consulta `docs/api/README.md`.
+
+<!-- openapi-extract:start -->
 ```yaml
 openapi: 3.1.0
 info:
   title: API de EntreVecinos
   version: 1.0.0
-  description: API REST para el MVP del marketplace local EntreVecinos.
+  description: |
+    API REST del marketplace de proximidad **EntreVecinos**.
+
+    ## Convenciones
+    - **Autenticación:** JWT en `Authorization: Bearer <token>` (`/auth/token`, o `/auth/email-verification` tras registrarse con `/auth/register`). Los endpoints públicos declaran `security: []`.
+    - **Autorización (RBAC):** cada operación indica en su descripción el rol necesario: usuario autenticado, miembro aprobado de la comunidad, `community_admin`/`moderator` o `platform_admin`.
+    - **MVP:** la extensión `x-mvp` vale `true` en las operaciones implementadas en el MVP y `false` en las pendientes de una versión futura, cuya descripción empieza por «Versión futura».
+    - **Paginación:** los listados aceptan `page` y `page_size` y devuelven `{items, page, page_size, total}`.
+    - **Errores:** cuerpo `{"detail": "..."}`; los errores de validación (422) siguen el formato estándar de FastAPI.
+    - **Imágenes:** se suben con `POST /media` y se asocian después a anuncios, perfiles o al avatar por su `id`.
+    - **Borrado:** usuarios, anuncios y mensajes usan borrado lógico.
 servers:
-  - url: https://api.entrevecinos.example.com/v1
-    description: Producción
-  - url: http://localhost:8000/v1
-    description: Desarrollo local
-
+- url: https://api.entrevecinos.example.com/v1
+  description: Producción
+- url: http://localhost:8000/v1
+  description: Desarrollo local
+security:
+- bearerAuth: []
 tags:
-  - name: Anuncios
-    description: Consulta y publicación de anuncios
-  - name: Autenticación
-    description: Registro e inicio de sesión
-
+- name: Autenticación
+  description: Registro, validación del correo e inicio de sesión.
+- name: Anuncios
+  description: Consulta, publicación y gestión de anuncios.
 paths:
   /communities/{community_id}/listings:
     parameters:
-      - name: community_id
-        in: path
-        required: true
-        description: Identificador de la comunidad cuyos anuncios se consultan o publican.
+    - $ref: '#/components/parameters/CommunityId'
+    get:
+      tags:
+      - Anuncios
+      operationId: listCommunityListings
+      summary: Buscar anuncios de una comunidad
+      description: Permite explorar anuncios y aplicar búsqueda, filtros y ordenación. Solo devuelve anuncios
+        `active` y `reserved` cuyo autor tiene una membresía aprobada en la comunidad (los de miembros
+        bloqueados o expulsados quedan ocultos). Requiere una membresía aprobada en la comunidad.
+      x-mvp: true
+      parameters:
+      - name: q
+        in: query
+        required: false
+        description: 'Busca palabras clave en el título y la descripción. Se recortan los espacios: vacío
+          equivale a no enviarlo; con menos de 2 caracteres responde 422. Las palabras de un solo carácter
+          se ignoran.'
+        schema:
+          type: string
+          maxLength: 160
+      - name: type
+        in: query
+        required: false
+        description: Filtra por modalidad de anuncio.
+        schema:
+          $ref: '#/components/schemas/ListingType'
+      - name: category_id
+        in: query
+        required: false
+        description: Filtra por categoría.
         schema:
           type: string
           format: uuid
-
-    get:
-      tags: [Anuncios]
-      summary: Buscar anuncios de una comunidad
-      description: Permite explorar anuncios y aplicar búsqueda, filtros y ordenación.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: q
-          in: query
-          required: false
-          description: >-
-            Busca palabras clave en el título y la descripción. Se recortan los espacios: vacío equivale a
-            no enviarlo; con menos de 2 caracteres responde 422. Las palabras de un solo carácter se ignoran.
-          schema:
-            type: string
-            maxLength: 160
-        - name: type
-          in: query
-          required: false
-          description: Filtra por modalidad de anuncio.
-          schema:
-            $ref: "#/components/schemas/ListingType"
-        - name: category_id
-          in: query
-          required: false
-          description: Filtra por categoría.
-          schema:
-            type: string
-            format: uuid
-        - name: sort
-          in: query
-          required: false
-          description: Campo de ordenación.
-          schema:
-            type: string
-            enum: [published_at, price]
-            default: published_at
-        - name: order
-          in: query
-          required: false
-          description: Dirección de ordenación.
-          schema:
-            type: string
-            enum: [asc, desc]
-            default: desc
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - name: page_size
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
+      - name: sort
+        in: query
+        required: false
+        description: Campo de ordenación.
+        schema:
+          type: string
+          enum:
+          - published_at
+          - price
+          default: published_at
+      - name: order
+        in: query
+        required: false
+        description: Dirección de ordenación.
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+          default: desc
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
       responses:
-        "200":
+        '200':
           description: Anuncios encontrados.
           content:
             application/json:
               schema:
-                type: object
-                required: [items, page, page_size, total]
-                properties:
-                  items:
-                    type: array
+                allOf:
+                - $ref: '#/components/schemas/PageMeta'
+                - type: object
+                  required:
+                  - items
+                  properties:
                     items:
-                      $ref: "#/components/schemas/Listing"
-                  page:
-                    type: integer
-                  page_size:
-                    type: integer
-                  total:
-                    type: integer
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: El usuario no pertenece a la comunidad o no puede acceder a ella.
-        "404":
-          description: Comunidad no encontrada.
-
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Listing'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/MembershipForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     post:
-      tags: [Anuncios]
+      tags:
+      - Anuncios
+      operationId: createListing
       summary: Publicar un anuncio
-      description: Crea un anuncio en la comunidad. El usuario debe tener una membresía aprobada.
-      security:
-        - bearerAuth: []
+      description: Crea un anuncio `active` en la comunidad. El usuario debe tener una membresía aprobada.
+      x-mvp: true
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ListingCreate"
+              $ref: '#/components/schemas/ListingCreate'
             example:
-              category_id: "98bff8e2-588e-4cdf-8ba2-03166a249477"
-              title: "Bicicleta infantil"
-              description: "Bicicleta en buen estado, poco uso."
+              category_id: 98bff8e2-588e-4cdf-8ba2-03166a249477
+              title: Bicicleta infantil
+              description: Bicicleta en buen estado, poco uso.
               type: sell
-              price: 45.00
+              price: 45
               currency: EUR
       responses:
-        "201":
+        '201':
           description: Anuncio creado.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Listing"
-        "400":
-          description: Datos inválidos o precio/moneda incompatibles.
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: El usuario no tiene una membresía aprobada en la comunidad.
-        "404":
-          description: Comunidad o categoría no encontrada.
-
+                $ref: '#/components/schemas/Listing'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/MembershipForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /auth/register:
     post:
-      tags: [Autenticación]
+      tags:
+      - Autenticación
+      operationId: registerUser
       summary: Registrar una cuenta
-      description: Crea una cuenta y devuelve un token JWT para iniciar la sesión.
+      description: 'Crea una cuenta inactiva con rol `user` y envía un correo con un enlace de validación
+        que caduca a las 24 horas. No inicia la sesión: la cuenta se activa al validar el correo (`POST
+        /auth/email-verification`). Acceso público.'
+      x-mvp: true
       security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RegisterRequest"
+              $ref: '#/components/schemas/RegisterRequest'
             example:
-              email: "vecino@example.com"
-              password: "UnaClaveSegura123!"
-              full_name: "Alex Vecino"
+              email: vecino@example.com
+              password: UnaClaveSegura123!
+              full_name: Alex Vecino
+              phone: '+34600111222'
       responses:
-        "201":
-          description: Cuenta creada.
+        '201':
+          description: Cuenta creada, pendiente de validar el correo.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "409":
-          description: Ya existe una cuenta con ese correo electrónico.
-        "422":
-          description: Datos de registro inválidos.
-
+                $ref: '#/components/schemas/RegistrationResponse'
+              example:
+                email: vecino@example.com
+                verification_expires_at: '2026-10-22T10:00:00Z'
+        '409':
+          description: El correo ya está registrado. Con una cuenta pendiente de validación, `code` es
+            `email_pending_verification` y la cuenta no cambia.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationConflict'
+              examples:
+                enUso:
+                  value:
+                    detail: El correo ya está en uso.
+                    code: email_in_use
+                pendiente:
+                  value:
+                    detail: Este correo está pendiente de validación.
+                    code: email_pending_verification
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /auth/token:
     post:
-      tags: [Autenticación]
+      tags:
+      - Autenticación
+      operationId: loginUser
       summary: Iniciar sesión
-      description: Valida las credenciales y emite un token JWT.
+      description: Valida las credenciales y emite un token JWT. Acceso público.
+      x-mvp: true
       security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginRequest"
+              $ref: '#/components/schemas/LoginRequest'
             example:
-              email: "vecino@example.com"
-              password: "UnaClaveSegura123!"
+              email: vecino@example.com
+              password: UnaClaveSegura123!
       responses:
-        "200":
+        '200':
           description: Inicio de sesión correcto.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "401":
-          description: Correo o contraseña incorrectos.
-        "422":
-          description: Datos de acceso inválidos.
-
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Correo o contraseña incorrectos, o cuenta desactivada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Credenciales correctas, pero la cuenta no ha validado su correo (no aplica a un
+            `platform_admin`). Solo se responde tras comprobar la contraseña.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  required:
+                  - code
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - email_not_verified
+              example:
+                detail: Tienes que validar tu correo electrónico antes de iniciar sesión.
+                code: email_not_verified
+        '422':
+          $ref: '#/components/responses/ValidationError'
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Token JWT enviado en la cabecera Authorization.
-
+      description: 'Token JWT obtenido en `/auth/register` o `/auth/token`, enviado en la cabecera `Authorization:
+        Bearer <token>`.'
+  parameters:
+    CommunityId:
+      name: community_id
+      in: path
+      required: true
+      description: Identificador de la comunidad.
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Número de página (empieza en 1).
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      description: Elementos por página.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    BadRequest:
+      description: Solicitud inválida o incompatible con el estado actual del recurso.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: Datos inválidos.
+    MembershipForbidden:
+      description: El usuario no pertenece a la comunidad (o no tiene permisos), o su membresía no está
+        aprobada; en este último caso el cuerpo incluye `status`.
+      content:
+        application/json:
+          schema:
+            oneOf:
+            - $ref: '#/components/schemas/MembershipError'
+            - $ref: '#/components/schemas/Error'
+          examples:
+            notApproved:
+              summary: Membresía no aprobada
+              value:
+                detail: Tu membresía en esta comunidad no está aprobada.
+                status: pending
+            forbidden:
+              summary: Sin membresía o sin permisos
+              value:
+                detail: No tienes permisos para realizar esta acción.
+    NotFound:
+      description: El recurso no existe o no es visible para el usuario.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: Recurso no encontrado.
+    Unauthorized:
+      description: Token ausente, inválido o caducado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: Autenticación requerida.
+    ValidationError:
+      description: Los datos enviados no superan la validación (formato estándar de FastAPI).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
   schemas:
-    ListingType:
-      type: string
-      enum: [sell, wanted, offer_service, need_service, free, other]
-
+    AuthResponse:
+      type: object
+      required:
+      - access_token
+      - token_type
+      - expires_in
+      - user
+      properties:
+        access_token:
+          type: string
+          description: JWT de acceso.
+        token_type:
+          type: string
+          enum:
+          - Bearer
+        expires_in:
+          type: integer
+          description: Duración del token en segundos.
+        user:
+          $ref: '#/components/schemas/User'
+    Error:
+      type: object
+      required:
+      - detail
+      properties:
+        detail:
+          type: string
+          description: Descripción legible del error.
+    Listing:
+      type: object
+      required:
+      - id
+      - community_id
+      - owner
+      - category_id
+      - title
+      - description
+      - type
+      - status
+      - published_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        community_id:
+          type: string
+          format: uuid
+        owner:
+          $ref: '#/components/schemas/ListingOwner'
+        category_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+        type:
+          $ref: '#/components/schemas/ListingType'
+        price:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+        currency:
+          type:
+          - string
+          - 'null'
+          pattern: ^[A-Z]{3}$
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ListingImage'
+        status:
+          $ref: '#/components/schemas/ListingStatus'
+        published_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ListingCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - category_id
+      - title
+      - description
+      - type
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        type:
+          $ref: '#/components/schemas/ListingType'
+        price:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          multipleOf: 0.01
+        currency:
+          type:
+          - string
+          - 'null'
+          pattern: ^[A-Z]{3}$
+          description: Código de moneda ISO 4217. Si se indica precio sin moneda, se usa `EUR`; una moneda
+            sin precio es un error.
+        image_asset_ids:
+          type: array
+          maxItems: 10
+          description: Ficheros subidos con `POST /media`. El primero se usa como portada.
+          items:
+            type: string
+            format: uuid
+    ListingImage:
+      type: object
+      required:
+      - asset_id
+      - url
+      - position
+      - is_cover
+      properties:
+        asset_id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri-reference
+        position:
+          type: integer
+          minimum: 0
+        is_cover:
+          type: boolean
+    ListingOwner:
+      type: object
+      description: Anunciante. `phone` y `email` son el canal de contacto del MVP y solo se muestran a
+        miembros aprobados de la comunidad del anuncio.
+      required:
+      - id
+      - full_name
+      - email
+      properties:
+        id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+        phone:
+          type:
+          - string
+          - 'null'
+        email:
+          type: string
+          format: email
+        avatar_url:
+          type:
+          - string
+          - 'null'
+          format: uri-reference
     ListingStatus:
       type: string
-      enum: [active, reserved, completed, hidden]
-
+      description: 'Estado visible del anuncio. `draft` y `deleted` del modelo de datos no se exponen:
+        un anuncio borrado responde 404.'
+      enum:
+      - active
+      - reserved
+      - completed
+      - hidden
+    ListingType:
+      type: string
+      description: 'Modalidad del anuncio: vendo, busco, ofrezco servicio, necesito servicio, regalo,
+        otros.'
+      enum:
+      - sell
+      - wanted
+      - offer_service
+      - need_service
+      - free
+      - other
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - email
+      - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    MembershipError:
+      description: Error de una operación sobre la membresía del usuario autenticado, con su estado actual
+        (extensión de `Error`). Permite mostrar «Solicitud pendiente» o «Sin acceso».
+      allOf:
+      - $ref: '#/components/schemas/Error'
+      - type: object
+        required:
+        - status
+        properties:
+          status:
+            $ref: '#/components/schemas/MembershipStatus'
+    MembershipStatus:
+      type: string
+      description: Estado de la solicitud de acceso a la comunidad.
+      enum:
+      - pending
+      - approved
+      - rejected
+      - blocked
+    PageMeta:
+      type: object
+      description: Metadatos de paginación comunes a todos los listados.
+      required:
+      - page
+      - page_size
+      - total
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+          description: Total de elementos que cumplen el filtro.
+    PlatformRole:
+      type: string
+      description: Rol global del usuario en la plataforma.
+      enum:
+      - user
+      - platform_admin
     RegisterRequest:
       type: object
       additionalProperties: false
-      required: [email, password, full_name]
+      required:
+      - email
+      - password
+      - full_name
       properties:
         email:
           type: string
@@ -1148,142 +1512,104 @@ components:
           type: string
           minLength: 1
           maxLength: 120
-
-    LoginRequest:
+        phone:
+          type:
+          - string
+          - 'null'
+          maxLength: 32
+    RegistrationConflict:
+      description: 'Conflicto al registrarse (extensión de `Error`): el correo ya pertenece a una cuenta
+        validada (`email_in_use`) o a una pendiente de validar (`email_pending_verification`), que puede
+        pedir otro enlace con `POST /auth/email-verification/resend`.'
+      allOf:
+      - $ref: '#/components/schemas/Error'
+      - type: object
+        required:
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - email_in_use
+            - email_pending_verification
+    RegistrationResponse:
       type: object
-      additionalProperties: false
-      required: [email, password]
+      description: Cuenta creada e inactiva hasta que se valide el correo. No incluye token de acceso.
+      required:
+      - email
+      - verification_expires_at
       properties:
         email:
           type: string
           format: email
-        password:
+          description: Correo al que se ha enviado el enlace de validación.
+        verification_expires_at:
           type: string
-          format: password
-
-    AuthResponse:
+          format: date-time
+          description: Caducidad del enlace de validación (24 horas tras el registro).
+    User:
       type: object
-      required: [access_token, token_type, expires_in, user]
-      properties:
-        access_token:
-          type: string
-          description: JWT de acceso.
-        token_type:
-          type: string
-          enum: [Bearer]
-        expires_in:
-          type: integer
-          description: Duración del token en segundos.
-        user:
-          type: object
-          required: [id, email, full_name]
-          properties:
-            id:
-              type: string
-              format: uuid
-            email:
-              type: string
-              format: email
-            full_name:
-              type: string
-
-    ListingCreate:
-      type: object
-      additionalProperties: false
-      required: [category_id, title, description, type]
-      properties:
-        category_id:
-          type: string
-          format: uuid
-        title:
-          type: string
-          minLength: 1
-          maxLength: 160
-        description:
-          type: string
-          minLength: 1
-        type:
-          $ref: "#/components/schemas/ListingType"
-        price:
-          type: ["number", "null"]
-          minimum: 0
-          multipleOf: 0.01
-        currency:
-          type: ["string", "null"]
-          pattern: "^[A-Z]{3}$"
-          description: Código de moneda ISO 4217; requerido si se indica precio.
-
-    Listing:
-      type: object
+      description: Datos completos del usuario autenticado (nunca incluye el hash de contraseña).
       required:
-        - id
-        - community_id
-        - owner
-        - category_id
-        - title
-        - description
-        - type
-        - status
-        - published_at
+      - id
+      - email
+      - full_name
+      - platform_role
+      - is_active
+      - created_at
       properties:
         id:
           type: string
           format: uuid
-        community_id:
+        email:
           type: string
-          format: uuid
-        owner:
-          type: object
-          required: [id, full_name]
-          properties:
-            id:
-              type: string
-              format: uuid
-            full_name:
-              type: string
-            phone:
-              type: ["string", "null"]
-        category_id:
+          format: email
+        full_name:
           type: string
-          format: uuid
-        title:
-          type: string
-        description:
-          type: string
-        type:
-          $ref: "#/components/schemas/ListingType"
-        price:
-          type: ["number", "null"]
-          minimum: 0
-        currency:
-          type: ["string", "null"]
-        image_urls:
-          type: array
-          items:
-            type: string
-            format: uri
-        status:
-          $ref: "#/components/schemas/ListingStatus"
-        published_at:
+        phone:
+          type:
+          - string
+          - 'null'
+        avatar_url:
+          type:
+          - string
+          - 'null'
+          format: uri-reference
+          description: URL relativa del avatar (`/media/{asset_id}`).
+        platform_role:
+          $ref: '#/components/schemas/PlatformRole'
+        is_active:
+          type: boolean
+        created_at:
           type: string
           format: date-time
-
-  responses:
-    Unauthorized:
-      description: Token ausente, inválido o caducado.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
-          example:
-            detail: "Autenticación requerida."
-
-    Error:
+    ValidationError:
       type: object
+      required:
+      - detail
       properties:
         detail:
-          type: string
+          type: array
+          items:
+            type: object
+            required:
+            - loc
+            - msg
+            - type
+            properties:
+              loc:
+                type: array
+                description: Ruta del campo erróneo (`body`, `query`, `path` y nombre del campo).
+                items:
+                  type:
+                  - string
+                  - integer
+              msg:
+                type: string
+              type:
+                type: string
 ```
+<!-- openapi-extract:end -->
 
 ---
 
