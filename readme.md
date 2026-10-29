@@ -225,19 +225,18 @@ flowchart TB
 
     subgraph FE["Capa de frontend"]
         NEXT["React + Next.js v16<br/>TypeScript + TailwindCSS"]
-        HELMET["Helmet<br/>Cabeceras HTTP de seguridad"]
-        NEXT --> HELMET
-    end
-
-    subgraph SEC["Capa de seguridad"]
-        CORS["CORS<br/>Control de orígenes"]
-        JWT["JWT Auth<br/>Autenticación"]
-        RBAC["RBAC<br/>Autorización por roles"]
-        CORS --> JWT --> RBAC
+        HEADERS["Cabeceras HTTP de seguridad<br/>next.config.ts + CSP con nonce"]
+        NEXT --> HEADERS
     end
 
     subgraph BE["Backend · contenedor Docker"]
-        API["FastAPI · Python<br/>API REST y lógica de negocio"]
+        subgraph FASTAPI["FastAPI · Python"]
+            CORS["CORS<br/>Control de orígenes"]
+            JWT["JWT Auth<br/>Autenticación"]
+            RBAC["RBAC<br/>Autorización por roles"]
+            API["API REST y lógica de negocio"]
+            CORS --> JWT --> RBAC --> API
+        end
     end
 
     subgraph DATA["Persistencia · contenedores Docker"]
@@ -253,12 +252,11 @@ flowchart TB
     SMTP["Servidor SMTP<br/>Mailpit en desarrollo"]
 
     U -->|"HTTPS"| NEXT
-    HELMET -->|"Solicitudes API con JWT"| CORS
-    RBAC -->|"Solicitud autorizada"| API
+    NEXT -->|"Solicitudes API con JWT"| CORS
     API -->|"Consultas y transacciones"| DB
     API -->|"Carga y lectura de imágenes"| IMG
     API -->|"Correo de validación"| SMTP
-    SMTP -.->|"Enlace de validación"| U
+    U <-.-|"Enlace de validación"| SMTP
 ```
 
 #### Patrón arquitectónico
@@ -268,7 +266,7 @@ La solución sigue una arquitectura cliente-servidor de tres capas: presentació
 
 Next.js proporciona la interfaz web; FastAPI concentra las reglas de negocio y expone la API REST. PostgreSQL almacena los datos estructurados y relacionados. MinIO almacena los ficheros de imagen, mientras que PostgreSQL conserva sus metadatos y referencias. Los volúmenes persistentes mantienen los datos aunque se recreen los contenedores.
 
-JWT Auth valida la identidad y RBAC comprueba los permisos en el backend. CORS restringe los orígenes autorizados a comunicarse con la API. Helmet configura cabeceras HTTP de seguridad para el frontend. Como Helmet pertenece al ecosistema Node.js, si Next.js se ejecuta sin un servidor Node personalizado, las cabeceras equivalentes deben configurarse en Next.js o en un proxy frontal.
+La seguridad de la API se aplica dentro de FastAPI, en este orden: CORS restringe los orígenes autorizados, JWT Auth valida la identidad y RBAC comprueba los permisos antes de ejecutar cada caso de uso. No hay una capa intermedia entre el frontend y el backend. En la web, Next.js configura las cabeceras HTTP de seguridad y una `Content-Security-Policy` con un *nonce* por petición, sin Helmet ni un servidor Node personalizado.
 
 **Beneficios**
 
@@ -287,11 +285,9 @@ JWT Auth valida la identidad y RBAC comprueba los permisos en el backend. CORS r
 
 ### **2.2. Descripción de componentes principales:**
 
-- **Frontend web:** construido con **React**, **Next.js v16** y **TypeScript**. Presenta las páginas de la aplicación y permite a los usuarios buscar, consultar y gestionar anuncios. **TailwindCSS** se utiliza para crear y adaptar los estilos a ordenadores, tablets y móviles.
+- **Frontend web:** construido con **React**, **Next.js v16** y **TypeScript**. Presenta las páginas de la aplicación y permite a los usuarios buscar, consultar y gestionar anuncios. **TailwindCSS** se utiliza para crear y adaptar los estilos a ordenadores, tablets y móviles. Next.js añade las cabeceras HTTP de seguridad a todas las respuestas (`next.config.ts`) y genera una `Content-Security-Policy` con un *nonce* por petición (`src/proxy.ts`).
 
-- **Capa de seguridad:** protege el acceso entre frontend y backend. **JWT Auth** identifica a los usuarios mediante tokens; **RBAC** controla las acciones permitidas según el rol; **CORS** limita los orígenes autorizados; y **Helmet** configura cabeceras HTTP de seguridad en el servidor Node.js del frontend. La API debe validar los tokens y permisos en el backend.
-
-- **API y lógica de negocio:** desarrollada en **Python con FastAPI** y ejecutada en un contenedor Docker. Gestiona usuarios, comunidades y publicaciones, aplica las reglas del producto y proporciona endpoints REST al frontend. También coordina el acceso a la base de datos y al almacenamiento de imágenes.
+- **API y lógica de negocio:** desarrollada en **Python con FastAPI** y ejecutada en un contenedor Docker. Gestiona usuarios, comunidades y publicaciones, aplica las reglas del producto y proporciona endpoints REST al frontend. También coordina el acceso a la base de datos y al almacenamiento de imágenes. La seguridad se aplica dentro de la propia API, antes de cada caso de uso: **CORS** (`CORSMiddleware`) limita los orígenes autorizados; **JWT Auth** (`CurrentUserDep`) valida el token y que el usuario siga activo; y **RBAC** (`CommunityAccess`) comprueba la membresía y el rol en la comunidad, con acceso total para el administrador de plataforma.
 
 - **Base de datos relacional:** **PostgreSQL 16**, desplegada en un contenedor Docker. Guarda la información estructurada, como usuarios, comunidades, anuncios y mensajes. Un volumen persistente conserva los datos cuando se reinicia o recrea el contenedor.
 
@@ -452,7 +448,7 @@ Según la arquitectura descrita en el README, el proyecto contempla las siguient
 
 - **Control de orígenes mediante CORS:** la API debe aceptar solicitudes web únicamente desde los dominios autorizados. Por ejemplo, producción podría permitir `https://entrevecinos.example.com` y rechazar otros orígenes. CORS no reemplaza la autenticación ni impide por sí solo las solicitudes realizadas fuera de un navegador.
 
-- **Cabeceras HTTP de seguridad con Helmet:** Helmet puede configurar cabeceras como `X-Content-Type-Options: nosniff` y `Strict-Transport-Security` en el servidor Node.js del frontend. Si Next.js se ejecuta sin un servidor Node personalizado, estas cabeceras deben configurarse en Next.js o en el proxy frontal.
+- **Cabeceras HTTP de seguridad en Next.js:** la web no usa Helmet; Next.js envía en todas las respuestas `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` y `Permissions-Policy` (`next.config.ts`), sin `X-Powered-By`. `Strict-Transport-Security` solo se envía en producción, detrás de HTTPS. La `Content-Security-Policy` se genera en `src/proxy.ts` con un *nonce* por petición, para que solo se ejecuten los scripts de la propia aplicación.
 
 - **Cifrado del tráfico:** el acceso público de producción debe utilizar HTTPS para proteger las comunicaciones entre usuarios, frontend y API. Los tokens no deben enviarse a través de conexiones HTTP sin cifrar.
 

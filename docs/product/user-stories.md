@@ -9,6 +9,7 @@ Historias del MVP definido en la sección 1.2 del `readme.md`. Las inferencias q
 - **Miembro**: vecino con acceso aprobado a una comunidad.
 - **Administrador de comunidad**: persona que gestiona los miembros y los anuncios de su comunidad.
 - **Administrador de plataforma** (`platform_admin`): persona que aprueba las comunidades nuevas y puede gestionar cualquier comunidad. Se nombra directamente en la base de datos (asumido).
+- **Desarrollador**: persona que mantiene o evalúa el código y la documentación técnica del proyecto (asumido).
 
 ## Fuera de alcance
 
@@ -29,6 +30,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 9. Cierre de sesión | HU-24 |
 | 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
 | 11. Experiencia de usuario | HU-28, HU-29, HU-30, HU-31, HU-32 |
+| 12. Documentación técnica | HU-33 |
 
 ---
 
@@ -855,3 +857,37 @@ Mejoras de presentación y de uso sobre las funcionalidades existentes, sin aña
 - **Given** que se ha ocultado un anuncio
 - **When** vuelvo al listado, lo abro como autor o gestor, o el autor intenta editarlo
 - **Then** veo «Anuncio ocultado.», «Este anuncio está oculto y no se muestra en la comunidad.» o «Este anuncio ha sido ocultado por la administración de la comunidad.», y en ningún texto visible aparece «retirar»
+
+---
+
+## Épica 12 — Documentación técnica
+
+La documentación técnica describe la arquitectura tal y como está implementada, para que quien mantiene o evalúa el proyecto no tenga que contrastarla con el código.
+
+### HU-33 Ver dónde se aplica la seguridad en el diagrama de arquitectura
+
+**Como** desarrollador, **quiero** que la documentación de arquitectura sitúe la autenticación JWT, la autorización por roles y CORS dentro de la API y describa las cabeceras de seguridad de la web como están implementadas, **para** entender dónde se aplica de verdad cada medida y no buscar componentes que no existen.
+
+**AC1 — Seguridad dentro de FastAPI**
+
+- **Given** que abro el diagrama de arquitectura del `readme.md` (§2.1)
+- **When** sigo una petición del frontend al backend
+- **Then** CORS, JWT Auth y RBAC aparecen dentro del bloque de FastAPI, en el orden en que se aplican y antes de la lógica de negocio, y no hay ninguna capa de seguridad entre el frontend y el backend
+
+**AC2 — Descripción coherente**
+
+- **Given** que leo la descripción de componentes (§2.2)
+- **When** busco dónde se aplican la autenticación, los roles y CORS
+- **Then** se describen como parte de la API y no como un componente independiente
+
+**AC3 — Cabeceras de seguridad de la web**
+
+- **Given** que leo la arquitectura (§2.1, §2.2) y la seguridad (§2.5) del `readme.md`
+- **When** busco cómo protege la web sus respuestas
+- **Then** veo que las cabeceras se configuran en Next.js (`next.config.ts`) y la `Content-Security-Policy` con un *nonce* por petición (`proxy.ts`), y Helmet no aparece como parte de la arquitectura
+
+**AC4 — Diagrama válido**
+
+- **Given** el diagrama actualizado
+- **When** se renderiza en GitHub
+- **Then** se muestra sin errores

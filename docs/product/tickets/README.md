@@ -51,12 +51,13 @@ docs/product/tickets/
 | `EP-11-experiencia-de-usuario/HU-30-ver-las-fotografias-de-un-anuncio-a-pantalla-completa/` | TK-069 visor de imágenes a pantalla completa |
 | `EP-11-experiencia-de-usuario/HU-31-acceder-como-administrador-de-plataforma-a-cualquier-comunidad/` | TK-070 acceso del `platform_admin` en la web · TK-071 backend anuncios del `platform_admin` |
 | `EP-11-experiencia-de-usuario/HU-32-entender-que-hace-la-moderacion-de-un-anuncio/` | TK-072 «Ocultar anuncio» en lugar de «Retirar anuncio» |
+| `EP-12-documentacion-tecnica/HU-33-ver-donde-se-aplica-la-seguridad-en-el-diagrama-de-arquitectura/` | TK-073 JWT, roles y CORS dentro de la API y cabeceras de Next.js en lugar de Helmet |
 
 ## Orden de implementación recomendado
 
 Respeta las dependencias de cada ticket (campo **Depende de**). Los números de migración (`0002`…`0009`) asumen este orden.
 
-**Estado:** los tickets TK-001 a TK-055 están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket. También están implementados los de la Épica 10 (TK-056 a TK-062), con un commit por historia y otro para la documentación. TK-063 a TK-065 (HU-27) también están implementados, con un cambio de OpenSpec archivado por ticket y un commit para la historia. Los de la Épica 11 (TK-066 a TK-072) están implementados en un único commit de experiencia de usuario, con las especificaciones de `openspec/specs/` actualizadas directamente, sin cambios de OpenSpec archivados.
+**Estado:** los tickets TK-001 a TK-055 están implementados en este orden, con un cambio de OpenSpec archivado (`openspec/changes/archive/`) y un commit por ticket. También están implementados los de la Épica 10 (TK-056 a TK-062), con un commit por historia y otro para la documentación. TK-063 a TK-065 (HU-27) también están implementados, con un cambio de OpenSpec archivado por ticket y un commit para la historia. Los de la Épica 11 (TK-066 a TK-072) están implementados en un único commit de experiencia de usuario; sus cambios de OpenSpec se crearon después y están archivados, uno por ticket, y las especificaciones de `openspec/specs/` están sincronizadas. TK-073 (Épica 12) también está implementado, con su cambio de OpenSpec archivado.
 
 | Bloque | Orden |
 |---|---|
@@ -74,5 +75,6 @@ Respeta las dependencias de cada ticket (campo **Depende de**). Los números de 
 | Épica 9 — Cierre de sesión | TK-055 |
 | Épica 10 — Validación del correo | TK-056 → TK-057 → TK-058 → TK-059 → TK-060 → TK-061 → TK-062 → TK-063 → TK-064 → TK-065 |
 | Épica 11 — Experiencia de usuario | TK-066 → TK-067 → TK-068 → TK-069 → TK-070 → TK-071 → TK-072 |
+| Épica 12 — Documentación técnica | TK-073 |
 
 El detalle del anuncio (TK-036/TK-037) se adelanta a la edición y la eliminación de la interfaz porque es su punto de entrada. La CSP (TK-046) va justo después de TK-023, en cuanto se sirven imágenes desde el almacenamiento. Reservar y finalizar (TK-044/TK-045) va al final porque amplía el endpoint de estado de TK-042.
