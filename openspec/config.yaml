@@ -1,20 +1,74 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Producto: EntreVecinos, tablón de anuncios privado por comunidades de vecinos
+  (registro con validación del correo, comunidades con solicitud de acceso y aprobación,
+  anuncios con fotografías, búsqueda, filtros, contacto y moderación). Todo en español de España.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Monorepo:
+  - apps/api: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic (migrations/), psycopg 3,
+    PyJWT (HS256) + pwdlib[argon2], boto3. Dependencias con uv (pyproject.toml + uv.lock).
+    Pruebas: pytest (marcadores `db` y `storage`) y httpx; lint con ruff (line-length 100).
+  - apps/web: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, zod.
+    Pruebas: Vitest + Testing Library, junto al código (`*.test.ts(x)`). Lint con ESLint.
+    Next.js 16 rompe APIs anteriores: consultar node_modules/next/dist/docs/ (ver apps/web/AGENTS.md).
+  - infra: docker-compose.yml con db (PostgreSQL 16), storage (MinIO, S3), mail (Mailpit),
+    api y web. Redes `data` (privada) y `edge`. Makefile: make dev | build | migrate | clean.
+    Todo se ejecuta en contenedores; no se instala nada en el host.
+  - docs: docs/api/openapi.yaml (contrato de referencia de la API), docs/product/user-stories.md
+    (épicas EP-xx e historias HU-xx), docs/product/tickets/ (tickets TK-yyy), readme.md.
+
+  Arquitectura limpia en la API (src/entrevecinos/), comprobada por tests/test_architecture.py:
+  - domain/: entidades, errores y reglas; sin frameworks ni otras capas.
+  - application/: casos de uso (clases con execute()) y puertos (interfaces de repositorio);
+    solo depende de domain.
+  - infrastructure/: adaptadores (repositorios SQLAlchemy, S3, correo, seguridad, settings).
+  - presentation/: FastAPI, create_app() y routers versionados en v1/.
+  - Cada área funcional (users, communities, listings, media…) tiene su subpaquete en cada capa.
+  - Permisos por comunidad solo vía CommunityAccess (require_member, require_role); platform_admin
+    pasa siempre. Visibilidad de anuncios solo vía ListingVisibility.
+  - Endpoints protegidos con CurrentUserDep; paginación con PageParams / Page[T] (y PageRequest /
+    PageResult[T] en aplicación); "no encontrado" hereda de domain.errors.NotFoundError (404).
+  - Lecturas de anuncios con ListingLoader para evitar N+1.
+
+  Web (apps/web/src/):
+  - app/ para rutas y layouts (zona privada en app/(privado)/); features/<área>/ agrupa
+    componentes, acciones y lógica; components/ui/ y lib/ solo para lo compartido.
+  - El navegador nunca ve el JWT: Server Actions y páginas de servidor llaman a la API con
+    apiFetch / userApiFetch (server-only) y la sesión vive en la cookie HttpOnly `ev_session`.
+  - Rutas privadas: proxy.ts comprueba la cookie y cada página o acción llama a requireUser().
+  - Los ficheros "use server" solo exportan funciones async.
+  - Identidad visual centralizada en styles/globals.css (@theme), fuentes con next/font,
+    CSP estricta; ocultar una acción en la web no sustituye a la comprobación en la API.
+
+  Convenciones:
+  - Textos de producto, documentación, specs, tickets y comentarios del código en español;
+    identificadores del código en inglés.
+  - Commits en inglés con Conventional Commits (feat, fix, docs, refactor…; ámbito opcional).
+  - Cada change de OpenSpec corresponde a un ticket: `tk-yyy-<capa>-<descripcion>`, igual que
+    docs/product/tickets/EP-xx-…/HU-xx-…/TK-yyy-<capa>-<descripcion>.md.
+  - Cambios de contrato: actualizar docs/api/openapi.yaml. Cambios de esquema: migración Alembic.
+  - Verificación en contenedores:
+    api: `$COMPOSE run --rm api pytest` y `$COMPOSE run --rm api ruff check .`
+    web: `$COMPOSE exec web npm run lint`, `npm run typecheck` y `npm run test`
+    (COMPOSE="docker compose --env-file .env -f infra/docker-compose.yml").
+
+rules:
+  proposal:
+    - Escribir en español, breve y directo.
+    - En Why, citar la historia (HU-xx) y la ruta del ticket en docs/product/tickets/.
+    - Rellenar siempre New Capabilities y Modified Capabilities (aunque alguna quede vacía).
+    - En Impact, indicar app y ficheros o carpetas afectados, y si hay cambios de contrato o migraciones.
+  design:
+    - Secciones Context, Decisions y Risks / Trade-offs; solo decisiones no evidentes.
+    - Respetar las reglas de dependencias de la arquitectura limpia y los puntos únicos
+      (CommunityAccess, ListingVisibility, apiFetch, requireUser).
+  specs:
+    - Requisitos en español con SHALL / MUST / MUST NOT; un párrafo por requisito.
+    - Citar entre «» los textos exactos que ve el usuario y con `código` rutas, códigos HTTP y campos.
+    - Escenarios cortos con WHEN / THEN; nombres de escenario en español.
+    - Usar RENAMED Requirements al cambiar el nombre de un requisito.
+  tasks:
+    - Agrupar por capa (BD, Backend, Frontend, Documentación) y terminar con un grupo Verificación.
+    - Incluir las pruebas en la tarea que implementa el comportamiento ("…, con pruebas").
+    - La verificación final ejecuta lint, typecheck y tests en contenedores.
