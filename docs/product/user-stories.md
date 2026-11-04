@@ -31,6 +31,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
 | 11. Experiencia de usuario | HU-28, HU-29, HU-30, HU-31, HU-32 |
 | 12. Documentación técnica | HU-33, HU-34, HU-35 |
+| 13. Puesta en producción en AWS | HU-36, HU-37, HU-38, HU-39 |
 
 ---
 
@@ -935,3 +936,125 @@ La documentación técnica describe la arquitectura tal y como está implementad
 - **Given** el fragmento de OpenAPI incluido en el `readme.md`
 - **When** lo comparo con las mismas operaciones de `docs/api/`
 - **Then** coinciden en rutas, parámetros, cuerpos, respuestas y esquemas
+
+## Épica 13 — Puesta en producción en AWS
+
+La aplicación se despliega en AWS (región `eu-north-1`) con toda la infraestructura definida como código en Terraform, sin secretos en el repositorio y con un gasto limitado a 40 € al mes. Mientras el proyecto no escale, para ahorrar costes, producción no tiene alta disponibilidad: la web, la API y PostgreSQL corren en una sola instancia, con copias de seguridad frecuentes. Las nuevas versiones se publican desde GitHub Actions y producción se vigila y se puede recuperar ante fallos.
+
+### HU-36 Desplegar la aplicación en AWS de forma reproducible y segura
+
+**Como** desarrollador, **quiero** crear toda la infraestructura de producción en AWS desde el código de Terraform del repositorio, **para** poner EntreVecinos al alcance de los vecinos con HTTPS y poder reconstruir el entorno sin pasos manuales ni secretos expuestos.
+
+**AC1 — Infraestructura reproducible**
+
+- **Given** una cuenta de AWS con sesión iniciada y el repositorio clonado
+- **When** sigo la guía de `infra/aws/README.md` y ejecuto `terraform apply`
+- **Then** se crean la red, la base de datos, el almacenamiento de imágenes, el correo, los secretos, la zona DNS de `entrevecinos.org` en Route 53 con todos sus registros, el certificado del dominio, la instancia y la distribución de CloudFront, y un segundo `terraform plan` no muestra cambios
+
+**AC2 — Aplicación accesible por HTTPS**
+
+- **Given** la infraestructura creada y la primera versión desplegada
+- **When** abro `https://entrevecinos.org` (o `www.entrevecinos.org`, que redirige a la raíz)
+- **Then** la web carga por HTTPS, puedo registrarme, validar el correo, iniciar sesión, publicar un anuncio con fotografías y verlas y el correo de validación llega desde `no-reply@entrevecinos.org` autenticado con SPF, DKIM y DMARC (asumido: solo a direcciones verificadas mientras SES siga en *sandbox*)
+
+**AC3 — Superficie mínima expuesta**
+
+- **Given** la infraestructura creada
+- **When** intento acceder desde Internet a la base de datos, a la API, al bucket de imágenes o a la instancia saltándome CloudFront
+- **Then** todas las conexiones se rechazan; la instancia no acepta SSH y solo se administra por Session Manager
+
+**AC4 — Sin secretos en el repositorio**
+
+- **Given** el repositorio y el estado de Terraform
+- **When** busco contraseñas, claves de acceso o el secreto de los JWT
+- **Then** no están en el repositorio; se generan en AWS, la aplicación los recibe de SSM Parameter Store (cifrados) con el rol de la instancia, sin claves de acceso de larga duración, y no se escriben en ningún fichero de la instancia
+
+**AC5 — Coste controlado**
+
+- **Given** el proyecto de AWS antes de crear ningún recurso
+- **When** consulto su configuración de facturación
+- **Then** tiene un límite de gasto de 40 € al mes, y recibo un aviso por correo cuando el gasto real supera el 50 %, el 75 % o el 90 % de ese importe o el previsto supera el 100 %
+
+### HU-37 Publicar nuevas versiones automáticamente al fusionar en `main`
+
+**Como** desarrollador, **quiero** que cada *pull request* se compruebe y que cada fusión en `main` se despliegue sola en producción, **para** publicar cambios con frecuencia sin ejecutar pasos a mano ni guardar credenciales de AWS en GitHub.
+
+**AC1 — Comprobaciones en cada *pull request***
+
+- **Given** que abro o actualizo un *pull request*
+- **When** termina el *workflow* de GitHub Actions
+- **Then** se han ejecutado el lint, el formato y las pruebas de la API y de la web, la validación de Terraform y la construcción de las imágenes de producción, y el *pull request* no puede fusionarse si alguna falla
+
+**AC2 — Despliegue continuo**
+
+- **Given** que se fusiona un cambio en `main` y las comprobaciones pasan
+- **When** termina el *workflow* de despliegue
+- **Then** producción ejecuta las imágenes de ese *commit*, con las migraciones aplicadas, y una prueba de humo contra la URL pública ha pasado
+
+**AC3 — Sin credenciales guardadas**
+
+- **Given** la configuración del repositorio en GitHub
+- **When** reviso sus secretos
+- **Then** no hay claves de acceso de AWS: el *workflow* obtiene credenciales temporales por OIDC con un rol que solo puede publicar imágenes y desplegar en la instancia de producción, y solo desde `main`
+
+**AC4 — Vuelta atrás automática**
+
+- **Given** un despliegue cuya versión nueva no supera la comprobación de salud
+- **When** termina el despliegue
+- **Then** producción vuelve a la versión anterior y el *workflow* falla
+
+### HU-38 Vigilar, recuperar y operar producción
+
+**Como** desarrollador, **quiero** que producción centralice sus registros, me avise de los fallos y tenga copias de seguridad probadas y procedimientos documentados, **para** detectar y resolver incidencias antes de que afecten a los vecinos y no perder datos.
+
+**AC1 — Registros centralizados**
+
+- **Given** la aplicación en producción
+- **When** consulto CloudWatch Logs
+- **Then** encuentro los registros de la web, de la API y del proxy, con una retención definida
+
+**AC2 — Alertas**
+
+- **Given** que la instancia o la base de datos fallan, se quedan sin recursos o la web devuelve errores `5xx` de forma sostenida
+- **When** se supera el umbral de la alarma
+- **Then** recibo un aviso por correo
+
+**AC3 — Recuperación de datos probada**
+
+- **Given** las copias automáticas de la base de datos
+- **When** sigo el procedimiento de restauración documentado
+- **Then** puedo restaurar la base de datos a cualquier copia de los últimos 30 días (la más reciente, de hace 6 horas como mucho) y comprobar que contiene los datos esperados
+
+**AC4 — Operación documentada**
+
+- **Given** la documentación de `infra/aws/README.md` y del `readme.md` (§2.4)
+- **When** necesito nombrar un `platform_admin`, volver a una versión anterior, rotar un secreto o destruir el entorno
+- **Then** encuentro los pasos exactos y el diagrama refleja la infraestructura desplegada
+
+### HU-39 Entender las decisiones de la arquitectura de producción y mantener su documentación al día
+
+**Como** desarrollador, **quiero** que la documentación explique por qué la arquitectura de producción es distinta de la prevista en el `readme.md`, cómo debe evolucionar cuando el proyecto escale y que se actualice con cada cambio de la infraestructura, **para** no tomar decisiones con información desfasada ni repetir debates ya resueltos.
+
+**AC1 — Regla de documentación**
+
+- **Given** `openspec/config.yaml` y `AGENTS.md`
+- **When** un agente o una persona prepara un cambio que toca la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`)
+- **Then** las reglas le obligan a actualizar `infra/aws/README.md` en el mismo cambio
+
+**AC2 — Comprobación automática**
+
+- **Given** un *pull request* que cambia la infraestructura sin tocar `infra/aws/README.md`
+- **When** se ejecutan las comprobaciones de CI
+- **Then** fallan con un mensaje que indica qué fichero hay que actualizar, salvo que el *pull request* lleve la etiqueta que declara que el cambio no afecta a la documentación
+
+**AC3 — Decisiones documentadas**
+
+- **Given** `infra/aws/README.md` y el `readme.md` (§2.4)
+- **When** comparo la arquitectura de producción con la prevista (contenedores gestionados, balanceador, PostgreSQL gestionado con alta disponibilidad, WAF)
+- **Then** encuentro cada diferencia con su motivo (ahorro de costes mientras el proyecto no escale), el riesgo que se acepta y su coste
+
+**AC4 — Evolución recomendada**
+
+- **Given** la sección de evolución de `infra/aws/README.md`
+- **When** el proyecto madura y tiene mucho tráfico
+- **Then** encuentro, en orden y con la señal que indica cuándo dar cada paso y su coste aproximado: RDS (y después Multi-AZ), ECS Fargate con ALB, WAF propio, DNSSEC en Route 53, origen cifrado y orígenes VPC de CloudFront
