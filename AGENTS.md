@@ -89,6 +89,7 @@ styles/       globals.css: tema (@theme), paletas y estilos base
 - **Pruebas:** todo cambio de comportamiento lleva pruebas. API en `apps/api/tests/`; web junto al código (`*.test.ts(x)`).
 - **Contrato:** si cambia una petición o respuesta de la API, actualiza `docs/api/openapi.yaml`.
 - **Esquema:** cualquier cambio de modelo lleva una migración Alembic revisada a mano, con `downgrade()`.
+- **Infraestructura:** si cambias `infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`, actualiza `infra/aws/README.md` en el mismo cambio (guía, *runbook*, costes y, si cambia una decisión, «Decisiones de arquitectura»).
 - **Dependencias:** se añaden con uv o npm dentro de contenedores (ver los README de cada app) y se versionan los *lockfiles*.
 - **Commits:** en inglés, [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `docs`, `refactor`…, ámbito opcional); asunto en imperativo y cuerpo que explique el porqué.
 

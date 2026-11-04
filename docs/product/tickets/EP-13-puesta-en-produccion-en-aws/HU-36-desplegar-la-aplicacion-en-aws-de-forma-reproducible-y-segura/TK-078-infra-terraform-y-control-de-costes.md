@@ -35,7 +35,7 @@ Datos del proyecto: cuenta `995006761619`, región `eu-north-1` (no se puede cam
   ├── modules/              # un módulo por área: network, storage, database, mail, compute, edge, ci, observability
   ├── envs/prod/            # composición de módulos, backend.tf, providers.tf, variables.tf, outputs.tf
   ├── .tflint.hcl
-  └── README.md             # esqueleto; lo completa TK-093
+  └── README.md             # ya existe (esqueleto de TK-094); este ticket completa «Estructura», «Puesta en marcha» y «Costes»
   ```
 - `bootstrap/`: bucket S3 del estado con versionado, cifrado SSE-S3, Block Public Access, política que deniega peticiones sin TLS y `prevent_destroy`.
 - `envs/prod/backend.tf`: *backend* `s3` con `use_lockfile = true` (bloqueo nativo, sin tabla de DynamoDB), `encrypt = true`.

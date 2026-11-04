@@ -15,6 +15,10 @@ context: |
   - infra: docker-compose.yml con db (PostgreSQL 16), storage (MinIO, S3), mail (Mailpit),
     api y web. Redes `data` (privada) y `edge`. Makefile: make dev | build | migrate | clean.
     Todo se ejecuta en contenedores; no se instala nada en el host.
+  - Producción en AWS (Épica 13): Terraform en infra/aws/, Compose de producción y scripts de la
+    instancia en infra/prod/ e infra/docker-compose.prod.yml, workflows en .github/workflows/.
+    Estas son las rutas de infraestructura. infra/aws/README.md es la guía de operación de
+    producción y el registro de decisiones de arquitectura.
   - docs: docs/api/openapi.yaml (contrato de referencia de la API), docs/product/user-stories.md
     (épicas EP-xx e historias HU-xx), docs/product/tickets/ (tickets TK-yyy), readme.md.
 
@@ -59,10 +63,12 @@ rules:
     - En Why, citar la historia (HU-xx) y la ruta del ticket en docs/product/tickets/.
     - Rellenar siempre New Capabilities y Modified Capabilities (aunque alguna quede vacía).
     - En Impact, indicar app y ficheros o carpetas afectados, y si hay cambios de contrato o migraciones.
+    - Si el change toca las rutas de infraestructura (infra/aws/, infra/prod/, infra/docker-compose.prod.yml o .github/workflows/), indicarlo en Impact y citar las secciones de infra/aws/README.md afectadas.
   design:
     - Secciones Context, Decisions y Risks / Trade-offs; solo decisiones no evidentes.
     - Respetar las reglas de dependencias de la arquitectura limpia y los puntos únicos
       (CommunityAccess, ListingVisibility, apiFetch, requireUser).
+    - Si el change modifica una decisión de arquitectura de producción, actualizar su entrada en la sección "Decisiones de arquitectura" de infra/aws/README.md.
   specs:
     - Requisitos en español con SHALL / MUST / MUST NOT; un párrafo por requisito.
     - Citar entre «» los textos exactos que ve el usuario y con `código` rutas, códigos HTTP y campos.
@@ -72,3 +78,4 @@ rules:
     - Agrupar por capa (BD, Backend, Frontend, Documentación) y terminar con un grupo Verificación.
     - Incluir las pruebas en la tarea que implementa el comportamiento ("…, con pruebas").
     - La verificación final ejecuta lint, typecheck y tests en contenedores.
+    - Si el change toca las rutas de infraestructura, incluir en el grupo Documentación una tarea que actualice infra/aws/README.md (guía, runbook, costes o decisiones, según corresponda).

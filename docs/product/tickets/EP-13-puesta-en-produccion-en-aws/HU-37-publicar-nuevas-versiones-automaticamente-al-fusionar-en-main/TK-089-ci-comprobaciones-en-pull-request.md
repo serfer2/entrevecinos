@@ -6,8 +6,8 @@
 | **Componente** | `.github/workflows/ci.yml` (nuevo), `.github/dependabot.yml` (nuevo), configuración del repositorio en GitHub |
 | **Historia** | HU-37 Publicar nuevas versiones automáticamente al fusionar en `main` (Épica 13) |
 | **Prioridad** | Alta |
-| **Depende de** | TK-078 |
-| **Referencias** | `AGENTS.md` («Verificación antes de dar un cambio por terminado»); `Makefile`; TK-076 (prueba de alcance del MVP) |
+| **Depende de** | TK-078, TK-094 |
+| **Referencias** | `AGENTS.md` («Verificación antes de dar un cambio por terminado» y «Infraestructura»); `Makefile`; TK-076 (prueba de alcance del MVP); TK-094 (regla de documentación de la infraestructura, cuya comprobación automática se implementa aquí) |
 
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.
 
@@ -24,10 +24,11 @@ Las comprobaciones de `AGENTS.md` (pruebas, lint y formato de la API y de la web
   - **api**: construir la imagen `dev` con Compose y ejecutar `ruff check`, `ruff format --check` y `pytest` (incluidas las pruebas `@pytest.mark.db` con el servicio `db` de Compose), igual que en `AGENTS.md`;
   - **web**: `npm ci`, `lint`, `typecheck` y `test` en la imagen de la web;
   - **infra**: `terraform fmt -check`, `terraform validate` (sin *backend*), `tflint` y `checkov` sobre `infra/aws/`, `shellcheck` de `infra/prod/*.sh`;
-  - **images**: construir las etapas `prod` de `api` y `web` para `linux/arm64` con `docker buildx` y caché de GitHub Actions, sin publicar.
+  - **images**: construir las etapas `prod` de `api` y `web` para `linux/arm64` con `docker buildx` y caché de GitHub Actions, sin publicar;
+  - **docs-infra** (solo en *pull requests*; trasladado desde TK-094): si algún fichero cambiado está en las rutas de infraestructura (`infra/aws/**`, `infra/prod/**`, `infra/docker-compose.prod.yml`, `.github/workflows/**`) y `infra/aws/README.md` no ha cambiado, falla con «Este *pull request* cambia la infraestructura: actualiza `infra/aws/README.md` o añade la etiqueta `sin-cambios-en-doc-infra` si el cambio no afecta a la documentación.»; la etiqueta `sin-cambios-en-doc-infra` (que se crea en el repositorio) lo omite. Usa `git diff --name-only origin/<base>...HEAD` con `fetch-depth: 0`, sin secretos.
 - Seguridad del *workflow*: `permissions: contents: read` por defecto; acciones de terceros fijadas por SHA; `concurrency` por rama con cancelación de ejecuciones antiguas; sin secretos en los trabajos de *pull request*.
 - `.github/dependabot.yml` para `github-actions`, `pip` (uv), `npm`, `docker` y `terraform`, semanal.
-- Protección de la rama `main` en GitHub (manual, documentada): exigir los cuatro trabajos y una revisión.
+- Protección de la rama `main` en GitHub (manual, documentada): exigir los cinco trabajos (`api`, `web`, `infra`, `images` y `docs-infra`) y una revisión.
 
 **No incluye**
 - Publicar imágenes ni desplegar (TK-090).
@@ -45,12 +46,17 @@ Las comprobaciones de `AGENTS.md` (pruebas, lint y formato de la API y de la web
 **AC1 — Comprobaciones completas (HU-37 AC1)**
 - **Given** un *pull request* a `main`
 - **When** termina el *workflow*
-- **Then** se han ejecutado los trabajos `api`, `web`, `infra` e `images` y su resultado aparece en el *pull request*
+- **Then** se han ejecutado los trabajos `api`, `web`, `infra`, `images` y `docs-infra` y su resultado aparece en el *pull request*
 
 **AC2 — Fusión bloqueada (HU-37 AC1)**
 - **Given** un *pull request* que rompe una prueba o el formato
 - **When** intento fusionarlo
 - **Then** GitHub no lo permite hasta que las comprobaciones pasen
+
+**AC2b — Documentación de la infraestructura (HU-39 AC2)**
+- **Given** un *pull request* que cambia un fichero de `infra/aws/` sin tocar `infra/aws/README.md`
+- **When** termina el *workflow*
+- **Then** `docs-infra` falla con el mensaje acordado y el *pull request* no se puede fusionar; con la etiqueta `sin-cambios-en-doc-infra`, o actualizando la guía, pasa; y un *pull request* que solo cambia `apps/web/` lo pasa sin más
 
 **AC3 — *Workflow* seguro**
 - **Given** el fichero del *workflow*
@@ -70,9 +76,10 @@ Las comprobaciones de `AGENTS.md` (pruebas, lint y formato de la API y de la web
 Desde la interfaz web de GitHub (no hace falta instalar `gh` ni ninguna otra herramienta en el equipo):
 
 - **Workflow registrado:** `https://github.com/serfer2/entrevecinos/actions` → en la barra lateral aparece «CI» (`ci.yml`) y su última ejecución en `main` está en verde.
-- **Comprobaciones de un *pull request* (AC1):** en el *pull request*, pestaña *Checks* (o el bloque de estado al pie de *Conversation*) → aparecen los trabajos `api`, `web`, `infra` e `images` con su resultado; cada uno enlaza a su registro.
+- **Comprobaciones de un *pull request* (AC1):** en el *pull request*, pestaña *Checks* (o el bloque de estado al pie de *Conversation*) → aparecen los trabajos `api`, `web`, `infra`, `images` y `docs-infra` con su resultado; cada uno enlaza a su registro.
+- **Documentación de la infraestructura (AC2b):** *pull request* de prueba que toca `infra/aws/` sin la guía → `docs-infra` en rojo con el mensaje; tras añadir la etiqueta o la guía, en verde.
 - **Fusión bloqueada (AC2):** en un *pull request* con una prueba rota, el botón *Merge pull request* está desactivado con el aviso «Required statuses must pass before merging».
-- **Protección de `main`:** *Settings* → *Branches* (o *Rules* → *Rulesets*) → la regla de `main` exige los cuatro trabajos como *status checks* y una revisión aprobada.
+- **Protección de `main`:** *Settings* → *Branches* (o *Rules* → *Rulesets*) → la regla de `main` exige los cinco trabajos como *status checks* y una revisión aprobada.
 - **Permisos y SHA (AC3):** revisión de `.github/workflows/ci.yml` en el *pull request* (bloque `permissions` y `uses: …@<sha>`).
 
 ## 7. Definición de terminado

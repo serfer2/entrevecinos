@@ -3,10 +3,10 @@
 | Campo | Valor |
 |---|---|
 | **Tipo** | Documentación / proceso |
-| **Componente** | `openspec/config.yaml`, `AGENTS.md`, `.github/workflows/ci.yml`, `.github/pull_request_template.md` (nuevo) |
+| **Componente** | `openspec/config.yaml`, `AGENTS.md`, `.github/pull_request_template.md` (nuevo), `infra/aws/README.md` (esqueleto), `infra/README.md`; `.github/workflows/ci.yml` en TK-089 |
 | **Historia** | HU-39 Entender las decisiones de la arquitectura de producción y mantener su documentación al día (Épica 13) |
 | **Prioridad** | Alta (adelantarlo justo después de TK-078; ver §8) |
-| **Depende de** | TK-078 (crea `infra/aws/README.md`); la comprobación de CI, de TK-089 |
+| **Depende de** | — (crea el esqueleto de `infra/aws/README.md`, que TK-078 amplía) |
 | **Referencias** | TK-093 §8 («Documentación que envejece»); `openspec/config.yaml` (`context` y `rules`); `AGENTS.md` (§Convenciones) |
 
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.
@@ -15,7 +15,9 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 
 `infra/aws/README.md` es la guía para crear, desplegar, operar y destruir producción (TK-093) y el registro de decisiones de arquitectura (TK-082, TK-095). Si un cambio en Terraform, en el Compose de producción, en los *scripts* de la instancia o en los *workflows* no la actualiza, la guía deja de ser fiable sin que nadie lo note. Hoy ninguna regla del proyecto lo exige: `openspec/config.yaml` solo describe el Compose de desarrollo y `AGENTS.md` no menciona la infraestructura de AWS.
 
-**Objetivo:** que todo cambio de la infraestructura actualice `infra/aws/README.md` en el mismo cambio, exigido por las reglas de OpenSpec, por las instrucciones de los agentes y por una comprobación automática en CI.
+**Objetivo:** que todo cambio de la infraestructura actualice `infra/aws/README.md` en el mismo cambio, exigido por las reglas de OpenSpec, por las instrucciones de los agentes y por la plantilla de *pull request*.
+
+**Alcance reducido (decisión del proyecto):** se implementa antes que el resto de la épica, cuando aún no existen `infra/aws/` ni `.github/workflows/`. Por eso este ticket crea el esqueleto de `infra/aws/README.md` y la **comprobación automática `docs-infra` se traslada a TK-089** (HU-39 AC2), que crea el primer *workflow*.
 
 ## 2. Alcance
 
@@ -28,7 +30,8 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
   - `rules.tasks`: «Si el change toca las rutas de infraestructura, incluir en el grupo Documentación una tarea que actualice `infra/aws/README.md` (guía, *runbook*, costes o decisiones, según corresponda).».
 - **`AGENTS.md`:** nueva viñeta en §Convenciones, junto a «Contrato» y «Esquema»:
   > **Infraestructura:** si cambias `infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`, actualiza `infra/aws/README.md` en el mismo cambio (guía, *runbook*, costes y, si cambia una decisión, «Decisiones de arquitectura»).
-- **Comprobación en CI** (trabajo `docs-infra` en `ci.yml`, cuando exista TK-089):
+- **Esqueleto de `infra/aws/README.md`** con una sección por tema (estructura, puesta en marcha, despliegue, DNS, secretos, operación, costes, decisiones de arquitectura, evolución, destrucción) y el ticket que completará cada una; enlace desde `infra/README.md`.
+- ~~**Comprobación en CI**~~ **trasladada a TK-089** (trabajo `docs-infra`; se conserva aquí la definición para referencia):
   - compara los ficheros cambiados del *pull request* con la rama base;
   - si alguno está en las rutas de infraestructura y `infra/aws/README.md` no ha cambiado, falla con el mensaje «Este *pull request* cambia la infraestructura: actualiza `infra/aws/README.md` o añade la etiqueta `sin-cambios-en-doc-infra` si el cambio no afecta a la documentación.»;
   - la etiqueta `sin-cambios-en-doc-infra` lo omite (p. ej. un cambio de formato o una versión de una acción); se crea en el repositorio;
@@ -58,12 +61,12 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 - **When** lo leo en §Convenciones
 - **Then** encuentro la viñeta «Infraestructura» con las rutas y la obligación de actualizar `infra/aws/README.md`
 
-**AC3 — Comprobación en CI (HU-39 AC2)**
+**AC3 — Comprobación en CI (HU-39 AC2; se verifica en TK-089, AC2b)**
 - **Given** un *pull request* que cambia `infra/aws/modules/network/main.tf` sin tocar `infra/aws/README.md`
 - **When** termina CI
 - **Then** el trabajo `docs-infra` falla con el mensaje acordado y el *pull request* no se puede fusionar; con la etiqueta `sin-cambios-en-doc-infra`, o actualizando la guía, pasa
 
-**AC4 — Sin falsos positivos**
+**AC4 — Sin falsos positivos (se verifica en TK-089, AC2b)**
 - **Given** un *pull request* que solo cambia `apps/web/`
 - **When** termina CI
 - **Then** `docs-infra` pasa
@@ -73,8 +76,9 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 1. Reglas y contexto en `openspec/config.yaml`.
 2. Viñeta en `AGENTS.md`.
 3. Plantilla de *pull request*.
-4. Trabajo `docs-infra`, etiqueta y *status check* obligatorio (cuando exista TK-089).
-5. Pruebas de AC1, AC3 y AC4 con *pull requests* de prueba.
+4. Esqueleto de `infra/aws/README.md` y enlace desde `infra/README.md`.
+5. Actualizar TK-089 con el trabajo `docs-infra` (sus AC verifican AC3 y AC4).
+6. Prueba de AC1 con las instrucciones de OpenSpec.
 
 ## 6. Verificación
 
@@ -92,6 +96,6 @@ En GitHub (interfaz web): un *pull request* de prueba que toca `infra/aws/` sin 
 
 ## 8. Riesgos y decisiones abiertas
 
-- **Momento de implementarlo:** cuanto antes, mejor: si se implementa al final, los tickets TK-079 a TK-093 no estarán sujetos a la regla. Se recomienda implementar las reglas (pasos 1-3) justo después de TK-078 y la comprobación de CI (paso 4) justo después de TK-089.
+- **Momento de implementarlo:** se implementa el primero de la épica para que TK-078 a TK-093 ya estén sujetos a la regla; la comprobación automática llega con TK-089.
 - **La comprobación solo detecta ausencia, no calidad:** un cambio trivial en la guía la satisface. Se complementa con la casilla de la plantilla y la revisión del *pull request*.
 - **Etiqueta de omisión usada de más:** se revisa en el *pull request*; si se abusa, exigir un comentario que justifique la etiqueta.
