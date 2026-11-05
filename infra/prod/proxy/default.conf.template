@@ -1,0 +1,41 @@
+# Proxy de origen (TK-086). Solo atiende peticiones que traen la cabecera secreta que añade
+# CloudFront (TK-087); el resto recibe 403 sin llegar a la web. El TLS lo termina CloudFront.
+#
+# El entrypoint de la imagen sustituye ${ORIGIN_VERIFY} (NGINX_ENVSUBST_FILTER) al arrancar y
+# escribe la configuración en /etc/nginx/conf.d, un tmpfs: el secreto no llega al disco.
+
+server_tokens off;
+client_max_body_size 12m;
+
+# DNS de Docker: la IP de `web` cambia en cada despliegue y nginx la resolvería solo al arrancar.
+resolver 127.0.0.11 valid=10s ipv6=off;
+
+server {
+    listen 8080;
+
+    if ($http_x_origin_verify != "${ORIGIN_VERIFY}") {
+        return 403;
+    }
+
+    location / {
+        set $web http://web:3000;
+        proxy_pass $web;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Todo el tráfico público llega por HTTPS a CloudFront.
+        proxy_set_header X-Forwarded-Proto https;
+        # La web no necesita el secreto.
+        proxy_set_header X-Origin-Verify "";
+    }
+}
+
+# Salud del proxy, solo dentro del contenedor (no se publica): sin abrir rutas sin cabecera en :8080.
+server {
+    listen 127.0.0.1:8081;
+    access_log off;
+
+    location / {
+        return 200 "ok\n";
+    }
+}

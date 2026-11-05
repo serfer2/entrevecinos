@@ -7,14 +7,14 @@
 # 3. Comprobación: tamaño mínimo y `pg_restore --list` sobre la copia subida.
 # 4. Métrica Entrevecinos/Backup BackupSucceeded = 1 (la alarma de TK-091 salta si falta).
 #
-# Configuración (no secreta) por entorno: BACKUP_BUCKET, AWS_REGION y COMPOSE_FILE. La contraseña
-# se lee de Parameter Store al ejecutarse y solo vive en el entorno de este proceso.
+# Configuración (no secreta) por entorno: BACKUP_BUCKET y AWS_REGION. La contraseña se lee de
+# Parameter Store al ejecutarse y solo vive en el entorno de este proceso. Usa `docker`, no
+# `docker compose`: el Compose de producción exige los secretos del despliegue (TK-086).
 set -euo pipefail
 set +x
 
 : "${BACKUP_BUCKET:?Falta BACKUP_BUCKET}"
 export AWS_REGION="${AWS_REGION:-eu-north-1}"
-compose_file="${COMPOSE_FILE:-/opt/entrevecinos/docker-compose.prod.yml}"
 min_bytes="${BACKUP_MIN_BYTES:-1024}"
 
 key="postgres/$(date -u +%Y/%m/%d)/$(date -u +%Y%m%dT%H%M%SZ).dump"
@@ -24,8 +24,15 @@ PGPASSWORD="$(aws ssm get-parameter --name /entrevecinos/prod/db/owner-password 
   --with-decryption --query Parameter.Value --output text)"
 export PGPASSWORD
 
+container="$(docker ps -q --filter label=com.docker.compose.project=entrevecinos \
+  --filter label=com.docker.compose.service=db)"
+if [[ -z $container ]]; then
+  echo "El contenedor db no está en marcha" >&2
+  exit 1
+fi
+
 db() {
-  docker compose -f "$compose_file" exec -T -e PGPASSWORD db "$@"
+  docker exec -i -e PGPASSWORD "$container" "$@"
 }
 
 echo "Copia de PostgreSQL en ${uri}"

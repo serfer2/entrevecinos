@@ -67,3 +67,8 @@ output "instance_public_dns" {
   description = "DNS público de la instancia (origen de CloudFront, TK-087)."
   value       = module.compute.public_dns
 }
+
+output "deploy_document_name" {
+  description = "Documento de SSM que despliega la aplicación (TK-086)."
+  value       = module.compute.deploy_document_name
+}

@@ -57,4 +57,5 @@ module "compute" {
   ecr_repository_arns       = values(module.storage.ecr_repository_arns)
   ses_identity_arns         = concat([module.mail.domain_identity_arn], module.mail.test_recipient_identity_arns)
   ses_configuration_set_arn = module.mail.configuration_set_arn
+  origin_verify_version     = var.origin_verify_version
 }

@@ -1,0 +1,174 @@
+# Producción en la instancia EC2 (TK-086). No se usa a mano: lo despliega infra/prod/deploy.sh
+# (documento de SSM entrevecinos-deploy), que lee los secretos de Parameter Store y los pasa solo
+# por entorno. Sin ellos, cualquier orden de `docker compose` falla (${VAR:?}): para operar, usa
+# `docker` (ver infra/aws/README.md, «Operación»).
+#
+# En la instancia: /opt/entrevecinos/docker-compose.prod.yml y /opt/entrevecinos/prod/.
+name: entrevecinos
+
+x-hardened: &hardened
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+x-logging: &logging
+  driver: awslogs
+  options: &logging-options
+    awslogs-region: eu-north-1
+    awslogs-group: /entrevecinos/prod/app/unset
+    tag: "{{.Name}}/{{.ID}}"
+
+services:
+  proxy:
+    <<: *hardened
+    # Comprueba la cabecera secreta de CloudFront (TK-087); el TLS lo termina CloudFront. Imagen sin
+    # root y sin capacidades de fichero (las de Caddy no arrancan con no-new-privileges).
+    image: nginxinc/nginx-unprivileged:1.30.4-alpine
+    environment:
+      ORIGIN_VERIFY: ${ORIGIN_VERIFY:?Lo define deploy.sh}
+      NGINX_ENVSUBST_FILTER: ^ORIGIN_VERIFY$$
+    volumes:
+      - ./prod/proxy:/etc/nginx/templates:ro
+    tmpfs:
+      # Configuración generada al arrancar (con el secreto) y ficheros temporales de nginx.
+      - /etc/nginx/conf.d:size=1m,mode=1777
+      - /tmp:size=16m,mode=1777
+    ports:
+      - "80:8080"
+    networks: [edge]
+    depends_on:
+      web:
+        condition: service_healthy
+    mem_limit: 64m
+    cpus: 0.5
+    pids_limit: 100
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      <<: *logging
+      options:
+        <<: *logging-options
+        awslogs-group: /entrevecinos/prod/app/proxy
+
+  web:
+    <<: *hardened
+    image: ${WEB_IMAGE:?Lo define deploy.sh}
+    environment:
+      API_INTERNAL_URL: http://api:8000/v1
+      # Origen de las URL prefirmadas de las imágenes: se permite en `img-src` de la CSP.
+      STORAGE_PUBLIC_URL: https://entrevecinos-media-995006761619.s3.eu-north-1.amazonaws.com
+    tmpfs:
+      - /tmp:size=32m
+      # Caché de Next (optimización de imágenes y páginas): el resto del sistema es de solo lectura.
+      - /app/.next/cache:size=128m,mode=1777
+    networks: [edge, internal]
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 200
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      <<: *logging
+      options:
+        <<: *logging-options
+        awslogs-group: /entrevecinos/prod/app/web
+
+  api:
+    <<: *hardened
+    image: ${API_IMAGE:?Lo define deploy.sh}
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://entrevecinos_app:${ENTREVECINOS_APP_PASSWORD:?Lo define deploy.sh}@db:5432/entrevecinos
+      CORS_ORIGINS: https://entrevecinos.org
+      JWT_SECRET: ${JWT_SECRET:?Lo define deploy.sh}
+      # S3 y SES con las credenciales del rol de la instancia (TK-081), sin claves.
+      STORAGE_BUCKET: entrevecinos-media-995006761619
+      STORAGE_REGION: eu-north-1
+      STORAGE_ADDRESSING_STYLE: virtual
+      MAIL_BACKEND: ses
+      SES_REGION: eu-north-1
+      SES_CONFIGURATION_SET: entrevecinos-prod
+      MAIL_FROM: EntreVecinos <no-reply@entrevecinos.org>
+      WEB_PUBLIC_URL: https://entrevecinos.org
+    tmpfs:
+      - /tmp:size=32m
+    # `egress` para salir a S3, SES e IMDS: las redes internas no tienen salida.
+    networks: [internal, data, egress]
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 384m
+    cpus: 1.0
+    pids_limit: 200
+    healthcheck:
+      # /v1/health responde 200 solo si la API está en marcha y llega a la base de datos.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      <<: *logging
+      options:
+        <<: *logging-options
+        awslogs-group: /entrevecinos/prod/app/api
+
+  db:
+    # Se actualiza aparte, con copia previa: `up -d` no lo reinicia si no cambia (TK-082).
+    image: postgres:16.15
+    restart: unless-stopped
+    # El entrypoint de la imagen oficial cambia el propietario de los datos y pasa a `postgres`.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      # Solo se usan al inicializar la base y al crear o actualizar los roles (10-roles.sh).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Lo define deploy.sh}
+      ENTREVECINOS_OWNER_PASSWORD: ${ENTREVECINOS_OWNER_PASSWORD:?Lo define deploy.sh}
+      ENTREVECINOS_APP_PASSWORD: ${ENTREVECINOS_APP_PASSWORD:?Lo define deploy.sh}
+      # Subdirectorio: la imagen necesita un directorio vacío y el volumen es la raíz del XFS.
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - /srv/entrevecinos/postgres:/var/lib/postgresql/data
+      - ./prod/initdb:/docker-entrypoint-initdb.d:ro
+    shm_size: 128m
+    networks: [data]
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d entrevecinos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      <<: *logging
+      options:
+        <<: *logging-options
+        awslogs-group: /entrevecinos/prod/app/db
+
+networks:
+  # Proxy ↔ web. Única red con un puerto publicado.
+  edge:
+  # Web ↔ API, sin salida.
+  internal:
+    internal: true
+  # API ↔ PostgreSQL, sin salida: la web no llega a la base de datos.
+  data:
+    internal: true
+  # Salida a Internet solo para la API.
+  egress:

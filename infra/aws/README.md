@@ -14,7 +14,8 @@ infra/aws/
 ├── modules/
 │   ├── private-bucket/ bucket S3 privado con los valores seguros comunes
 │   ├── budget/         presupuesto mensual con avisos (TK-078)
-│   ├── compute/        instancia EC2 endurecida, su rol, Session Manager y Patch Manager (TK-085)
+│   ├── compute/        instancia EC2 endurecida, su rol, Session Manager y Patch Manager (TK-085);
+│   │                   documento de despliegue, logs de los contenedores y cabecera de origen (TK-086)
 │   ├── network/        VPC, subred pública, grupo de seguridad y flow logs (TK-079)
 │   ├── storage/        repositorios ECR y bucket de imágenes (TK-080)
 │   ├── database/       volumen de PostgreSQL, snapshots, bucket de copias y contraseñas (TK-082)
@@ -22,7 +23,10 @@ infra/aws/
 │   └── mail/           SES (configuration set, dominio con DKIM y MAIL FROM) y secreto de los JWT (TK-083, TK-084)
 ├── .tflint.hcl         reglas de tflint
 └── .checkov.yaml       comprobaciones de checkov omitidas, con su motivo
+infra/docker-compose.prod.yml   Compose de producción: proxy, web, api y db (TK-086)
 infra/prod/             ficheros que se copian a la instancia (TK-082, TK-086)
+├── deploy.sh           despliegue: secretos, migraciones, salud y vuelta atrás
+├── proxy/              nginx: exige la cabecera de origen de CloudFront
 ├── initdb/10-roles.sh  roles de PostgreSQL
 ├── backup.sh           copia de PostgreSQL a S3
 └── systemd/            servicio y temporizador de las copias
@@ -64,11 +68,73 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
 
    Mientras AWS no la apruebe, SES solo envía a direcciones verificadas y como máximo 200 correos al día.
 
-*Pendiente: TK-086 y TK-087* (despliegue y CloudFront).
+7. **Primer despliegue** de la aplicación: ver «Despliegue».
+
+*Pendiente: TK-087* (CloudFront).
 
 ## Despliegue
 
-*Pendiente: TK-086 y TK-090.* Compose de producción, `deploy.sh`, primer despliegue manual por SSM, despliegue continuo desde GitHub Actions y vuelta atrás.
+La instancia ejecuta `infra/docker-compose.prod.yml` con cuatro servicios: `proxy` (nginx, único puerto publicado, el 80), `web`, `api` y `db`. Las imágenes de la web y la API van por *digest* desde ECR; las de nginx y PostgreSQL, fijadas por versión desde Docker Hub.
+
+| Red | Servicios | Salida a Internet |
+|---|---|---|
+| `edge` | `proxy`, `web` | sí (solo el puerto 80 publicado) |
+| `internal` | `web`, `api` | no |
+| `data` | `api`, `db` | no |
+| `egress` | `api` | sí (S3, SES e IMDS) |
+
+- **Proxy de origen:** responde `403` a toda petición sin la cabecera `X-Origin-Verify` con el valor de `/entrevecinos/prod/origin-verify` (la añade CloudFront, TK-087) y la quita antes de reenviar a la web. Mientras no haya CloudFront, la web solo se prueba desde la instancia.
+- **Contenedores endurecidos:** `proxy`, `web` y `api` sin *root*, con el sistema de ficheros de solo lectura (`tmpfs` donde hace falta), sin capacidades, con `no-new-privileges`, límites de memoria, CPU y procesos, y sin el socket de Docker. `db` mantiene solo las capacidades que usa la imagen oficial.
+- **Logs** con el *driver* `awslogs` en `/entrevecinos/prod/app/{proxy,web,api,db}`, y la salida de cada despliegue en `/entrevecinos/prod/app/deploy` (30 días).
+
+### Cómo se despliega
+
+El documento de SSM `entrevecinos-deploy` lleva dentro el Compose y `infra/prod/` (los incrusta Terraform), los escribe en `/opt/entrevecinos` y ejecuta `deploy.sh <digest de api> <digest de web>` como *root*. **Si cambias el Compose o algo de `infra/prod/`, `make tf-apply` antes de desplegar.** `deploy.sh`:
+
+1. configura `amazon-ecr-credential-helper` (Docker pide el token de ECR con el rol; no queda ninguno en disco);
+2. lee los secretos de Parameter Store y los exporta solo al entorno de su proceso;
+3. descarga las imágenes, arranca `db` y crea o actualiza los roles (también aplica las contraseñas rotadas);
+4. aplica las migraciones como `entrevecinos_owner` (`alembic upgrade head`);
+5. arranca el resto, espera a que todo esté *healthy* y comprueba la web a través del proxy con la cabecera;
+6. si falla, vuelve a los *digests* de `/opt/entrevecinos/current-digests` (sin deshacer migraciones) y termina con error;
+7. guarda los *digests*, instala el temporizador de copias y borra las imágenes sin uso.
+
+Las migraciones deben ser compatibles con la versión anterior de la API (*expand/contract*): la vuelta atrás no las deshace.
+
+### Despliegue manual
+
+Hasta TK-090 (GitHub Actions) se construye y despliega desde el equipo. La instancia es `arm64`; en un equipo `amd64` hace falta la emulación de QEMU (en Ubuntu, `sudo apt-get install qemu-user-static`; comprobar con `docker buildx inspect --bootstrap`, que debe listar `linux/arm64`).
+
+```bash
+registry=995006761619.dkr.ecr.eu-north-1.amazonaws.com
+tag=$(git rev-parse --short=12 HEAD)          # los tags de ECR son inmutables
+aws ecr get-login-password --profile entrevecinos --region eu-north-1 |
+  docker login --username AWS --password-stdin "$registry"
+# Imágenes base desde la réplica oficial de ECR Public: sin el límite de descargas de Docker Hub.
+bases=(--build-context python:3.12-slim=docker-image://public.ecr.aws/docker/library/python:3.12-slim
+       --build-context node:22-alpine=docker-image://public.ecr.aws/docker/library/node:22-alpine)
+docker buildx build --platform linux/arm64 --target prod --provenance=false "${bases[@]}" \
+  -t "$registry/entrevecinos/api:$tag" --push apps/api
+docker buildx build --platform linux/arm64 --target prod --provenance=false "${bases[@]}" \
+  --build-arg NEXT_PUBLIC_API_BASE_URL=http://api:8000/v1 \
+  -t "$registry/entrevecinos/web:$tag" --push apps/web
+digest() { aws ecr describe-images --profile entrevecinos --region eu-north-1 \
+  --repository-name "entrevecinos/$1" --image-ids imageTag="$tag" \
+  --query 'imageDetails[0].imageDigest' --output text; }
+
+aws ssm send-command --profile entrevecinos --region eu-north-1 \
+  --document-name entrevecinos-deploy \
+  --targets Key=InstanceIds,Values="$(make -s tf-output | sed -n 's/^instance_id = "\(.*\)"/\1/p')" \
+  --parameters ApiDigest="$(digest api)",WebDigest="$(digest web)" \
+  --cloud-watch-output-config CloudWatchOutputEnabled=true,CloudWatchLogGroupName=/entrevecinos/prod/app/deploy \
+  --query Command.CommandId --output text
+aws ssm list-command-invocations --profile entrevecinos --region eu-north-1 --details \
+  --command-id <id> --query 'CommandInvocations[0].{estado:Status,salida:CommandPlugins[0].Output}'
+```
+
+`docker login` deja el token de ECR (válido 12 horas) en `~/.docker/config.json` del equipo; `docker logout "$registry"` lo borra.
+
+*Pendiente: TK-090* (despliegue continuo desde GitHub Actions).
 
 ## DNS
 
@@ -123,12 +189,18 @@ Todos los secretos viven en SSM Parameter Store como `SecureString` (nivel está
 | `/entrevecinos/prod/db/owner-password` | `entrevecinos_owner` (migraciones y copias) | TK-082 |
 | `/entrevecinos/prod/db/app-password` | `entrevecinos_app` (la API) | TK-082 |
 | `/entrevecinos/prod/db/{host,port,name}` | Conexión (`String`, no secretos): `db`, `5432`, `entrevecinos` | TK-082 |
+| `/entrevecinos/prod/origin-verify` | Cabecera `X-Origin-Verify` entre CloudFront y el proxy (48 caracteres) | TK-086 |
 
-- Los valores se generan con `ephemeral "random_password"` y se escriben con argumentos de solo escritura (`value_wo`): **no quedan en el estado de Terraform**.
+- Los valores (salvo `origin-verify`) se generan con `ephemeral "random_password"` y se escriben con argumentos de solo escritura (`value_wo`): **no quedan en el estado de Terraform**.
 - No tienen rotación automática. Para rotar: sube `jwt_secret_version` o `db_password_version` en `prod.tfvars`, `make tf-apply` y vuelve a desplegar (TK-086 aplica las contraseñas nuevas a PostgreSQL y recrea los contenedores). Rotar el secreto de los JWT invalida todas las sesiones.
 - Para consultar uno (solo administración): `aws ssm get-parameter --name <nombre> --with-decryption --profile entrevecinos`.
 
-*Pendiente: TK-086* (cómo llegan a los contenedores, solo por entorno).
+**Cómo llegan a los contenedores (TK-086): solo por entorno.** `deploy.sh` los lee con una sola llamada a Parameter Store y los exporta al entorno de su proceso; `docker compose` los interpola (`${VAR:?}`) y se los pasa a cada contenedor. No hay `.env`, ni ficheros de contraseñas, ni temporales, y el script no los imprime (sin traza ni `docker compose config`). Consecuencias:
+
+- `docker compose` sin esas variables falla: cualquier recreación de contenedores pasa por `deploy.sh` (para operar, `docker`; ver «Operación»). Tras un reinicio de la instancia, Docker vuelve a arrancar los contenedores existentes con su configuración guardada.
+- **Rotar** cualquier secreto exige volver a desplegar, que recrea los contenedores afectados (si cambian las contraseñas de PostgreSQL, también `db`).
+- **Riesgo residual:** Docker guarda el entorno de cada contenedor en `/var/lib/docker/containers/` y `docker inspect` lo muestra. Solo *root* accede (el usuario `deploy` no está en el grupo `docker`).
+- `origin-verify` se genera con `random_password` y, a diferencia del resto, **queda en el estado de Terraform**: CloudFront lo necesita como cabecera de origen, que no admite valores de solo escritura. Solo sirve para que nadie salte CloudFront. Se rota con `origin_verify_version`.
 
 ## Operación
 
@@ -156,6 +228,19 @@ Una sola instancia `entrevecinos-prod-app` (`t4g.small`, arm64, Amazon Linux 202
   - escribir en los grupos de logs `/entrevecinos/prod/app/*` y de sesiones, y publicar métricas en `Entrevecinos/Backup` y `CWAgent`.
 - **Reemplazar la instancia** (nueva AMI, cambio de *user data*): procedimiento en TK-093.
 
+### Aplicación (TK-086)
+
+El Compose exige los secretos, así que en la instancia se opera con `docker` y las etiquetas de Compose (en una sesión de Session Manager, `sudo -i`):
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+docker logs --tail 50 entrevecinos-api-1        # también en /entrevecinos/prod/app/api
+docker restart entrevecinos-web-1               # reinicia con la misma configuración
+cat /opt/entrevecinos/current-digests           # versión desplegada
+```
+
+Para cambiar imágenes, configuración o secretos, siempre un despliegue nuevo (ver «Despliegue»).
+
 ### Base de datos y copias (TK-082)
 
 PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un volumen EBS propio (`entrevecinos-prod-postgres`, 10 GB, cifrado) que sobrevive a la instancia.
@@ -165,6 +250,7 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Snapshots** diarios del volumen a las 03:00 UTC con Data Lifecycle Manager; se conservan 7.
 - **Copias protegidas:** la política del bucket deniega el borrado a todos salvo a los roles de `admin_role_arns`; la instancia solo escribe y lee.
 - Copia a demanda (p. ej. antes de una migración destructiva): `sudo systemctl start entrevecinos-backup.service` en la instancia.
+- `deploy.sh` instala el script y el temporizador en cada despliegue (`/opt/entrevecinos/prod/backup.sh`). El script localiza el contenedor `db` con `docker` (por sus etiquetas de Compose), así que no necesita los secretos del despliegue.
 
 *Pendiente: TK-091 a TK-093* (registros, alarmas, restauración probada y *runbook*).
 
@@ -174,6 +260,8 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Presupuesto** `entrevecinos-mensual` en AWS Budgets, igual al límite (`monthly_budget_usd`, 44 USD): avisos por correo al 50 %, 75 % y 90 % del gasto real y al 100 % del previsto.
 - **Estimación** de la épica completa (sin alta disponibilidad, mientras el proyecto no escale): unos 20 USD/mes. Hasta TK-085 solo se pagan céntimos (S3, ECR, CloudWatch y el volumen de datos, ≈ 1 USD/mes) y la zona de Route 53 (0,50 USD/mes más las consultas; las de alias a CloudFront no se cobran).
 - **Instancia** (TK-085): `t4g.small` ≈ 12 USD/mes más el volumen raíz de 20 GB (≈ 1,6 USD/mes). Entra en la capa gratuita del plan FREE, así que se paga con los créditos. Con créditos de CPU `standard` no hay cargos por exceso.
+
+- **Logs de la aplicación** (TK-086): unos MB al día con el tráfico del MVP, dentro de los 5 GB de ingesta gratuitos al mes; 30 días de retención.
 
 *Pendiente: TK-093* (estimación por servicio con la infraestructura completa).
 
@@ -196,6 +284,15 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Mitigaciones:** sin SSH (Session Manager con registro), IMDSv2, rol de mínimo privilegio, parches automáticos, recuperación automática y contenedores sin privilegios ni socket de Docker (TK-086).
 - **Cuándo revisarla:** CPU o memoria saturadas de forma sostenida, necesidad de más de una instancia o de separar web y API.
 - **Evolución:** ECS Fargate con ALB y una tarea por servicio (TK-095).
+
+### Despliegue por SSM con secretos solo por entorno (TK-086)
+
+- **Qué:** un documento de SSM con la configuración incrustada ejecuta `deploy.sh` en la instancia; los secretos van de Parameter Store al entorno de los contenedores sin pasar por disco. Proxy nginx sin *root* en lugar de Caddy.
+- **Por qué:** sin SSH ni claves, sin buckets ni permisos nuevos para repartir ficheros, y la versión del documento es la versión de la configuración. Caddy no arranca sin *root* con `no-new-privileges` (su binario tiene una capacidad de fichero), y como *root* incumpliría el endurecimiento.
+- **Impacto:** cambiar el Compose o `infra/prod/` exige `make tf-apply` antes de desplegar; Docker conserva el entorno de los contenedores (solo *root*); un despliegue corta el servicio unos segundos.
+- **Mitigaciones:** *digests* validados por el documento, vuelta atrás automática y operación sin acceso a Docker para usuarios no *root*.
+- **Cuándo revisarla:** al automatizar con GitHub Actions (TK-090) o al pasar a ECS, que inyecta secretos de Parameter Store por su cuenta.
+- **Evolución:** que la API y el proxy lean los secretos al arrancar con el rol, y despliegue *blue/green* detrás del proxy.
 
 ### Excepciones de checkov
 

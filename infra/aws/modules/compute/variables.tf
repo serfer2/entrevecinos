@@ -67,3 +67,9 @@ variable "compose_sha256" {
   type        = string
   default     = "42cfa75f51ad0ccf290bad37899e0038a8c10a0069e85233ecc1d53e3ff1347d"
 }
+
+variable "origin_verify_version" {
+  description = "Súbela para rotar la cabecera de origen de CloudFront (TK-086, TK-087)."
+  type        = number
+  default     = 1
+}

@@ -14,8 +14,9 @@ admin_role_arns = ["arn:aws:iam::995006761619:role/AccountFullAccessRole"]
 ses_test_recipients = []
 
 # Súbelos solo para rotar (ver infra/aws/README.md, «Secretos»).
-db_password_version = 1
-jwt_secret_version  = 1
+db_password_version   = 1
+jwt_secret_version    = 1
+origin_verify_version = 1
 
 # true solo cuando los servidores de nombres de Dinahosting ya sean los de Route 53 (TK-084).
 wait_for_certificate_validation = false

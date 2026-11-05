@@ -38,6 +38,12 @@ variable "jwt_secret_version" {
   default     = 1
 }
 
+variable "origin_verify_version" {
+  description = "Súbela para rotar la cabecera secreta entre CloudFront y la instancia (TK-086)."
+  type        = number
+  default     = 1
+}
+
 variable "wait_for_certificate_validation" {
   description = "Esperar a que ACM emita el certificado; true solo cuando el dominio ya esté delegado en Route 53 (TK-084)."
   type        = bool
