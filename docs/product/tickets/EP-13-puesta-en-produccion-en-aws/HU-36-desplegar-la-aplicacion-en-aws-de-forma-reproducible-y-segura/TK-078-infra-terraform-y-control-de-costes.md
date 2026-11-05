@@ -24,7 +24,7 @@ Datos del proyecto: cuenta `995006761619`, región `eu-north-1` (no se puede cam
 **Incluye**
 - **Límite de gasto del proyecto: 40 € al mes.** Es lo primero de la épica: se configura antes de crear ningún recurso, ni siquiera el bucket del estado.
   - Lo configura el **propietario del proyecto** en AWS Settings > Billing > *Spend limit* (paso manual; no se gestiona con Terraform).
-  - Importe: 40 € al mes. Si el panel solo admite USD, se usa el equivalente redondeado hacia abajo con el cambio del día y se anota en `infra/aws/README.md` (asumido: unos 45 USD).
+  - Importe: 40 € al mes. Si el panel solo admite USD, se usa el equivalente redondeado hacia abajo con el cambio del día y se anota en `infra/aws/README.md` (44 USD, fijado el 2026-11-05).
   - Al alcanzarlo, AWS **pausa el proyecto**: los SCP del proyecto deniegan las acciones (crear o arrancar instancias, servicios, distribuciones…) y producción puede quedar sin servicio hasta el mes siguiente o hasta que el propietario suba el límite. Es la red de seguridad; los avisos de AWS Budgets están para no llegar a ella.
   - Los créditos del plan gratuito (100 USD) se consumen antes que el límite; el límite protege también cuando se agoten o al pasar al plan de pago (asumido: comprobar en AWS Settings cómo cuentan los créditos para el límite).
 - Estructura de directorios:

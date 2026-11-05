@@ -39,7 +39,7 @@ El navegador solo habla con Next.js; la API se llama desde el servidor de Next (
   6. espera a que `api` y `web` estén *healthy* y comprueba `http://127.0.0.1/` con la cabecera de origen;
   7. si falla, vuelve a los *digests* anteriores (`/opt/entrevecinos/current-digests`, que solo contiene los *digests*, nunca secretos) y termina con error;
   8. guarda los *digests* desplegados y limpia imágenes antiguas (`docker image prune`).
-- Instalación de `backup.sh` y su temporizador `systemd` de TK-082 en cada despliegue (idempotente).
+- Instalación de `backup.sh` y su temporizador `systemd` de TK-082 en cada despliegue (idempotente). Incluye la primera copia real en la instancia y su comprobación con `pg_restore --list` (AC4 de TK-082, trasladado aquí porque necesita la instancia y el contenedor `db`).
 - Documento de SSM `entrevecinos-deploy` (Terraform) que copia los ficheros de `infra/prod/` y ejecuta `deploy.sh` con los parámetros `ApiDigest` y `WebDigest`.
 - Primer despliegue manual: construir y subir las imágenes desde el equipo y lanzar el documento con `aws ssm send-command`.
 
