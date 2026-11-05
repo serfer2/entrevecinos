@@ -29,6 +29,7 @@ from entrevecinos.infrastructure.listings.sqlalchemy_category_repository import 
 from entrevecinos.infrastructure.listings.sqlalchemy_listing_repository import (
     SqlAlchemyListingRepository,
 )
+from entrevecinos.infrastructure.mail.ses_email_sender import SesEmailSender
 from entrevecinos.infrastructure.mail.smtp_email_sender import SmtpEmailSender
 from entrevecinos.infrastructure.media.sqlalchemy_media_repository import (
     SqlAlchemyMediaRepository,
@@ -85,7 +86,17 @@ EmailVerificationRepositoryDep = Annotated[
 ]
 
 
+@lru_cache
+def _ses_email_sender(sender: str, region: str, configuration_set: str) -> SesEmailSender:
+    # Un cliente de boto3 por configuración, como el almacenamiento.
+    return SesEmailSender(sender, region, configuration_set=configuration_set)
+
+
 def get_email_sender(settings: SettingsDep) -> EmailSender:
+    if settings.mail_backend == "ses":
+        return _ses_email_sender(
+            settings.mail_from, settings.ses_region, settings.ses_configuration_set
+        )
     return SmtpEmailSender(
         settings.smtp_host,
         settings.smtp_port,
@@ -175,10 +186,18 @@ def get_media_repository(session: SessionDep) -> SqlAlchemyMediaRepository:
 
 @lru_cache
 def _object_storage(
-    endpoint: str, public_endpoint: str, bucket: str, access_key: str, secret_key: str
+    endpoint: str,
+    public_endpoint: str,
+    bucket: str,
+    access_key: str,
+    secret_key: str,
+    region: str,
+    addressing_style: str,
 ) -> S3ObjectStorage:
     # Los clientes de boto3 son costosos de crear y seguros entre hilos: uno por configuración.
-    return S3ObjectStorage(endpoint, public_endpoint, bucket, access_key, secret_key)
+    return S3ObjectStorage(
+        endpoint, public_endpoint, bucket, access_key, secret_key, region, addressing_style
+    )
 
 
 def get_object_storage(settings: SettingsDep) -> S3ObjectStorage:
@@ -188,6 +207,8 @@ def get_object_storage(settings: SettingsDep) -> S3ObjectStorage:
         settings.storage_bucket,
         settings.storage_access_key,
         settings.storage_secret_key,
+        settings.storage_region,
+        settings.storage_addressing_style,
     )
 
 

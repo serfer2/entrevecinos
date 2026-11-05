@@ -64,21 +64,25 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 
 | Variable | Uso | Valor por defecto |
 |---|---|---|
-| `DATABASE_URL` | Cadena de conexión a PostgreSQL (`postgresql+psycopg://…`) | obligatoria |
+| `DATABASE_URL` | Cadena de conexión a PostgreSQL (`postgresql+psycopg://…`). En producción, con el rol `entrevecinos_app`; las migraciones usan otra con `entrevecinos_owner` | obligatoria |
 | `CORS_ORIGINS` | Orígenes permitidos, separados por comas | `http://localhost:3000` |
 | `ENVIRONMENT` | `development` o `production` | `development` |
 | `JWT_SECRET` | Clave de firma de los JWT (HS256, mínimo 32 caracteres) | obligatoria |
 | `JWT_TTL_SECONDS` | Duración del token de acceso en segundos | `86400` |
-| `STORAGE_ENDPOINT` | Endpoint S3 para subir (red interna) | obligatoria |
-| `STORAGE_PUBLIC_ENDPOINT` | Endpoint S3 con el que se firman las URL que abre el navegador | obligatoria |
+| `STORAGE_ENDPOINT` | Endpoint S3 para subir (red interna). Vacío en AWS: el de la región | vacío |
+| `STORAGE_PUBLIC_ENDPOINT` | Endpoint S3 con el que se firman las URL que abre el navegador. Vacío: el mismo que el de subida | vacío |
 | `STORAGE_BUCKET` | Bucket privado de las imágenes | obligatoria |
-| `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` | Credenciales S3 propias de la API | obligatorias |
+| `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` | Credenciales S3 propias de la API; las dos o ninguna. Vacías en AWS: credenciales temporales del rol de la instancia | vacías |
+| `STORAGE_REGION` | Región del bucket (MinIO la ignora) | `us-east-1` (`eu-north-1` en AWS) |
+| `STORAGE_ADDRESSING_STYLE` | `path` (MinIO) o `virtual` (S3 de AWS) | `path` |
 | `MEDIA_MAX_BYTES` | Tamaño máximo de una imagen | `5242880` (5 MB) |
 | `MEDIA_URL_TTL_SECONDS` | Validez de las URL prefirmadas | `300` |
-| `SMTP_HOST` | Servidor SMTP (`mail` en desarrollo) | obligatoria |
+| `MAIL_BACKEND` | `smtp` (Mailpit en desarrollo) o `ses` (API de Amazon SES con el rol de la instancia) | `smtp` |
+| `SMTP_HOST` | Servidor SMTP (`mail` en desarrollo) | obligatoria con `MAIL_BACKEND=smtp` |
 | `SMTP_PORT` | Puerto SMTP | `587` (`1025` en `.env.example`) |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | Credenciales SMTP | vacías |
-| `SMTP_STARTTLS` | STARTTLS; en producción debe ser `true` | `true` |
+| `SMTP_STARTTLS` | STARTTLS; en producción con `smtp` debe ser `true` | `true` |
+| `SES_REGION` / `SES_CONFIGURATION_SET` | Región de SES y *configuration set* (eventos de envío) con `MAIL_BACKEND=ses` | `eu-north-1` / vacío |
 | `MAIL_FROM` | Remitente de los correos | obligatoria |
 | `WEB_PUBLIC_URL` | Origen de los enlaces que se envían por correo; en producción, `https` | obligatoria |
 | `EMAIL_VERIFICATION_TTL_HOURS` | Caducidad del enlace de validación del correo (`> 0`) | `24` |
