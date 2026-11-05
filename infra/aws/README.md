@@ -2,7 +2,7 @@
 
 Guía de operación de producción de EntreVecinos y registro de sus decisiones de arquitectura. La infraestructura se define con Terraform en este directorio y se despliega en el proyecto de AWS `995006761619`, región `eu-north-1`. Todo cambio en `infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/` debe actualizar esta guía en el mismo cambio (ver `AGENTS.md`, §Convenciones).
 
-> **Estado:** en construcción. La Épica 13 (`docs/product/tickets/EP-13-puesta-en-produccion-en-aws/`) completa cada sección con el ticket indicado. Ya están escritos el límite de gasto y la base de Terraform (TK-078), la red (TK-079), el registro de imágenes y el bucket de fotografías (TK-080), PostgreSQL con sus copias (TK-082), SES con los secretos (TK-083) y el DNS con el certificado (TK-084); la instancia, el despliegue y CloudFront llegan en TK-085 a TK-087.
+> **Estado:** en construcción. La Épica 13 (`docs/product/tickets/EP-13-puesta-en-produccion-en-aws/`) completa cada sección con el ticket indicado. Ya están escritos el límite de gasto y la base de Terraform (TK-078), la red (TK-079), el registro de imágenes y el bucket de fotografías (TK-080), PostgreSQL con sus copias (TK-082), SES con los secretos (TK-083) el DNS con el certificado (TK-084) y la instancia (TK-085); el despliegue y CloudFront llegan en TK-086 y TK-087.
 
 ## Estructura
 
@@ -14,6 +14,7 @@ infra/aws/
 ├── modules/
 │   ├── private-bucket/ bucket S3 privado con los valores seguros comunes
 │   ├── budget/         presupuesto mensual con avisos (TK-078)
+│   ├── compute/        instancia EC2 endurecida, su rol, Session Manager y Patch Manager (TK-085)
 │   ├── network/        VPC, subred pública, grupo de seguridad y flow logs (TK-079)
 │   ├── storage/        repositorios ECR y bucket de imágenes (TK-080)
 │   ├── database/       volumen de PostgreSQL, snapshots, bucket de copias y contraseñas (TK-082)
@@ -63,7 +64,7 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
 
    Mientras AWS no la apruebe, SES solo envía a direcciones verificadas y como máximo 200 correos al día.
 
-*Pendiente: TK-085 a TK-087* (instancia, despliegue y CloudFront).
+*Pendiente: TK-086 y TK-087* (despliegue y CloudFront).
 
 ## Despliegue
 
@@ -131,6 +132,30 @@ Todos los secretos viven en SSM Parameter Store como `SecureString` (nivel está
 
 ## Operación
 
+### Instancia de aplicación (TK-085)
+
+Una sola instancia `entrevecinos-prod-app` (`t4g.small`, arm64, Amazon Linux 2023) en `eu-north-1a`, con IP pública y el grupo de seguridad que solo admite HTTP desde CloudFront. Ejecuta Docker Compose (TK-086).
+
+- **Acceso solo con Session Manager:** sin par de claves, sin puerto 22 y con `sshd` desactivado. Cada sesión queda registrada en `/entrevecinos/prod/ssm-sessions` (30 días); se cierra tras 20 minutos inactiva y dura como máximo 60.
+
+  ```bash
+  aws ssm start-session --profile entrevecinos --target "$(make -s tf-output | sed -n 's/^instance_id = "\(.*\)"/\1/p')"
+  ```
+
+  Necesita el [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) en el equipo. Sin él, se ejecutan comandos con Run Command (`aws ssm send-command --document-name AWS-RunShellScript …`) o se abre la sesión desde la consola de EC2 (*Connect* → *Session Manager*).
+- **Endurecimiento:** IMDSv2 obligatorio (*hop limit* 2, para que los contenedores obtengan las credenciales del rol), volumen raíz `gp3` de 20 GB cifrado, protección contra la terminación y créditos de CPU `standard` (sin cargos por exceso; si la CPU se agota, la instancia se ralentiza).
+- **Primer arranque** (`modules/compute/user-data.sh.tftpl`, registro en `/var/log/cloud-init-output.log`): actualiza el sistema e instala Docker (con `live-restore`, `no-new-privileges` y logs rotados), Compose v5.6.1 (con su SHA-256 comprobado), el agente de CloudWatch (se configura en TK-091) y `dnf-automatic`. Crea 1 GB de *swap*, el usuario `deploy` (sin *shell* ni grupo `docker`) y `/opt/entrevecinos` (750). Solo se ejecuta al crear la instancia: Terraform ignora sus cambios y los de la AMI.
+- **Volumen de datos** de TK-082 adjunto y montado por UUID en `/srv/entrevecinos/postgres` (XFS, `nofail`). Se formatea solo si no tiene sistema de ficheros, y Docker no arranca si no está montado (`RequiresMountsFor`), así que PostgreSQL nunca escribe en el volumen raíz.
+- **Parches:** `dnf-automatic` aplica a diario los de seguridad, y Patch Manager (`AWS-RunPatchBaseline`, `Install`) todos los domingos a las 04:00 UTC, reiniciando si hace falta (corte de minutos). Estado: `aws ssm describe-instance-patch-states --instance-ids <id> --profile entrevecinos`.
+- **Recuperación:** la alarma `entrevecinos-prod-app-recover` recupera la instancia (mismo ID, IP y volúmenes) si falla el *status check* del sistema.
+- **Rol `entrevecinos-prod-app`** (mínimo privilegio, validado con IAM Access Analyzer): `AmazonSSMManagedInstanceCore` y una política propia que permite:
+  - `PutObject` y `GetObject` en el bucket de imágenes, y en `postgres/` del de copias (sin borrar);
+  - `ses:SendEmail` con la identidad del dominio, el *configuration set* y, mientras haya *sandbox*, los destinatarios de prueba, solo con remitente `no-reply@entrevecinos.org`;
+  - leer los parámetros de `/entrevecinos/prod/`. `AmazonSSMManagedInstanceCore` concede `ssm:GetParameter(s)` sobre `*`, así que la política deniega expresamente cualquier otro parámetro de la cuenta (solo quedan además los públicos de AWS, `/aws/*`);
+  - descargar imágenes de los dos repositorios de ECR;
+  - escribir en los grupos de logs `/entrevecinos/prod/app/*` y de sesiones, y publicar métricas en `Entrevecinos/Backup` y `CWAgent`.
+- **Reemplazar la instancia** (nueva AMI, cambio de *user data*): procedimiento en TK-093.
+
 ### Base de datos y copias (TK-082)
 
 PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un volumen EBS propio (`entrevecinos-prod-postgres`, 10 GB, cifrado) que sobrevive a la instancia.
@@ -148,6 +173,7 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Límite de gasto:** 40 €/mes en AWS Settings (manual, paso 1 de la puesta en marcha). Equivalente en USD anotado: **44 USD** (fijado el 2026-11-05).
 - **Presupuesto** `entrevecinos-mensual` en AWS Budgets, igual al límite (`monthly_budget_usd`, 44 USD): avisos por correo al 50 %, 75 % y 90 % del gasto real y al 100 % del previsto.
 - **Estimación** de la épica completa (sin alta disponibilidad, mientras el proyecto no escale): unos 20 USD/mes. Hasta TK-085 solo se pagan céntimos (S3, ECR, CloudWatch y el volumen de datos, ≈ 1 USD/mes) y la zona de Route 53 (0,50 USD/mes más las consultas; las de alias a CloudFront no se cobran).
+- **Instancia** (TK-085): `t4g.small` ≈ 12 USD/mes más el volumen raíz de 20 GB (≈ 1,6 USD/mes). Entra en la capa gratuita del plan FREE, así que se paga con los créditos. Con créditos de CPU `standard` no hay cargos por exceso.
 
 *Pendiente: TK-093* (estimación por servicio con la infraestructura completa).
 
@@ -162,9 +188,18 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Cuándo revisarla:** tráfico sostenido que satura la instancia, datos que no se pueden perder 6 horas o más de un servidor de aplicación.
 - **Evolución:** migrar a Amazon RDS (`pg_dump` / `pg_restore`, nuevo `DATABASE_URL`, corte de minutos) y después Multi-AZ.
 
+### Instancia única endurecida (TK-085)
+
+- **Qué:** web, API, proxy y PostgreSQL en una instancia EC2 `t4g.small` con Docker Compose, en lugar de ECS Fargate con balanceador.
+- **Por qué:** **coste, mientras el proyecto no escale** (≈ 12 USD/mes frente a 30-40 USD/mes de Fargate y ALB), dentro del límite de 40 €/mes.
+- **Impacto:** la seguridad del sistema operativo queda a cargo del proyecto (parches, acceso y permisos), y la web y la API comparten host y rol: un fallo en la web daría acceso a las credenciales de la API. Sin alta disponibilidad: un fallo de la instancia corta el servicio hasta que se recupera.
+- **Mitigaciones:** sin SSH (Session Manager con registro), IMDSv2, rol de mínimo privilegio, parches automáticos, recuperación automática y contenedores sin privilegios ni socket de Docker (TK-086).
+- **Cuándo revisarla:** CPU o memoria saturadas de forma sostenida, necesidad de más de una instancia o de separar web y API.
+- **Evolución:** ECS Fargate con ALB y una tarea por servicio (TK-095).
+
 ### Excepciones de checkov
 
-`.checkov.yaml` omite, con su motivo, las comprobaciones que chocan con decisiones de coste o con el plan del proyecto: claves KMS propias (≈ 1 USD/mes cada una; se usan las gestionadas por AWS), réplica entre regiones (no permitida), registro de accesos y notificaciones de S3, y retenciones de registros de un año. Las excepciones puntuales van en el propio recurso con `#checkov:skip`; entre ellas, DNSSEC y el registro de consultas de la zona de Route 53 (TK-084: DNSSEC necesita una clave KMS y se deja para la evolución).
+`.checkov.yaml` omite, con su motivo, las comprobaciones que chocan con decisiones de coste o con el plan del proyecto: claves KMS propias (≈ 1 USD/mes cada una; se usan las gestionadas por AWS), réplica entre regiones (no permitida), registro de accesos y notificaciones de S3, y retenciones de registros de un año. Las excepciones puntuales van en el propio recurso con `#checkov:skip`; entre ellas, DNSSEC y el registro de consultas de la zona de Route 53 (TK-084: DNSSEC necesita una clave KMS y se deja para la evolución), y en la instancia la IP pública (sin NAT es su única salida) y la monitorización detallada (TK-085).
 
 *Pendiente: TK-095* (resto de decisiones frente a la arquitectura prevista en el `readme.md` §2.4).
 

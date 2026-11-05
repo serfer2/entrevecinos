@@ -45,3 +45,16 @@ module "mail" {
   test_recipients    = var.ses_test_recipients
   jwt_secret_version = var.jwt_secret_version
 }
+
+module "compute" {
+  source = "../../modules/compute"
+
+  subnet_id                 = module.network.public_subnet_id
+  security_group_id         = module.network.app_security_group_id
+  postgres_volume_id        = module.database.volume_id
+  media_bucket_arn          = module.storage.media_bucket_arn
+  backups_bucket_arn        = module.database.backups_bucket_arn
+  ecr_repository_arns       = values(module.storage.ecr_repository_arns)
+  ses_identity_arns         = concat([module.mail.domain_identity_arn], module.mail.test_recipient_identity_arns)
+  ses_configuration_set_arn = module.mail.configuration_set_arn
+}

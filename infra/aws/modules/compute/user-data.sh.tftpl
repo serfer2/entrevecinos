@@ -1,0 +1,86 @@
+#!/bin/bash
+# Primer arranque de la instancia de aplicación (TK-085). cloud-init lo ejecuta una sola vez, al
+# crear la instancia; los cambios posteriores se aplican por Session Manager o Run Command (ver
+# infra/aws/README.md, «Operación»). Registro: /var/log/cloud-init-output.log.
+set -euo pipefail
+
+echo "== Actualización y paquetes"
+dnf -y upgrade --releasever=latest
+dnf -y install docker amazon-cloudwatch-agent dnf-automatic
+
+echo "== Parches de seguridad diarios (Patch Manager aplica el resto cada semana)"
+sed -i -e 's/^upgrade_type *=.*/upgrade_type = security/' \
+  -e 's/^apply_updates *=.*/apply_updates = yes/' /etc/dnf/automatic.conf
+systemctl enable --now dnf-automatic.timer
+
+echo "== Sin SSH: el acceso es por Session Manager"
+systemctl disable --now sshd.service sshd.socket 2>/dev/null || true
+
+echo "== Swap de 1 GB"
+if [ ! -f /swapfile ]; then
+  fallocate -l 1G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+fi
+swapon /swapfile 2>/dev/null || true
+grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+echo 'vm.swappiness = 10' > /etc/sysctl.d/90-entrevecinos.conf
+sysctl --system >/dev/null
+
+echo "== Volumen de datos de PostgreSQL"
+device="${postgres_device}"
+# El adjunto del volumen se crea después de la instancia: esperar a que aparezca (hasta 10 min).
+for _ in $(seq 1 120); do
+  [ -e "$device" ] && break
+  sleep 5
+done
+if [ ! -e "$device" ]; then
+  echo "No aparece el volumen $device" >&2
+  exit 1
+fi
+# Formatear solo si no tiene sistema de ficheros: nunca se reformatea un volumen con datos.
+if ! blkid "$device" >/dev/null; then
+  mkfs.xfs -L pgdata "$device"
+fi
+uuid="$(blkid -s UUID -o value "$device")"
+install -d -m 700 "${postgres_mount}"
+grep -q "UUID=$uuid " /etc/fstab ||
+  echo "UUID=$uuid ${postgres_mount} xfs defaults,noatime,nofail 0 2" >> /etc/fstab
+systemctl daemon-reload
+mountpoint -q "${postgres_mount}" || mount "${postgres_mount}"
+
+echo "== Docker"
+install -d -m 755 /etc/docker
+cat > /etc/docker/daemon.json <<'JSON'
+{
+  "live-restore": true,
+  "no-new-privileges": true,
+  "log-driver": "local",
+  "log-opts": { "max-size": "10m", "max-file": "3" }
+}
+JSON
+# Docker no arranca sin el volumen de datos: PostgreSQL nunca escribe en el volumen raíz.
+install -d -m 755 /etc/systemd/system/docker.service.d
+cat > /etc/systemd/system/docker.service.d/10-postgres-volume.conf <<'UNIT'
+[Unit]
+RequiresMountsFor=${postgres_mount}
+UNIT
+systemctl daemon-reload
+systemctl enable --now docker
+
+echo "== Docker Compose ${compose_version}"
+install -d -m 755 /usr/local/lib/docker/cli-plugins
+compose=/usr/local/lib/docker/cli-plugins/docker-compose
+curl -fsSL -o "$compose" \
+  "https://github.com/docker/compose/releases/download/v${compose_version}/docker-compose-linux-aarch64"
+echo "${compose_sha256}  $compose" | sha256sum -c -
+chmod 755 "$compose"
+docker compose version
+
+echo "== Usuario deploy y directorio de la aplicación"
+# Sin shell y fuera del grupo docker: deploy.sh lo ejecuta el agente de SSM como root (TK-086).
+id deploy >/dev/null 2>&1 ||
+  useradd --system --user-group --shell /sbin/nologin --home-dir /opt/entrevecinos --no-create-home deploy
+install -d -m 750 -o deploy -g deploy /opt/entrevecinos
+
+echo "== Primer arranque terminado"

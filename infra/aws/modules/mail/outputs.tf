@@ -17,3 +17,8 @@ output "domain_identity_arn" {
   description = "Identidad del dominio en SES (para limitar ses:SendEmail en el rol de la instancia, TK-085)."
   value       = aws_sesv2_email_identity.domain.arn
 }
+
+output "test_recipient_identity_arns" {
+  description = "Identidades de los destinatarios de prueba (SES también autoriza el envío contra ellas en sandbox)."
+  value       = [for identity in aws_sesv2_email_identity.test_recipient : identity.arn]
+}

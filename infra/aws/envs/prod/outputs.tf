@@ -57,3 +57,13 @@ output "ses_domain_identity_arn" {
   description = "Identidad del dominio en SES."
   value       = module.mail.domain_identity_arn
 }
+
+output "instance_id" {
+  description = "Instancia de aplicación (Session Manager y despliegue)."
+  value       = module.compute.instance_id
+}
+
+output "instance_public_dns" {
+  description = "DNS público de la instancia (origen de CloudFront, TK-087)."
+  value       = module.compute.public_dns
+}
