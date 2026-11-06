@@ -293,7 +293,7 @@ La seguridad de la API se aplica dentro de FastAPI, en este orden: CORS restring
 
 - **Almacenamiento de imágenes:** un servicio compatible con S3, como **MinIO**, almacena las fotografías de los anuncios y perfiles. Sus ficheros se conservan en un volumen persistente. PostgreSQL guarda las referencias y metadatos de cada imagen, mientras que el backend gestiona las cargas y lecturas.
 
-- **Envío de correo:** la API envía por **SMTP** los correos de la aplicación, como el enlace de validación del registro. En desarrollo los recoge **Mailpit**, que los muestra en `http://localhost:8025` sin enviarlos a nadie; en producción se usa un proveedor SMTP con STARTTLS.
+- **Envío de correo:** la API envía por **SMTP** los correos de la aplicación, como el enlace de validación del registro. En desarrollo los recoge **Mailpit**, que los muestra en `http://localhost:8025` sin enviarlos a nadie; en producción se envían con **Amazon SES** (por su API, con las credenciales del rol de la instancia).
 
 - **Contenedores y red de despliegue:** **Docker** ejecuta frontend, backend, PostgreSQL y almacenamiento de imágenes en servicios separados. La base de datos y el almacenamiento deberían permanecer en una red interna, accesibles desde el backend, y no exponerse directamente a los usuarios.
 
@@ -387,30 +387,52 @@ flowchart LR
         API_LOCAL -->|"SMTP"| MAIL_LOCAL
         BROWSER_LOCAL -.->|"Ver correos"| MAIL_LOCAL
     end
+```
 
-    subgraph CLOUD["Producción · Cloud"]
+```mermaid
+flowchart LR
+    subgraph AWS["Producción · AWS eu-north-1"]
         USER["Usuarios"]
-        CDN["DNS + CDN + WAF<br/>HTTPS"]
+        DNS["Route 53<br/>entrevecinos.org<br/>dominio registrado en Dinahosting"]
+        CDN["CloudFront<br/>HTTPS con ACM · caché de estáticos"]
 
-        WEB_CLOUD["Frontend<br/>Next.js en runtime Node"]
-        LB["Balanceador o API Gateway"]
-        API_CLOUD["Backend<br/>FastAPI en contenedores"]
-        DB_CLOUD[("PostgreSQL gestionado<br/>alta disponibilidad + backups")]
-        IMG_CLOUD[("Almacenamiento de objetos<br/>S3 compatible")]
-        SECRETS["Gestor de secretos"]
-        OBS["Logs, métricas y alertas"]
+        subgraph EC2["Instancia EC2 t4g.small · Docker Compose"]
+            PROXY["Proxy nginx<br/>cabecera de origen + límite de peticiones"]
+            WEB_PROD["Frontend<br/>Next.js"]
+            API_PROD["Backend<br/>FastAPI"]
+            DB_PROD[("PostgreSQL 16 en la instancia<br/>volumen EBS + copias cada 6 h en S3")]
+            PROXY --> WEB_PROD
+            WEB_PROD -->|"API REST · JWT<br/>red interna"| API_PROD
+            API_PROD --> DB_PROD
+        end
 
-        USER --> CDN
-        CDN --> WEB_CLOUD
-        CDN --> LB
-        LB -->|"API REST · JWT"| API_CLOUD
-        API_CLOUD --> DB_CLOUD
-        API_CLOUD --> IMG_CLOUD
-        SECRETS -.-> WEB_CLOUD
-        SECRETS -.-> API_CLOUD
-        API_CLOUD -.-> OBS
-        WEB_CLOUD -.-> OBS
+        S3_MEDIA[("S3<br/>imágenes · URL prefirmadas")]
+        S3_BACKUP[("S3<br/>copias de la base")]
+        SES["SES<br/>correo de validación"]
+        SSM_PS["Parameter Store<br/>secretos"]
+        CW["CloudWatch<br/>registros, métricas y alarmas"]
+        SNS["SNS<br/>avisos por correo"]
+
+        USER --> DNS
+        USER -->|"HTTPS"| CDN
+        CDN -->|"HTTP + X-Origin-Verify"| PROXY
+        USER -.->|"Imágenes"| S3_MEDIA
+        API_PROD --> S3_MEDIA
+        API_PROD --> SES
+        DB_PROD -.->|"backup.sh"| S3_BACKUP
+        SSM_PS -.->|"deploy.sh"| EC2
+        EC2 -.-> CW
+        CW -.-> SNS
     end
+
+    subgraph GH["GitHub"]
+        GHA["GitHub Actions<br/>CI en cada pull request<br/>despliegue al fusionar en main"]
+        ECR[("ECR<br/>imágenes de api y web")]
+    end
+
+    GHA -->|"publica"| ECR
+    GHA -->|"SSM Run Command"| EC2
+    ECR -.->|"descarga por digest"| EC2
 ```
 
 #### Desarrollo local
@@ -419,46 +441,65 @@ Docker Compose levanta los componentes necesarios en el equipo del desarrollador
 
 Esta configuración facilita arrancar el proyecto con un entorno reproducible y probar la integración entre componentes. Las credenciales locales deben ser de desarrollo y no reutilizarse en producción.
 
-#### Producción en cloud
+#### Producción en AWS
 
-En producción, el frontend y la API se despliegan en servicios con runtime compatible con Node.js y contenedores, respectivamente. Un proveedor cloud puede ofrecerlos como servicios gestionados de contenedores. El tráfico público entra por DNS y HTTPS; CDN y WAF pueden proteger y distribuir el contenido web, mientras que un balanceador o API Gateway dirige las solicitudes a la API.
+Producción está en `https://entrevecinos.org`, en la región `eu-north-1` de AWS, y toda la infraestructura se define con Terraform en `infra/aws/` (guía, *runbook*, costes y decisiones en [`infra/aws/README.md`](infra/aws/README.md)). El dominio sigue registrado en Dinahosting, con el DNS en Route 53.
 
-PostgreSQL se sustituye por una instancia gestionada, preferiblemente con alta disponibilidad, copias de seguridad y recuperación a un punto en el tiempo. Las imágenes pasan de MinIO local a almacenamiento de objetos cloud compatible con S3. Las credenciales se obtienen de un gestor de secretos, y logs y métricas se centralizan para facilitar la operación.
+- **Entrada:** CloudFront termina HTTPS (certificado de ACM), redirige `www` y HTTP, guarda en caché solo los estáticos de Next.js y reenvía el resto a la instancia por HTTP con una cabecera secreta. No hay WAF: el plan del proyecto no admite el plan gratuito de CloudFront y una web ACL costaría unos 10 USD/mes, así que los límites de peticiones por IP los pone el proxy.
+- **Aplicación:** una sola instancia EC2 `t4g.small` (Graviton, Amazon Linux 2023) ejecuta con Docker Compose el proxy nginx, la web, la API y PostgreSQL, con contenedores sin privilegios. Solo el proxy publica un puerto, y solo CloudFront puede llegar a él; **la API no es pública**: la web la llama por una red interna de Docker. No hay balanceador ni API Gateway.
+- **Datos:** **PostgreSQL 16 en la propia instancia**, sobre un volumen EBS cifrado que sobrevive a la instancia, con copias de `pg_dump` cada 6 horas en S3 (30 días) y *snapshots* diarios (7). Las imágenes de los anuncios, en un bucket S3 privado con versionado, se leen con URL prefirmadas.
+- **Secretos:** en Parameter Store; llegan a los contenedores solo por entorno durante el despliegue, sin ficheros `.env` en la instancia.
+- **Correo:** SES, con el dominio verificado (DKIM, SPF y DMARC).
+- **Operación:** registros, métricas y alarmas en CloudWatch con aviso por correo, y procedimientos de recuperación ensayados (RPO 6 horas, RTO 4 horas). Sin SSH: la instancia se opera con Session Manager.
+
+**Base de datos y disponibilidad.** La arquitectura prevista usaba una base de datos gestionada con alta disponibilidad. Se ha optado por **PostgreSQL en la instancia y sin alta disponibilidad para ahorrar costes mientras el proyecto no escale** (unos 15 USD/mes menos que Amazon RDS, dentro del límite de 40 €/mes). El precio es un RPO de 6 horas y que un fallo de la instancia corta el servicio hasta recuperarla. Se mitiga con copias cada 6 horas comprobadas y una alarma si falta una, un volumen de datos separado que sobrevive a la instancia, *snapshots* diarios y un usuario de aplicación sin privilegios de DDL ([decisión](infra/aws/README.md#base-de-datos-en-la-instancia-tk-082)). Con más tráfico, el paso siguiente es Amazon RDS.
+
+#### Integración y despliegue continuos
+
+Todo cambio llega a `main` por *pull request* y solo se fusiona si pasan las comprobaciones de [`.github/workflows/ci.yml`](.github/workflows/ci.yml), las mismas órdenes que en local (`make ci-api`, `make ci-web`, `make tf-lint`, `make shellcheck`):
+
+- `api`: ruff y pytest con PostgreSQL; `web`: lint, tipos y pruebas; `infra`: Terraform, tflint, checkov y shellcheck;
+- `images (api)` e `images (web)`: construyen las imágenes de producción para arm64;
+- `docs-infra`: un cambio de infraestructura debe actualizar `infra/aws/README.md`.
+
+Al fusionar, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) repite esas comprobaciones, publica las imágenes del commit en ECR, las despliega con un documento de SSM (migraciones con copia previa, comprobación de salud y **vuelta atrás automática** si la versión nueva no arranca) y prueba la URL pública. Nunca hay dos despliegues a la vez, y cualquier commit anterior de `main` se puede volver a desplegar a mano. GitHub Actions usa credenciales temporales de un rol que solo puede publicar imágenes y lanzar ese despliegue. Detalle en «Integración continua» y «Despliegue continuo» de [`infra/aws/README.md`](infra/aws/README.md).
 
 #### Diferencias técnicas principales
 
-- **Ejecución:** Compose coordina contenedores en una sola máquina; en cloud, los servicios pueden ejecutarse en plataformas administradas y escalar según la demanda.
-- **Persistencia:** los volúmenes locales sirven para desarrollo. En producción, la base de datos y las imágenes deben residir en almacenamiento gestionado, con copias de seguridad y políticas de retención.
-- **Seguridad:** producción requiere HTTPS, secretos protegidos, reglas de red restrictivas y acceso privado desde la API a la base de datos. JWT, RBAC y CORS siguen aplicándose en la API.
-- **Disponibilidad y observabilidad:** la producción necesita monitorización, alertas, gestión de errores y un plan de recuperación ante fallos.
-- **Despliegue:** una canalización CI/CD puede construir y publicar imágenes Docker, ejecutar comprobaciones y desplegar versiones controladas.
-
-Para un MVP, conviene usar servicios gestionados para PostgreSQL y almacenamiento de imágenes, y mantener frontend y API en contenedores desplegables de forma independiente.
-
-**Pendiente**: La infraestructura cloud concreta depende del proveedor y del tráfico esperado. Se completará en la entrega 3 del presente proyecto. 
-
+- **Ejecución:** en local, Compose con imágenes de desarrollo; en producción, el mismo Compose con imágenes de producción por *digest*, contenedores endurecidos y una sola instancia, sin autoescalado.
+- **Persistencia:** en local, volúmenes de Docker; en producción, PostgreSQL en un volumen EBS propio con copias en S3, e imágenes en S3 en lugar de MinIO.
+- **Secretos:** en local, `.env`; en producción, Parameter Store y solo por entorno (sin Secrets Manager: el nivel estándar de Parameter Store es gratuito).
+- **Correo:** en local, Mailpit por SMTP; en producción, SES por su API.
+- **Red:** en producción la web solo es accesible a través de CloudFront, la API y PostgreSQL solo desde redes internas de Docker, y la instancia no tiene SSH.
+- **Despliegue:** en local, `make dev`; en producción, GitHub Actions y SSM en cada fusión a `main`.
 
 ### **2.5. Seguridad**
 
-Según la arquitectura descrita en el README, el proyecto contempla las siguientes prácticas de seguridad. Como el desarrollo y el despliegue figuran como pendientes, se presentan como medidas previstas; su implementación debe confirmarse en el código y en la configuración de producción.
+Medidas implementadas en la aplicación y en producción (detalle en [`infra/aws/README.md`](infra/aws/README.md)):
 
-- **Autenticación mediante JWT:** la API valida los tokens de acceso para identificar al usuario en las solicitudes protegidas. Por ejemplo, al crear un anuncio, el frontend enviaría `Authorization: Bearer <token>`. La clave de firma debe guardarse como secreto y no incluirse en el repositorio.
+- **Autenticación mediante JWT:** la API valida el token y que el usuario siga activo en cada petición. El navegador nunca recibe el JWT: la web lo guarda en la *cookie* `HttpOnly` y `Secure` `ev_session` y llama a la API desde el servidor con `Authorization: Bearer <token>`. La clave de firma vive en Parameter Store.
 
-- **Autorización basada en roles (RBAC):** el backend comprueba los permisos antes de realizar cada operación. Por ejemplo, solo un administrador de comunidad debería poder aprobar solicitudes o moderar publicaciones. Ocultar un botón en la interfaz no sustituye la comprobación de permisos en la API.
+- **Autorización basada en roles (RBAC):** la API comprueba la membresía y el rol en la comunidad antes de cada operación (`CommunityAccess`); ocultar un botón en la interfaz no sustituye esa comprobación.
 
-- **Control de orígenes mediante CORS:** la API debe aceptar solicitudes web únicamente desde los dominios autorizados. Por ejemplo, producción podría permitir `https://entrevecinos.example.com` y rechazar otros orígenes. CORS no reemplaza la autenticación ni impide por sí solo las solicitudes realizadas fuera de un navegador.
+- **CORS:** la API solo acepta el origen `https://entrevecinos.org`. CORS no sustituye la autenticación.
 
-- **Cabeceras HTTP de seguridad en Next.js:** la web no usa Helmet; Next.js envía en todas las respuestas `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` y `Permissions-Policy` (`next.config.ts`), sin `X-Powered-By`. `Strict-Transport-Security` solo se envía en producción, detrás de HTTPS. La `Content-Security-Policy` se genera en `src/proxy.ts` con un *nonce* por petición, para que solo se ejecuten los scripts de la propia aplicación.
+- **Cabeceras HTTP de seguridad en Next.js:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` y, en producción, `Strict-Transport-Security`, sin `X-Powered-By` (`next.config.ts`). La `Content-Security-Policy` se genera en `src/proxy.ts` con un *nonce* por petición.
 
-- **Cifrado del tráfico:** el acceso público de producción debe utilizar HTTPS para proteger las comunicaciones entre usuarios, frontend y API. Los tokens no deben enviarse a través de conexiones HTTP sin cifrar.
+- **HTTPS y entrada protegida:** CloudFront sirve solo HTTPS (certificado de ACM, HTTP redirigido) con Shield Standard. La instancia solo admite tráfico de CloudFront (grupo de seguridad con su lista de prefijos) y el proxy rechaza con `403` las peticiones sin la cabecera secreta de origen. El proxy limita las peticiones por IP del visitante (inicio de sesión y registro, y general) con `429`.
 
-- **Aislamiento de base de datos y archivos:** PostgreSQL y MinIO —o el almacenamiento compatible con S3 usado en producción— deben permanecer en una red privada y ser accesibles desde el backend, sin exponer sus puertos directamente a Internet.
+- **Instancia endurecida:** sin SSH ni par de claves (Session Manager con registro de sesiones), IMDSv2 obligatorio, parches de seguridad automáticos y contenedores sin *root*, con el sistema de ficheros de solo lectura, sin capacidades y sin el socket de Docker.
 
-- **Gestión de secretos:** las credenciales de PostgreSQL, las claves JWT y las credenciales del almacenamiento deben guardarse en variables protegidas o en un gestor de secretos. Por ejemplo, `.env.example` puede documentar `DATABASE_URL` y `JWT_SECRET` con valores ficticios; el archivo `.env` real debe excluirse del repositorio.
+- **Mínimo privilegio en AWS:** el rol de la instancia solo puede leer y escribir lo que usa la aplicación (validado con IAM Access Analyzer). GitHub Actions usa una clave que solo puede asumir, con un identificador externo, el rol de despliegue, desde el entorno `production` limitado a `main`; las comprobaciones de CI son obligatorias para fusionar.
 
-- **Protección de datos persistentes:** la arquitectura utiliza volúmenes para conservar PostgreSQL y las imágenes. En producción, estos datos deben contar con copias de seguridad y una política de retención. Por ejemplo, se pueden programar copias periódicas y comprobar que es posible restaurarlas.
+- **Base de datos aislada:** PostgreSQL solo es accesible desde la API, por una red interna de Docker sin salida a Internet. La API usa `entrevecinos_app`, sin permisos de DDL; las migraciones, `entrevecinos_owner`.
 
-- **Validación y control de acceso a imágenes:** el backend debe verificar los permisos de quien carga o consulta una imagen y validar los ficheros recibidos. Por ejemplo, puede aceptar solo formatos permitidos, como JPEG, PNG o WebP, y aplicar un tamaño máximo.
+- **Gestión de secretos:** contraseñas, clave de los JWT y cabecera de origen en Parameter Store (`SecureString`), generadas sin quedar en el estado de Terraform (salvo la cabecera). Llegan a los contenedores solo por entorno: no hay ficheros `.env` en la instancia. En local, `.env` está excluido del repositorio y `.env.example` documenta las variables con valores ficticios.
+
+- **Copias protegidas y probadas:** copias de `pg_dump` cada 6 horas que la instancia no puede borrar (política del bucket), *snapshots* diarios, alarma si falta una copia y restauración ensayada.
+
+- **Imágenes:** el bucket es privado; la API valida el contenido (*magic bytes*), el formato (JPEG, PNG o WebP) y el tamaño, y las imágenes solo se leen con URL prefirmadas.
+
+- **Registros sin datos sensibles y alertas:** los registros no guardan contraseñas, *tokens* de validación ni *cookies* de sesión, y las alarmas avisan por correo de caídas, errores y falta de copias.
 
 ### **2.6. Tests**
 

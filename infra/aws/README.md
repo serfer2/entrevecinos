@@ -58,7 +58,19 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
 
 1. **Límite de gasto (manual, antes que nada).** El propietario del proyecto fija **40 € al mes** en AWS Settings > Billing > *Spend limit*. Si el panel solo admite USD, se usa el equivalente redondeado hacia abajo y se anota en «Costes». Al alcanzarlo, AWS pausa el proyecto (las operaciones fallan con `AccessDenied` y la web puede caer).
 2. **Estado de Terraform:** `make tf-bootstrap` crea `entrevecinos-tfstate-995006761619` (privado, cifrado, versionado). Su estado queda en `infra/aws/bootstrap/terraform.tfstate`, fuera del repositorio: consérvalo.
-3. **Variables:** `cp infra/aws/envs/prod/prod.tfvars.example infra/aws/envs/prod/prod.tfvars` y ajusta el correo de avisos, el importe del presupuesto y los destinatarios de prueba de SES.
+3. **Variables:** `cp infra/aws/envs/prod/prod.tfvars.example infra/aws/envs/prod/prod.tfvars` (no se versiona) y ajusta:
+
+   | Variable | Para qué | Por defecto |
+   |---|---|---|
+   | `alert_email` | Avisos del presupuesto y de las alarmas | — (obligatoria) |
+   | `monthly_budget_usd` | Presupuesto mensual, equivalente al límite de gasto | `44` |
+   | `availability_zone` | Zona de la subred, la instancia y el volumen de datos | `eu-north-1a` |
+   | `admin_role_arns` | Roles que pueden borrar copias de la base | — (obligatoria) |
+   | `ses_test_recipients` | Destinatarios verificados mientras SES esté en *sandbox* | `[]` |
+   | `db_password_version`, `jwt_secret_version`, `origin_verify_version` | Subirlas rota el secreto (ver «Secretos») | `1` |
+   | `wait_for_certificate_validation` | `true` cuando el dominio ya esté delegado en Route 53 | `false` |
+
+   Salidas útiles (`make tf-output`): `instance_id` (`DEPLOY_INSTANCE_ID` de GitHub), `name_servers` (delegación), `distribution_id`, `ecr_repository_urls`, `backups_bucket`, `media_bucket`, `github_user`, `github_deploy_role_arn`, `github_deploy_external_id` y `alerts_topic_arn`.
 4. **Infraestructura:** `make tf-init`, `make tf-plan` y `make tf-apply`. Un segundo `make tf-plan` no debe mostrar cambios.
 5. **Pasos manuales tras el `apply`:**
    - cada destinatario de `ses_test_recipients` recibe un correo de AWS y debe pulsar el enlace de verificación;
@@ -345,7 +357,7 @@ Una sola instancia `entrevecinos-prod-app` (`t4g.small`, arm64, Amazon Linux 202
   - leer los parámetros de `/entrevecinos/prod/`. `AmazonSSMManagedInstanceCore` concede `ssm:GetParameter(s)` sobre `*`, así que la política deniega expresamente cualquier otro parámetro de la cuenta (solo quedan además los públicos de AWS, `/aws/*`);
   - descargar imágenes de los dos repositorios de ECR;
   - escribir en los grupos de logs `/entrevecinos/prod/app/*` y de sesiones, y publicar métricas en `Entrevecinos/Backup` y `CWAgent`.
-- **Reemplazar la instancia** tras perderla o cambiar de zona: ver «Recuperación», procedimiento 3. Nueva AMI o cambio de *user data* sin pérdida: TK-093.
+- **Reemplazar la instancia** tras perderla o cambiar de zona: ver «Recuperación», procedimiento 3. Nueva AMI o cambio de *user data* sin pérdida: ver «Runbook».
 
 ### Aplicación (TK-086)
 
@@ -383,8 +395,6 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Copias protegidas:** la política del bucket deniega el borrado a todos salvo a los roles de `admin_role_arns`; la instancia solo escribe y lee.
 - **Copia antes de migrar:** `deploy.sh` ejecuta `backup.sh` antes de las migraciones si hay alguna pendiente (TK-092); si la copia falla, no migra ni despliega. A demanda: `sudo systemctl start entrevecinos-backup.service` en la instancia.
 - `deploy.sh` instala los scripts y el temporizador en cada despliegue (`/opt/entrevecinos/prod/backup.sh` y `restore.sh`). El script localiza el contenedor `db` con `docker` (por sus etiquetas de Compose), así que no necesita los secretos del despliegue.
-
-*Pendiente: TK-093* (*runbook* completo).
 
 ### Recuperación (TK-092)
 
@@ -517,18 +527,95 @@ aws cloudwatch list-metrics --profile entrevecinos --namespace CWAgent --query '
 
 Sin monitorización externa: si la cuenta de AWS o CloudWatch fallan, no llega ningún aviso (ver «Decisiones»).
 
+### Runbook (TK-093)
+
+Órdenes para las tareas habituales. En la instancia, siempre en una sesión de Session Manager como *root* (`sudo -i`). Las operaciones que tocan producción se confirman antes con quien sea responsable.
+
+**Sesión de AWS.** `aws login --profile entrevecinos` abre el navegador y deja credenciales temporales que caducan (al cabo de unas horas, `Your session has expired`): basta con repetirlo. Si operaciones que antes funcionaban fallan de repente con `AccessDenied`, revisa en AWS Settings > *Billing* si se ha alcanzado el límite de gasto (pausa el proyecto) antes de tocar permisos.
+
+**Nombrar un `platform_admin`** (la cuenta ya registrada y validada):
+
+```bash
+docker exec "$(docker ps -q --filter label=com.docker.compose.service=db)" psql -U postgres -d entrevecinos \
+  -c "UPDATE users SET platform_role = 'platform_admin' WHERE email = '<correo>' RETURNING email, platform_role"
+```
+
+Para retirarlo, el mismo `UPDATE` con `'user'`. El cambio se aplica en la siguiente petición del usuario (la API comprueba el rol en cada una).
+
+**Desplegar un commit concreto o volver a una versión anterior:** *Actions → Deploy → Run workflow* con el SHA de un commit de `main` (ver «Despliegue continuo»). Si la versión anterior necesita un esquema anterior, no basta: las migraciones no se deshacen solas (*expand/contract*, ver «Cómo se despliega»).
+
+**Rotar secretos** (ver «Secretos»): subir la versión en `prod.tfvars`, `make tf-apply` y desplegar enseguida.
+
+| Secreto | Variable | Efecto |
+|---|---|---|
+| Clave de los JWT | `jwt_secret_version` | Cierra todas las sesiones |
+| Contraseñas de PostgreSQL | `db_password_version` | `deploy.sh` las aplica con `10-roles.sh` (`ALTER ROLE … PASSWORD`) y recrea `api` y `db` (segundos sin servicio) |
+| Cabecera de origen | `origin_verify_version` | El mismo `apply` cambia el parámetro y la cabecera de CloudFront: hasta que el despliegue recrea el proxy, la web responde `403` (minutos). Mejor con poco tráfico |
+
+**Actualizar PostgreSQL:**
+
+- **Versión menor** (`16.x`, sin cambio de formato): copia a demanda (`systemctl start entrevecinos-backup.service`), cambiar `image: postgres:16.<x>` en `infra/docker-compose.prod.yml`, `make tf-apply` y desplegar; `deploy.sh` recrea `db` (segundos sin servicio).
+- **Versión mayor** (p. ej. 17, formato de datos distinto): se hace con copia y restauración, no con `pg_upgrade`.
+  1. Copia a demanda y anotar su clave (`aws s3 ls … | tail -1`).
+  2. En el Compose, `image: postgres:17.<x>` y `PGDATA: /var/lib/postgresql/data/pgdata17` (directorio nuevo en el mismo volumen; el de la 16 queda intacto para volver atrás).
+  3. `make tf-apply` y desplegar: la imagen nueva inicializa un clúster vacío y crea los roles (`10-roles.sh`), y las migraciones crean el esquema vacío.
+  4. `restore.sh --production --yes <clave>` con la copia del paso 1 y comprobar la web.
+  5. Unos días después, borrar `pgdata` (el clúster de la 16) del volumen.
+
+  Para volver atrás: devolver la imagen y `PGDATA` del Compose, `make tf-apply` y desplegar.
+
+**Migrar a Amazon RDS** (cuando el proyecto escale; ver «Decisiones»):
+
+1. Crear RDS PostgreSQL en Terraform (subred privada, grupo de seguridad que solo admita la instancia, copias automáticas y PITR) y los roles con `10-roles.sh` contra el *endpoint*.
+2. Ventana de corte: parar la API, copia con `backup.sh`, `pg_restore` de esa copia en RDS como `entrevecinos_owner` (`aws s3 cp <copia> - | pg_restore -h <endpoint> …`).
+3. Cambiar `DATABASE_URL` en el Compose (o el parámetro `/entrevecinos/prod/db/host`) al *endpoint*, retirar el servicio `db`, `make tf-apply` y desplegar (minutos sin servicio).
+4. Adaptar `backup.sh` (o sustituirlo por las copias de RDS), la alarma `backup-missing` y esta guía.
+
+**Reemplazar la instancia sin perder datos** (nueva AMI de Amazon Linux o cambio del *user data*, que solo se aplica al crearla). El volumen de datos es aparte y se vuelve a adjuntar:
+
+```bash
+P=--profile=entrevecinos
+ID=$(make -s tf-output | sed -n 's/^instance_id = "\(.*\)"/\1/p')
+aws ec2 modify-instance-attribute $P --instance-id "$ID" --no-disable-api-termination   # protección contra la terminación
+make tf ARGS="apply -var-file=prod.tfvars -replace=module.compute.aws_instance.app"
+```
+
+Terraform separa el volumen (parando la instancia), destruye la instancia, crea otra con la última AMI y el *user data* actual, adjunta el volumen y actualiza CloudFront (nuevo origen), las alarmas y las asociaciones de State Manager. Después: `DEPLOY_INSTANCE_ID` en el entorno `production` de GitHub con el nuevo ID (`make -s tf-output`) y un despliegue (*Run workflow*). Unos 15 minutos sin servicio; la protección contra la terminación vuelve a activarse con la instancia nueva.
+
+**Alarmas:** qué hacer con cada una, en «Observabilidad y alertas». **Restaurar copias, *snapshots* o imágenes:** «Recuperación».
+
 ## Costes
 
 - **Límite de gasto:** 40 €/mes en AWS Settings (manual, paso 1 de la puesta en marcha). Equivalente en USD anotado: **44 USD** (fijado el 2026-11-05).
 - **Presupuesto** `entrevecinos-mensual` en AWS Budgets, igual al límite (`monthly_budget_usd`, 44 USD): avisos por correo al 50 %, 75 % y 90 % del gasto real y al 100 % del previsto.
-- **Estimación** de la épica completa (sin alta disponibilidad, mientras el proyecto no escale): unos 20 USD/mes. Hasta TK-085 solo se pagan céntimos (S3, ECR, CloudWatch y el volumen de datos, ≈ 1 USD/mes) y la zona de Route 53 (0,50 USD/mes más las consultas; las de alias a CloudFront no se cobran).
-- **Instancia** (TK-085): `t4g.small` ≈ 12 USD/mes más el volumen raíz de 20 GB (≈ 1,6 USD/mes). Entra en la capa gratuita del plan FREE, así que se paga con los créditos. Con créditos de CPU `standard` no hay cargos por exceso.
+- **Plan FREE de AWS:** el gasto se descuenta de los créditos del plan (quedaban 119,36 USD el 2026-11-06) y la `t4g.small` entra en su capa gratuita; mientras duren, la factura es 0. Gasto bruto real del 1 al 6 de noviembre de 2026, sin créditos: 0,63 USD (0,50 de la zona de Route 53, 0,08 de la IPv4 pública y 0,05 de EBS).
+- **Estimación mensual a precio de lista** (sin alta disponibilidad, mientras el proyecto no escale; `eu-north-1`, tráfico del MVP):
+
+  | Servicio | Qué se paga | USD/mes |
+  |---|---|---|
+  | EC2 (TK-085) | `t4g.small` (capa gratuita del plan FREE mientras dure) | ≈ 12 |
+  | IPv4 pública (TK-085) | 0,005 USD/hora | ≈ 3,7 |
+  | EBS (TK-082, TK-085) | 20 GB raíz y 10 GB de datos `gp3`, y 7 *snapshots* incrementales | ≈ 2,8 |
+  | Route 53 (TK-084) | zona alojada y consultas (las de alias a CloudFront no se cobran) | ≈ 0,5 |
+  | CloudWatch (TK-086, TK-091) | 14 métricas de alarma (10 gratuitas), registros dentro de los 5 GB gratuitos | ≈ 0,4 |
+  | S3 y ECR (TK-080, TK-082) | copias, imágenes de los anuncios y de los contenedores (pocos GB) | < 0,5 |
+  | CloudFront, SES, SNS, Parameter Store, KMS gestionada | capas gratuitas o céntimos | ≈ 0 |
+  | **Total** | | **≈ 20** |
+
+  Precios de lista consultados en noviembre de 2026; se revisan con el gasto real. Consulta del mes en curso por servicio, sin los créditos:
+
+  ```bash
+  aws ce get-cost-and-usage --profile entrevecinos --granularity MONTHLY --metrics UnblendedCost \
+    --time-period Start=$(date +%Y-%m-01),End=$(date -d tomorrow +%F) --group-by Type=DIMENSION,Key=SERVICE \
+    --filter '{"Not":{"Dimensions":{"Key":"RECORD_TYPE","Values":["Credit"]}}}' \
+    --query 'ResultsByTime[0].Groups[].[Keys[0],Metrics.UnblendedCost.Amount]' --output text
+  aws freetier get-account-plan-state --profile entrevecinos   # plan y créditos restantes
+  ```
+- **Instancia** (TK-085): con créditos de CPU `standard` no hay cargos por exceso.
 
 - **Logs de la aplicación** (TK-086): unos MB al día con el tráfico del MVP, dentro de los 5 GB de ingesta gratuitos al mes; 14 días de retención (30 los despliegues).
 - **Observabilidad** (TK-091): 13 alarmas con la de recuperación; `web-5xx` usa dos métricas y cuenta como dos, así que son 14 métricas de alarma (las 10 primeras gratuitas; ≈ 0,40 USD/mes el resto). Panel, filtros de métricas y tema SNS por correo, gratuitos; métricas del agente (4 series) y de los filtros, dentro de las 10 personalizadas gratuitas o céntimos.
 - **CloudFront** (TK-087): pago por uso, dentro de su capa gratuita permanente (1 TB y 10 millones de peticiones al mes) con el tráfico del MVP; Shield Standard incluido. Registros de acceso en CloudWatch Logs (`us-east-1`): céntimos al mes, 7 días de retención. Sin WAF: el plan Free de CloudFront no está disponible en el plan del proyecto y no se contrata una web ACL (≈ 10 USD/mes).
-
-*Pendiente: TK-093* (estimación por servicio con la infraestructura completa).
 
 ## Decisiones de arquitectura
 
@@ -624,4 +711,46 @@ Sin monitorización externa: si la cuenta de AWS o CloudWatch fallan, no llega n
 
 ## Destruir el entorno
 
-*Pendiente: TK-093.* Orden para eliminar la infraestructura sin gastar créditos y qué se conserva.
+Para dejar de gastar créditos cuando producción ya no haga falta. **Borra la web y sus datos**: confirma antes con quien sea responsable. No se ha ensayado (destruiría producción); el orden evita los bloqueos conocidos.
+
+**Se conserva:** el bucket del estado (`bootstrap/`, fuera de `envs/prod`) y, si se quiere, el de copias con la copia final (fuera de Terraform; con la política que impide borrar salvo a `admin_role_arns`). El límite de gasto de AWS Settings no cambia.
+
+1. **Copia final**, en la instancia: `systemctl start entrevecinos-backup.service`; anotar su clave (`aws s3 ls s3://entrevecinos-backups-995006761619/postgres/ --recursive | tail -1`).
+2. **GitHub:** *Actions → Deploy → Disable workflow* (una fusión intentaría desplegar) y borrar los secretos del entorno `production`.
+3. **DNS:** en Dinahosting, volver a sus servidores de nombres (ver «DNS»), o el dominio quedará apuntando a una zona borrada.
+4. **Quitar los bloqueos** (sin subir estos cambios):
+
+   ```bash
+   P=--profile=entrevecinos
+   aws ec2 modify-instance-attribute $P --no-disable-api-termination \
+     --instance-id "$(make -s tf-output | sed -n 's/^instance_id = "\(.*\)"/\1/p')"
+   # Clave de acceso del usuario de CI (creada a mano: Terraform no puede borrar un usuario con claves)
+   aws iam list-access-keys $P --user-name entrevecinos-github-actions --query 'AccessKeyMetadata[].AccessKeyId'
+   aws iam delete-access-key $P --user-name entrevecinos-github-actions --access-key-id <id>
+   # Conservar el bucket de copias: Terraform deja de gestionarlo
+   make tf ARGS="state rm module.database.module.backups_bucket"
+   ```
+
+   Y `prevent_destroy = false` en `modules/database/main.tf` (volumen), `modules/domain/main.tf` (zona) y `modules/private-bucket/main.tf` (bucket de imágenes).
+5. **Vaciar lo que Terraform no borra con contenido:** el bucket de imágenes (con todas sus versiones) y los repositorios de ECR:
+
+   ```bash
+   B=entrevecinos-media-995006761619
+   for q in Versions DeleteMarkers; do
+     aws s3api delete-objects $P --bucket $B --delete "$(aws s3api list-object-versions $P --bucket $B \
+       --query "{Objects: $q[].{Key: Key, VersionId: VersionId}}" --output json)" || true   # hasta 1000 por vuelta
+   done
+   for r in api web; do
+     aws ecr batch-delete-image $P --repository-name entrevecinos/$r \
+       --image-ids "$(aws ecr list-images $P --repository-name entrevecinos/$r --query imageIds --output json)"
+   done
+   ```
+6. **Destruir:** `make tf ARGS="destroy -var-file=prod.tfvars"` (CloudFront tarda unos 15 minutos en desactivarse y borrarse).
+7. **Después:** borrar los *snapshots* de Data Lifecycle Manager, que no gestiona Terraform:
+
+   ```bash
+   aws ec2 describe-snapshots $P --owner-ids self --filters Name=tag:Name,Values=entrevecinos-prod-postgres \
+     --query 'Snapshots[].SnapshotId' --output text | xargs -n1 aws ec2 delete-snapshot $P --snapshot-id
+   ```
+
+   Y deshacer los `prevent_destroy = false` del paso 4 (`git checkout -- infra/aws/modules`). Para volver a crear el entorno, «Puesta en marcha» desde el paso 3; los datos, con `restore.sh --production --yes` y la copia final.

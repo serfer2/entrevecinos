@@ -10,7 +10,9 @@ EntreVecinos es un tablón de anuncios privado por comunidades de vecinos: regis
 |---|---|
 | `apps/api/` | API REST: Python 3.12, FastAPI, SQLAlchemy 2, Alembic, PyJWT, boto3; dependencias con uv |
 | `apps/web/` | Web: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, zod |
-| `infra/` | Docker Compose: `db` (PostgreSQL 16), `storage` (MinIO), `mail` (Mailpit), `api`, `web` |
+| `infra/` | Docker Compose local: `db` (PostgreSQL 16), `storage` (MinIO), `mail` (Mailpit), `api`, `web` |
+| `infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` | Producción en AWS: Terraform, scripts de la instancia y Compose de producción (guía en `infra/aws/README.md`) |
+| `.github/workflows/` | CI en cada *pull request* (`ci.yml`) y despliegue continuo al fusionar en `main` (`deploy.yml`) |
 | `docs/api/openapi.yaml` | Contrato de referencia de la API |
 | `docs/product/` | Historias de usuario (`user-stories.md`) y tickets (`tickets/`) |
 | `openspec/` | Especificaciones vigentes (`specs/`) y cambios (`changes/`, `changes/archive/`) |
@@ -46,6 +48,21 @@ $COMPOSE exec web npm run test
 - Ejecuta solo las pruebas afectadas mientras iteras (`pytest tests/test_x.py`, `npm run test -- <ruta>`) y la suite completa al final.
 - Las pruebas `@pytest.mark.db` usan la base `<POSTGRES_DB>_test`, que se crea y migra sola; nunca tocan la de desarrollo.
 - Servicios locales: web http://localhost:3000, API http://localhost:8000/docs, correo http://localhost:8025.
+
+### Infraestructura de producción
+
+Terraform se ejecuta en contenedores con `make` (credenciales de `aws login --profile entrevecinos`):
+
+```bash
+make tf-lint     # fmt, validate, tflint y checkov; sin credenciales: úsalo siempre tras cambiar infra/aws/
+make shellcheck  # scripts de infra/prod/
+make tf-plan     # cambios en producción (solo lectura)
+make tf-apply    # aplica en producción
+make tf ARGS="…" # otras órdenes de Terraform (state, import…)
+```
+
+- **Nunca** ejecutes `make tf-apply`, `terraform destroy`, un despliegue ni órdenes que cambien recursos o datos de producción (Run Command, `restore.sh`…) sin confirmación explícita; enseña antes el `plan` o lo que va a cambiar.
+- Cambiar `infra/prod/` o el Compose de producción exige `make tf-apply` antes de desplegar: el documento de SSM los incrusta.
 
 ## Arquitectura
 
