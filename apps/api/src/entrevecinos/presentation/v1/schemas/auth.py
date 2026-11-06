@@ -76,6 +76,11 @@ class RegistrationConflictResponse(BaseModel):
     code: Literal["email_in_use", "email_pending_verification"]
 
 
+class EmailQuotaExceededResponse(BaseModel):
+    detail: str
+    code: Literal["email_quota_exceeded"]
+
+
 class EmailNotVerifiedResponse(BaseModel):
     detail: str
     code: Literal["email_not_verified"]

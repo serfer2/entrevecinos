@@ -94,6 +94,20 @@ describe("signup", () => {
     });
   });
 
+  it("con 503 email_quota_exceeded avisa y conserva los valores", async () => {
+    apiFetch.mockResolvedValue({
+      ok: false,
+      error: { status: 503, detail: "x", payload: { code: "email_quota_exceeded" } },
+    });
+
+    const state = await signup(undefined, form(validForm));
+
+    expect(state).toEqual({
+      formError: "Ahora mismo no podemos enviar correos de validación. Inténtalo de nuevo en unos días.",
+      values: keptValues,
+    });
+  });
+
   it("con 409 email_in_use no ofrece el reenvío", async () => {
     apiFetch.mockResolvedValue({
       ok: false,
@@ -147,7 +161,18 @@ describe("resendVerification", () => {
     });
   });
 
-  it.each([0, 422, 500])("con estado %i muestra un error", async (status) => {
+  it("con 503 email_quota_exceeded explica que no se pueden enviar correos", async () => {
+    apiFetch.mockResolvedValue({
+      ok: false,
+      error: { status: 503, detail: "x", payload: { code: "email_quota_exceeded" } },
+    });
+
+    expect(await resendVerification(undefined, form({ email: "vecino@example.com" }))).toEqual({
+      error: "Ahora mismo no podemos enviar correos de validación. Inténtalo de nuevo en unos días.",
+    });
+  });
+
+  it.each([0, 422, 500, 503])("con estado %i muestra un error", async (status) => {
     apiFetch.mockResolvedValue({ ok: false, error: { status, detail: null } });
 
     expect(await resendVerification(undefined, form({ email: "vecino@example.com" }))).toEqual({

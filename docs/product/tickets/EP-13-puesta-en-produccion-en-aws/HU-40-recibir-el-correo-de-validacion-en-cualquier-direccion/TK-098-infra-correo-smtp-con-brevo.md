@@ -123,9 +123,9 @@ aws ec2 describe-security-group-rules --profile entrevecinos \
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] Ninguna credencial en el repositorio ni en el estado.
-- [ ] Cambios revisados y fusionados mediante *pull request*.
+- [x] Los criterios de aceptación se cumplen.
+- [x] Ninguna credencial en el repositorio ni en el estado.
+- [x] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas
 

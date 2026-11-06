@@ -3,10 +3,16 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from entrevecinos.application.mail.email_quota import EmailQuota
 from entrevecinos.application.users.email_verification import EmailVerificationIssuer, hash_token
 from entrevecinos.application.users.resend_email_verification import ResendEmailVerification
+from entrevecinos.domain.mail.errors import EmailQuotaExceeded
 from entrevecinos.domain.users.entities import NewUser, PlatformRole, User
-from tests.fakes import InMemoryEmailVerificationRepository, InMemoryUserRepository
+from tests.fakes import (
+    InMemoryEmailQuotaRepository,
+    InMemoryEmailVerificationRepository,
+    InMemoryUserRepository,
+)
 
 EMAIL = "vecino@example.com"
 
@@ -43,13 +49,26 @@ def issuer(
 
 
 @pytest.fixture
+def quota_counts() -> InMemoryEmailQuotaRepository:
+    return InMemoryEmailQuotaRepository()
+
+
+@pytest.fixture
 def resend(
     users: InMemoryUserRepository,
     verifications: InMemoryEmailVerificationRepository,
     issuer: EmailVerificationIssuer,
+    quota_counts: InMemoryEmailQuotaRepository,
     clock: Clock,
 ) -> ResendEmailVerification:
-    return ResendEmailVerification(users, verifications, issuer, clock)
+    quota = EmailQuota(quota_counts, 5000, reset_day=6, clock=clock)
+    return ResendEmailVerification(users, verifications, issuer, quota, clock)
+
+
+def exhaust(quota_counts: InMemoryEmailQuotaRepository, clock: Clock) -> None:
+    from entrevecinos.domain.mail.quota import current_period
+
+    quota_counts.counts[current_period(clock(), 6).start] = 5000
 
 
 @pytest.fixture
@@ -116,3 +135,31 @@ def test_ignores_platform_admin(
     )
 
     assert resend.execute(EMAIL) is None
+
+
+def test_resend_uses_one_email_of_the_quota(
+    resend: ResendEmailVerification, quota_counts: InMemoryEmailQuotaRepository, pending: User
+) -> None:
+    assert resend.execute(EMAIL) is not None
+    assert sum(quota_counts.counts.values()) == 1
+
+
+def test_resend_that_sends_nothing_does_not_use_the_quota(
+    resend: ResendEmailVerification, quota_counts: InMemoryEmailQuotaRepository
+) -> None:
+    assert resend.execute("nadie@example.com") is None
+    assert quota_counts.counts == {}
+
+
+@pytest.mark.parametrize("email", [EMAIL, "nadie@example.com"])
+def test_without_quota_fails_the_same_whether_the_account_exists_or_not(
+    resend: ResendEmailVerification,
+    quota_counts: InMemoryEmailQuotaRepository,
+    clock: Clock,
+    pending: User,
+    email: str,
+) -> None:
+    exhaust(quota_counts, clock)
+
+    with pytest.raises(EmailQuotaExceeded):
+        resend.execute(email)

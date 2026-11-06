@@ -62,6 +62,19 @@ locals {
       statistic   = "Sum", period = 300, periods = 1, operator = "GreaterThanThreshold"
       threshold   = 10, missing = "notBreaching"
     }
+    # Cupo de correos por coste (TK-099): aviso al cruzar el 80 % y en cada envío bloqueado.
+    email-quota-80 = {
+      description = "Se ha usado el 80 % del cupo de correos del periodo (límite por coste)"
+      namespace   = local.logs_namespace, metric = "EmailQuotaWarning", dimensions = {}
+      statistic   = "Sum", period = 300, periods = 1, operator = "GreaterThanThreshold"
+      threshold   = 0, missing = "notBreaching"
+    }
+    email-quota-exceeded = {
+      description = "Cupo de correos agotado: el registro y el reenvío responden 503 hasta el día 6"
+      namespace   = local.logs_namespace, metric = "EmailQuotaExceeded", dimensions = {}
+      statistic   = "Sum", period = 300, periods = 1, operator = "GreaterThanThreshold"
+      threshold   = 0, missing = "notBreaching"
+    }
     ses-bounces = {
       description = "Tasa de rebotes de SES por encima del 5 % (AWS revisa la cuenta a partir del 5 %)"
       namespace   = "AWS/SES", metric = "Reputation.BounceRate", dimensions = {}

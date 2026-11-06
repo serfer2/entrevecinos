@@ -2,12 +2,15 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from entrevecinos.application.mail.email_quota import EmailQuota
 from entrevecinos.application.users.email_verification import EmailVerificationIssuer, hash_token
 from entrevecinos.application.users.register_user import RegisterUser, RegisterUserCommand
+from entrevecinos.domain.mail.errors import EmailQuotaExceeded
 from entrevecinos.domain.users.entities import PlatformRole
 from entrevecinos.domain.users.errors import EmailAlreadyRegistered, EmailPendingVerification
 from tests.fakes import (
     FakePasswordHasher,
+    InMemoryEmailQuotaRepository,
     InMemoryEmailVerificationRepository,
     InMemoryUserRepository,
 )
@@ -26,13 +29,30 @@ def verifications() -> InMemoryEmailVerificationRepository:
 
 
 @pytest.fixture
-def register_user(
-    users: InMemoryUserRepository, verifications: InMemoryEmailVerificationRepository
+def quota_counts() -> InMemoryEmailQuotaRepository:
+    return InMemoryEmailQuotaRepository()
+
+
+def make_register_user(
+    users: InMemoryUserRepository,
+    verifications: InMemoryEmailVerificationRepository,
+    quota_counts: InMemoryEmailQuotaRepository,
+    limit: int = 5000,
 ) -> RegisterUser:
     issuer = EmailVerificationIssuer(
         verifications, "http://web.test/", timedelta(hours=24), clock=lambda: NOW
     )
-    return RegisterUser(users, FakePasswordHasher(), issuer)
+    quota = EmailQuota(quota_counts, limit, reset_day=6, clock=lambda: NOW)
+    return RegisterUser(users, FakePasswordHasher(), issuer, quota)
+
+
+@pytest.fixture
+def register_user(
+    users: InMemoryUserRepository,
+    verifications: InMemoryEmailVerificationRepository,
+    quota_counts: InMemoryEmailQuotaRepository,
+) -> RegisterUser:
+    return make_register_user(users, verifications, quota_counts)
 
 
 def command(**overrides: str | None) -> RegisterUserCommand:
@@ -108,3 +128,36 @@ def test_rejects_email_pending_verification_without_changes(
         register_user.execute(command(email="VECINO@example.com", full_name="Otra persona"))
 
     assert list(users.users.values()) == [first]
+
+
+def test_registration_uses_one_email_of_the_quota(
+    register_user: RegisterUser, quota_counts: InMemoryEmailQuotaRepository
+) -> None:
+    register_user.execute(command())
+
+    assert sum(quota_counts.counts.values()) == 1
+
+
+def test_without_quota_no_account_is_created(
+    users: InMemoryUserRepository,
+    verifications: InMemoryEmailVerificationRepository,
+    quota_counts: InMemoryEmailQuotaRepository,
+) -> None:
+    register_user = make_register_user(users, verifications, quota_counts, limit=1)
+    register_user.execute(command())
+
+    with pytest.raises(EmailQuotaExceeded):
+        register_user.execute(command(email="otra@example.com"))
+
+    assert users.get_by_email("otra@example.com") is None
+
+
+def test_duplicate_email_does_not_use_the_quota(
+    register_user: RegisterUser, quota_counts: InMemoryEmailQuotaRepository
+) -> None:
+    register_user.execute(command())
+
+    with pytest.raises(EmailPendingVerification):
+        register_user.execute(command())
+
+    assert sum(quota_counts.counts.values()) == 1

@@ -1255,6 +1255,22 @@ paths:
                     code: email_pending_verification
         '422':
           $ref: '#/components/responses/ValidationError'
+        '503':
+          description: 'Cupo de correos del periodo agotado (restricción de costes): no se crea nada ni
+            se envía nada. `Retry-After` indica los segundos hasta el inicio del periodo siguiente.'
+          headers:
+            Retry-After:
+              description: Segundos hasta el inicio del periodo siguiente (el día 6 a las 00:00, hora
+                de Madrid).
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailQuotaExceeded'
+              example:
+                detail: Ahora mismo no podemos enviar correos. Inténtalo de nuevo más tarde.
+                code: email_quota_exceeded
   /auth/token:
     post:
       tags:
@@ -1414,6 +1430,20 @@ components:
           description: Duración del token en segundos.
         user:
           $ref: '#/components/schemas/User'
+    EmailQuotaExceeded:
+      description: Cupo de correos del periodo agotado (extensión de `Error`, TK-099). Por coste, la aplicación
+        envía como mucho un número fijo de correos entre el día 6 de un mes y el día 6 del siguiente;
+        al llegar al límite no crea la cuenta ni el enlace y no envía nada.
+      allOf:
+      - $ref: '#/components/schemas/Error'
+      - type: object
+        required:
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - email_quota_exceeded
     Error:
       type: object
       required:

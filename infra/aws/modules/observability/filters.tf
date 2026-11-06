@@ -15,6 +15,9 @@ locals {
     # Python escribe el mensaje y la traza sin nivel).
     api-error     = { group = "api", metric = "ApiErrors", pattern = "\"ERROR:\"" }
     api-traceback = { group = "api", metric = "ApiErrors", pattern = "\"Traceback (most recent call last)\"" }
+    # Cupo de correos por coste (TK-099): aviso al 80 % y cada envío bloqueado.
+    email-quota-80       = { group = "api", metric = "EmailQuotaWarning", pattern = "\"Cupo de correo al 80\"" }
+    email-quota-exceeded = { group = "api", metric = "EmailQuotaExceeded", pattern = "\"Límite mensual de correos alcanzado\"" }
     # Proxy: todas las peticiones y las 5xx (alarma web-5xx) y las rechazadas por límite (sustituyen a
     # los bloqueos del WAF; solo en el panel).
     proxy-requests = { group = "proxy", metric = "ProxyRequests", pattern = "[ip, time, request, status, ...]" }

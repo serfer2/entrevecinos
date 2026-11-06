@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from entrevecinos.application.authorization.community_access import CommunityAccess
+from entrevecinos.application.mail.email_quota import EmailQuota
 from entrevecinos.application.users.authenticate_user import AuthenticateUser
 from entrevecinos.application.users.email_verification import EmailVerificationIssuer
 from entrevecinos.application.users.get_current_user import GetCurrentUser
@@ -31,6 +32,9 @@ from entrevecinos.infrastructure.listings.sqlalchemy_listing_repository import (
 )
 from entrevecinos.infrastructure.mail.ses_email_sender import SesEmailSender
 from entrevecinos.infrastructure.mail.smtp_email_sender import SmtpEmailSender
+from entrevecinos.infrastructure.mail.sqlalchemy_email_quota_repository import (
+    SqlAlchemyEmailQuotaRepository,
+)
 from entrevecinos.infrastructure.media.sqlalchemy_media_repository import (
     SqlAlchemyMediaRepository,
 )
@@ -125,18 +129,33 @@ EmailVerificationIssuerDep = Annotated[
 ]
 
 
+def get_email_quota(session: SessionDep, settings: SettingsDep) -> EmailQuota:
+    return EmailQuota(
+        SqlAlchemyEmailQuotaRepository(session),
+        settings.email_monthly_limit,
+        settings.email_quota_reset_day,
+    )
+
+
+EmailQuotaDep = Annotated[EmailQuota, Depends(get_email_quota)]
+
+
 def get_register_user(
-    users: UserRepositoryDep, hasher: PasswordHasherDep, verification: EmailVerificationIssuerDep
+    users: UserRepositoryDep,
+    hasher: PasswordHasherDep,
+    verification: EmailVerificationIssuerDep,
+    quota: EmailQuotaDep,
 ) -> RegisterUser:
-    return RegisterUser(users, hasher, verification)
+    return RegisterUser(users, hasher, verification, quota)
 
 
 def get_resend_email_verification(
     users: UserRepositoryDep,
     verifications: EmailVerificationRepositoryDep,
     issuer: EmailVerificationIssuerDep,
+    quota: EmailQuotaDep,
 ) -> ResendEmailVerification:
-    return ResendEmailVerification(users, verifications, issuer)
+    return ResendEmailVerification(users, verifications, issuer, quota)
 
 
 def get_verify_email(
