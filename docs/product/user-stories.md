@@ -991,11 +991,11 @@ La aplicación se despliega en AWS (región `eu-north-1`) con toda la infraestru
 - **When** termina el *workflow* de despliegue
 - **Then** producción ejecuta las imágenes de ese *commit*, con las migraciones aplicadas, y una prueba de humo contra la URL pública ha pasado
 
-**AC3 — Sin credenciales guardadas**
+**AC3 — Credenciales de mínimo privilegio**
 
 - **Given** la configuración del repositorio en GitHub
 - **When** reviso sus secretos
-- **Then** no hay claves de acceso de AWS: el *workflow* obtiene credenciales temporales por OIDC con un rol que solo puede publicar imágenes y desplegar en la instancia de producción, y solo desde `main`
+- **Then** la única clave de AWS es la de un usuario de CI que solo puede asumir, con un identificador externo, un rol que solo puede publicar imágenes y desplegar en la instancia de producción; el *workflow* trabaja con las credenciales temporales de ese rol y solo desde `main` (el entorno `production`). El plan de AWS del proyecto no admite OIDC (TK-088)
 
 **AC4 — Vuelta atrás automática**
 
