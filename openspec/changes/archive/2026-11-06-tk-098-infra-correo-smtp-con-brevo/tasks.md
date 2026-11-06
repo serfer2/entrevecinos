@@ -18,4 +18,4 @@
 - [x] 4.1 `make shellcheck`, `make tf-lint` y pruebas de la API
 - [x] 4.2 `make tf-plan` revisado y `make tf-apply`
 - [x] 4.3 En Brevo: IP elástica autorizada y dominio verificado (el seguimiento de clics no se puede desactivar: riesgo aceptado)
-- [ ] 4.4 Despliegue y registro de extremo a extremo con dos direcciones no verificadas (cabeceras DKIM y DMARC); retirar la IP antigua de Brevo
+- [x] 4.4 Despliegue (`e8412a2`) y registro de extremo a extremo con dos direcciones no verificadas (Gmail y Outlook): en la bandeja de entrada, `dkim=pass` y `dmarc=pass`, sin fallos de envío en la API. Pendiente fuera del repositorio: retirar `16.16.213.236` de las IP autorizadas de Brevo
