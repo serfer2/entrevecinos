@@ -4,7 +4,7 @@
 Integración continua en GitHub Actions: comprobaciones de la API, la web, la infraestructura y las imágenes en cada pull request, regla de documentación de la infraestructura, Dependabot y protección de `main`.
 ## Requirements
 ### Requirement: Comprobaciones en cada pull request
-El *workflow* `CI` (`.github/workflows/ci.yml`) SHALL ejecutarse en cada *pull request*, en cada `push` a `main` y como `workflow_call`, con los trabajos `api` (`ruff check`, `ruff format --check` y `pytest` con PostgreSQL), `web` (`lint`, `typecheck` y `test`), `infra` (`make tf-lint` y `shellcheck`), `images` (etapas `prod` de `api` y `web` para `linux/arm64`, sin publicar) y `docs-infra`. Los trabajos MUST usar los objetivos `make ci-api`, `make ci-web`, `make tf-lint` y `make shellcheck`, que también se ejecutan en local.
+El *workflow* `CI` (`.github/workflows/ci.yml`) SHALL ejecutarse en cada *pull request* y como `workflow_call` (en `main`, desde el despliegue de `deploy.yml`), con los trabajos `api` (`ruff check`, `ruff format --check` y `pytest` con PostgreSQL), `web` (`lint`, `typecheck` y `test`), `infra` (`make tf-lint` y `shellcheck`), `images` (etapas `prod` de `api` y `web` para `linux/arm64`, sin publicar) y `docs-infra`. Los trabajos MUST usar los objetivos `make ci-api`, `make ci-web`, `make tf-lint` y `make shellcheck`, que también se ejecutan en local. Solo en *pull requests* una ejecución nueva cancela la anterior.
 
 #### Scenario: Pull request correcto
 - **WHEN** abro un *pull request* a `main` que pasa todas las comprobaciones
@@ -13,6 +13,10 @@ El *workflow* `CI` (`.github/workflows/ci.yml`) SHALL ejecutarse en cada *pull r
 #### Scenario: Prueba rota
 - **WHEN** un *pull request* rompe una prueba o el formato
 - **THEN** el trabajo correspondiente falla y GitHub no permite fusionarlo
+
+#### Scenario: Comprobaciones en main
+- **WHEN** se fusiona un *pull request* en `main`
+- **THEN** las comprobaciones se ejecutan una sola vez, dentro del despliegue
 
 ### Requirement: Documentación de la infraestructura
 El trabajo `docs-infra` SHALL fallar en un *pull request* que cambia `infra/aws/**`, `infra/prod/**`, `infra/docker-compose.prod.yml` o `.github/workflows/**` sin cambiar `infra/aws/README.md`, con el mensaje «Este pull request cambia la infraestructura: actualiza infra/aws/README.md o añade la etiqueta sin-cambios-en-doc-infra si el cambio no afecta a la documentación.», salvo que el *pull request* tenga la etiqueta `sin-cambios-en-doc-infra`.
