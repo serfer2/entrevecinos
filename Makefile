@@ -12,6 +12,7 @@ COMPOSE      := docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
 env_value = $(or $(shell grep -E '^$(1)=' $(ENV_FILE) 2>/dev/null | tail -1 | cut -d= -f2 | cut -d' ' -f1),$(2))
 
 .PHONY: help check-env build-frontend build-backend build dev migrate clean \
+        ci-api ci-web shellcheck \
         tf-bootstrap tf-init tf-plan tf-apply tf-output tf-lint
 
 help: ## Muestra esta ayuda
@@ -40,6 +41,26 @@ migrate: check-env ## Aplica las migraciones pendientes de la base de datos
 
 clean: check-env ## Elimina contenedores e imágenes locales (conserva los volúmenes de datos)
 	$(COMPOSE) down --rmi local --remove-orphans
+
+# --- Comprobaciones de AGENTS.md, las mismas en local y en CI (TK-089) ---
+
+ci-api: check-env ## Lint, formato y pruebas de la API (incluidas las de base de datos)
+	$(COMPOSE) build api
+	$(COMPOSE) run --rm api ruff check .
+	$(COMPOSE) run --rm api ruff format --check .
+	$(COMPOSE) run --rm -v "$(CURDIR)/apps/api/tests:/app/tests" api python -m pytest -q
+
+# Sobre la imagen `dev`, sin montar el código: en CI el usuario del runner no es el de la imagen.
+ci-web: ## Lint, tipos y pruebas de la web
+	docker build --target dev -t entrevecinos-web-ci apps/web
+	docker run --rm entrevecinos-web-ci npm run lint
+	docker run --rm entrevecinos-web-ci npm run typecheck
+	docker run --rm entrevecinos-web-ci npm run test
+
+SHELLCHECK_IMAGE := koalaman/shellcheck:v0.11.0
+
+shellcheck: ## shellcheck de los scripts de producción (infra/prod)
+	docker run --rm -v "$(CURDIR):/mnt:ro" -w /mnt $(SHELLCHECK_IMAGE) $(wildcard infra/prod/*.sh infra/prod/*/*.sh)
 
 # --- Producción en AWS (TK-078). Terraform y sus linters se ejecutan en contenedores. ---
 # Las credenciales temporales de `aws login` se pasan al contenedor por entorno, sin escribirlas
@@ -86,7 +107,7 @@ tf-lint: ## Formato, validación, tflint y checkov de infra/aws (sin credenciale
 		docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v "$(CURDIR)":/work -e TF_DATA_DIR=.terraform-lint -w /work/$$dir $(TF_IMAGE) init -backend=false -input=false >/dev/null; \
 		docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v "$(CURDIR)":/work -e TF_DATA_DIR=.terraform-lint -w /work/$$dir $(TF_IMAGE) validate; \
 	done
-	docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v "$(CURDIR)":/work -w /work/infra/aws --entrypoint sh $(TFLINT_IMAGE) \
+	docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -e GITHUB_TOKEN -v "$(CURDIR)":/work -w /work/infra/aws --entrypoint sh $(TFLINT_IMAGE) \
 		-c "tflint --init --config=/work/infra/aws/.tflint.hcl && tflint --recursive --config=/work/infra/aws/.tflint.hcl"
 	docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -v "$(CURDIR)":/work -w /work/infra/aws $(CHECKOV_IMAGE) \
 		--directory . --config-file .checkov.yaml

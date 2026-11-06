@@ -26,6 +26,8 @@ infra/aws/
 ├── .tflint.hcl         reglas de tflint
 └── .checkov.yaml       comprobaciones de checkov omitidas, con su motivo
 infra/docker-compose.prod.yml   Compose de producción: proxy, web, api y db (TK-086)
+.github/workflows/ci.yml        comprobaciones de cada pull request y de main (TK-089)
+.github/dependabot.yml          actualizaciones semanales de dependencias (TK-089)
 infra/prod/             ficheros que se copian a la instancia (TK-082, TK-086)
 ├── deploy.sh           despliegue: secretos, migraciones, salud y vuelta atrás
 ├── proxy/              nginx: exige la cabecera de origen de CloudFront
@@ -181,6 +183,30 @@ Uso en un *workflow* (TK-090), en un *job* con `environment: production`:
 **Rotación cada 90 días** (como mucho dos claves a la vez): crear una nueva y actualizar los secretos con la orden anterior, comprobar que un despliegue funciona y borrar la antigua (`aws iam list-access-keys` y `aws iam delete-access-key --access-key-id <antigua>`). **Si se filtra:** `aws iam update-access-key --user-name entrevecinos-github-actions --access-key-id <id> --status Inactive` y crear otra.
 
 *Pendiente: TK-090* (despliegue continuo desde GitHub Actions).
+
+## Integración continua
+
+`.github/workflows/ci.yml` (*workflow* `CI`) se ejecuta en cada *pull request*, en cada `push` a `main` y como `workflow_call` (el despliegue de TK-090 lo reutiliza). Cinco trabajos en paralelo, con las mismas órdenes que en local:
+
+| Trabajo | Qué hace | Local |
+|---|---|---|
+| `api` | `ruff check`, `ruff format --check` y `pytest` (con PostgreSQL de Compose; `.env` copiado de `.env.example`) | `make ci-api` |
+| `web` | `lint`, `typecheck` y `test` sobre la imagen `dev` (sin montar el código) | `make ci-web` |
+| `infra` | `terraform fmt` y `validate`, tflint y checkov; `shellcheck` de `infra/prod` | `make tf-lint`, `make shellcheck` |
+| `images` | etapas `prod` de `api` y `web` para `linux/arm64` en *runners* arm64 nativos, con caché de GitHub Actions; no publica | — |
+| `docs-infra` | solo en *pull requests*: falla si cambian `infra/aws/**`, `infra/prod/**`, `infra/docker-compose.prod.yml` o `.github/workflows/**` sin `infra/aws/README.md`, salvo con la etiqueta `sin-cambios-en-doc-infra` | — |
+
+- **Seguridad:** `permissions: contents: read`, acciones fijadas por SHA (versión en comentario; Dependabot las actualiza), `persist-credentials: false`, sin secretos ni acceso a AWS. Solo el *token* automático de solo lectura, para que tflint descargue su *plugin*. Una ejecución nueva de la misma rama cancela la anterior.
+- **Dependabot** (`.github/dependabot.yml`): `github-actions`, `uv`, `npm`, `docker`, `docker-compose` y `terraform`, cada semana.
+- **Coste:** 0; el repositorio es público (minutos ilimitados, también en `ubuntu-24.04-arm`).
+
+**Configuración de GitHub (manual, una vez):**
+
+1. **Etiqueta:** *Issues → Labels → New label* `sin-cambios-en-doc-infra` («El cambio de infraestructura no afecta a la guía»).
+2. **Protección de `main`:** *Settings → Rules → Rulesets → New branch ruleset*: nombre `main`, *Enforcement status* `Active`, *Target branches* → *Include default branch*, y activa:
+   - *Restrict deletions* y *Block force pushes*;
+   - *Require a pull request before merging* con *Required approvals* `1` (con un solo mantenedor, añade tu rol a *Bypass list* para poder fusionar tus propios *pull requests*, o deja `0`);
+   - *Require status checks to pass* con `api`, `web`, `infra`, `images (api)`, `images (web)` y `docs-infra` (aparecen tras la primera ejecución; los de la matriz llevan el servicio entre paréntesis).
 
 ## Web pública
 
@@ -396,6 +422,14 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Mitigaciones:** la clave solo asume el rol (con `ExternalId`), vive en un entorno limitado a `main` (los *forks* nunca la reciben), no está en Terraform ni en el repositorio, se rota cada 90 días y su uso queda en CloudTrail. Sin rol de `terraform plan` para *pull requests*: sería otra clave al alcance de cualquier rama.
 - **Cuándo revisarla:** al activar las funciones avanzadas de la cuenta o pasar a un plan que admita OIDC.
 - **Evolución:** proveedor OIDC de GitHub y confianza del rol con `token.actions.githubusercontent.com:sub = repo:serfer2/entrevecinos:environment:production`; borrar el usuario y su clave.
+
+### Integración continua con objetivos de `make` y sin AWS (TK-089)
+
+- **Qué:** GitHub Actions ejecuta los mismos objetivos de `make` que se usan en local, en contenedores, sin secretos ni credenciales de AWS; las imágenes `arm64` se construyen en *runners* arm64 nativos.
+- **Por qué:** CI y local no divergen; un *pull request* (incluido uno de un *fork*) no puede tocar AWS; los *runners* arm64 son gratuitos en repositorios públicos y evitan la emulación de QEMU, mucho más lenta.
+- **Impacto:** sin `terraform plan` en los *pull requests* (los cambios de infraestructura se revisan con el `plan` local); `ci-web` no monta el código, así que construye la imagen `dev` en cada ejecución.
+- **Cuándo revisarla:** si el repositorio pasa a privado (minutos de pago, sobre todo arm64) o si hace falta `plan` automático.
+- **Evolución:** `plan` en *pull requests* con OIDC y un rol de lectura cuando el plan de AWS lo permita (TK-088).
 
 ### Excepciones de checkov
 

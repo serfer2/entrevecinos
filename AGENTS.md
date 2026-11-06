@@ -42,6 +42,7 @@ $COMPOSE exec web npm run typecheck
 $COMPOSE exec web npm run test
 ```
 
+- `make ci-api` y `make ci-web` ejecutan todo lo anterior igual que la integración continua (`.github/workflows/ci.yml`), que además valida la infraestructura (`make tf-lint`, `make shellcheck`) y construye las imágenes de producción. Los *pull requests* no se fusionan si falla.
 - Ejecuta solo las pruebas afectadas mientras iteras (`pytest tests/test_x.py`, `npm run test -- <ruta>`) y la suite completa al final.
 - Las pruebas `@pytest.mark.db` usan la base `<POSTGRES_DB>_test`, que se crea y migra sola; nunca tocan la de desarrollo.
 - Servicios locales: web http://localhost:3000, API http://localhost:8000/docs, correo http://localhost:8025.
