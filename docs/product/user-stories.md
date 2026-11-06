@@ -1089,3 +1089,9 @@ Hoy SES sigue en *sandbox* en `eu-north-1`: solo entrega a direcciones verificad
 - **When** consulto el correo de producción
 - **Then** encuentro el estado real del acceso de producción, los límites de envío, cómo se comprobó y qué hacer si vuelve a fallar
 
+**AC5 — Límite mensual de envíos**
+
+- **Given** que la aplicación ya ha enviado 5.000 correos en el periodo actual, del día 6 de un mes al día 6 del siguiente
+- **When** alguien se registra o pide de nuevo el correo de validación
+- **Then** no se envía nada, veo un mensaje que me pide intentarlo más tarde y el equipo recibe un aviso; el día 6 siguiente el envío vuelve a funcionar. El límite es una restricción de costes y está documentado como tal
+
