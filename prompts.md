@@ -449,6 +449,90 @@ Si alguien abre un enlace antiguo que fue reemplazado por uno enviado nuevamente
 Crea una historia de usuario con los tickets necesarios para ello e impleméntala.
 ```
 
+**Prompt 12:** Look & Feel y mejoras de usabilidad
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Desarrollo del MVP completado. Fase de mejoras y depuración
+
+```
+Crea una épica con historias de usuario y tickets para los siguientes cambios:
+
+Rediseña el look & feel de esta web de anuncios clasificados para que transmita una conexión clara con la naturaleza y resulte sencilla, limpia y fácil de usar.
+Antes de hacer cambios, revisa la estructura del proyecto y localiza las tecnologías, páginas y componentes que ya existen. Conserva las funcionalidades actuales y céntrate en la presentación visual; reutiliza los componentes y estilos del proyecto siempre que tenga sentido.
+Dirección visual
+  - Usa una paleta inspirada en la naturaleza: verdes suaves, tonos tierra y fondos claros, con buen contraste para que el texto se lea bien.
+  - Da prioridad a la sencillez: espacios amplios, jerarquía visual clara y pocos elementos decorativos.
+  - Haz que los anuncios sean fáciles de explorar, con tarjetas ordenadas que destaquen imágenes, título y precio.
+  - Mantén una navegación intuitiva y una búsqueda y unos filtros fáciles de encontrar y utilizar.
+  - Elige tipografía legible y consistente, y utiliza iconos solo cuando ayuden a entender una acción.
+  - Asegúrate de que el diseño se adapte bien a móviles, tabletas y escritorio.
+  - Evita que el resultado parezca una plantilla genérica: adapta las decisiones visuales al contenido y a la identidad que ya tenga el proyecto.
+Implementa los cambios en el código existente. Al terminar, resume qué archivos modificaste y qué decisiones visuales aplicaste.
+
+Cuando voy al buscador de comunidades, como admin, me sigue saliendo el botón de "solicitar acceso". Como admin, el acceso debería ser por defecto a cualquier comunidad.
+
+Acabo de publicar un anuncio en la comunidad "Barrio HU21" y no aparece. Se debe considerar al platform_admin como miembro, igual que ya hace require_member.
+
+Las imágenes en la ficha del anuncio se ven pequeñas. Quiero que al hacer click en ellas, se vean en grande en primer plano y pueda hacer carrusel a izquierda o derecha pusando botones o arrastrando el dedo en dispositivo táctil.
+```
+
+**Prompt 13:** Aplicar sugerencias del Feedback de entrega 1
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** El feedback de la 1a entrega muestra deficiencias en la doc.
+
+```
+Crea una HU y los tickets y la implementación en openspec para llevar a cabo el siguiente cambio:
+En la doc, el diagrama dibuja una capa de seguridad entre el frontend y el backend, pero JWT, roles y CORS viven dentro de la API; dibújalos dentro de FastAPI.
+No lo implementes aún, quiero revisar los tickets
+```
+
+**Prompt 14:** Ajustar las definiciones de la doc del API
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** El feedback de la 1a entrega muestra deficiencias en la doc del API y en el alcance del MVP
+
+```
+ Añade a la épica 12 historias de usuario y tickets para estos cambios:
+
+  comprueba si el número de entidades del modelo de datos, coincide con las rutas definidas en docs/api. Si hay más rutas en la doc del api, esas rutas no pertenecen al MVP. Marca en la doc del api y en el resto de la doc, qué subconjunto es el del MVP y cuales están pendientes de implementar en futuras versiones. Asegúrate de que el README apunta a docs/api/openapi.yaml
+  como la fuente de verdad y de que el fragmento incluido en él coincide.
+```
+
+**Prompt 15:** Creación de las tareas para puesta en producción en AWS
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** El proyecto está listo para poner en producción. Es necesario preparar la infra en AWS
+
+```
+Eres un experto en infrastructura y AWS. Crea una nueva épica para crear todos los recursos necesarios en AWS para poner el proyecto en producción. La épica debe contener los tickets, siguiendo el orden necesario. No los implementes, quiero revisarlos y refinarlos antes de la implementación.
+NOTAS:
+- El dominio es "entrevecinos.org" y está configurado en Dinahosting
+- Añade un límite de gasto mensual en AWS de 40 euros al mes
+```
+
+**Prompt 16:** Refinement de tickets de la épica 13 - reducción de costes
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Los tickets y las historias de usuario de la épica 13 han sido creados y es necesario refinarlos/corregirlos y tomar decisiones que han quedado abiertas 
+
+```
+Vamos a intentar recortar costes: De momento no es necesario alta disponibilidad, no nos preocupamos por eso hasta que el proyecto sea maduro y tenga mucho tráfico. Teninendo esto en cuenta, refactoriza la infrastructura y refleja los cambios en la documentación. Si tienes dudas pregúntame
+```
+
+**Prompt 16:** Refinement de tickets de la épica 13 - seguridad (secretos)
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Los tickets y las historias de usuario de la épica 13 han sido creados y es necesario refinarlos/corregirlos y tomar decisiones que han quedado abiertas 
+
+```
+De acuerdo con el ticket 086, se pretende almacenar las los secretos en en fichero .env dentro de la propia instancia. Evítalo usando la alternativa mencionada: pasarlos solo por entorno al proceso de Compose. Documenta el cambio y dime cuales tickets se modifican.
+```
+
+**Prompt 17:** Refinement de tickets de la épica 13 - Documentación al día
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Los tickets y las historias de usuario de la épica 13 han sido creados y es necesario refinarlos/corregirlos y tomar decisiones que han quedado abiertas 
+
+```
+Con respecto a lo mencionado en el ticket 093, hay dos acciones que deben llevarse a cabo (crea la historia de usuario y/o tickets necesarios):
+- Asegúrate de añadir una regla en openspec/config.yaml y en AGENTS.md para asegurarte de que infra/aws/README.md refleje cualquier cambio en la infrastructura.
+- Inicialmente el README hablaba de contenedores gestionados y balanceador pero de momento la arquitectura va a ser distinta a la prevista. Asegúrate de que se documenta la decisión (coste, mientras el proyecto no escale) y la evolución recomendada cuando sea maduro y tenga mucho tráfico: RDS (y después Multi-AZ), ECS Fargate + ALB, WAF propio, DNSSEC en Route 53, origen cifrado y orígenes VPC de CloudFront.
+```
+
 #### 6.1 Implementación de tickets de trabajo
 
 **Prompt 1:** Implementar infra de desarrollo
@@ -477,6 +561,22 @@ Claude propone ir creando las specs en openspec a partir de los ficheros de tick
 
 ```
 Implementa los tickets que falten por implementar. Revisa los que ya han sido implementados y asegúrate de que todos queden hechos
+```
+
+**Prompt 4:** Implementar los tickets de la Épica de mejoras y depurado de experiencia de usuario
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Todos los tickets de la épica 11 están listos para implementar.
+
+```
+Implementa los tickets de la épica 11
+```
+
+**Prompt 5:** Implementar los tickets de la Épica 12
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Todos los tickets de la épica 12 han sido revisados y refinados y están listos para implementar.
+
+```
+Implementa los tickets de la épica 12
 ```
 
 ##### Importante
