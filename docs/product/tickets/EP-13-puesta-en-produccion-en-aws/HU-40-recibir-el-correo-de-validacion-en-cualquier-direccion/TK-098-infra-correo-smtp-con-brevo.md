@@ -22,11 +22,21 @@ Brevo solo acepta envíos por SMTP y por la API desde las IP que se le autorizan
 ## 2. Alcance
 
 **Incluye**
-- **Autenticación del dominio en Brevo**, con registros en Route 53 gestionados por Terraform (`modules/domain` o `modules/mail`). Los valores se copian de la cuenta de Brevo, no de ejemplos:
-  - **verificación:** TXT `brevo-code:<código>` en `entrevecinos.org`. **Route 53 solo admite un conjunto TXT por nombre**, así que va en el mismo recurso que el SPF de la raíz, como un segundo valor;
-  - **DKIM:** los dos CNAME que da Brevo (asumido: `brevo1._domainkey` y `brevo2._domainkey`, 2048 bits). Firman con `d=entrevecinos.org`, lo que cumple DMARC con `adkim=s`;
-  - **SPF:** la raíz publica hoy `v=spf1 -all`, porque SES usa `MAIL FROM` en `mail.entrevecinos.org`. Si Brevo envía con su propio dominio de rebotes, DMARC pasa por DKIM y el SPF de la raíz no se evalúa. Si Brevo exige SPF, pasa a `v=spf1 include:spf.brevo.com -all`. Hay que decidirlo según lo que pida Brevo al autenticar el dominio;
-  - **DMARC:** se mantiene el actual (`p=none`); Brevo exige que exista.
+- **Registros DNS de Brevo** en Route 53, gestionados por Terraform (`modules/domain` o `modules/mail`). Valores dados por Brevo el 2026-11-06; no se crean a mano en la consola:
+
+  | Registro | Tipo | Nombre | Valor | Cómo se integra |
+  |---|---|---|---|---|
+  | Verificación | TXT | `entrevecinos.org` | `brevo-code:63e65be73c205d7e281cfa96975e98a5` | **Segundo valor del registro TXT de la raíz**, junto a `v=spf1 -all`: Route 53 solo admite un conjunto TXT por nombre |
+  | DKIM 1 | CNAME | `brevo1._domainkey` | `b1.entrevecinos-org.dkim.brevo.com` | Nuevo. Firma con `d=entrevecinos.org` y DMARC pasa con `adkim=s`; no choca con el DKIM de SES |
+  | DKIM 2 | CNAME | `brevo2._domainkey` | `b2.entrevecinos-org.dkim.brevo.com` | Nuevo |
+  | DMARC | TXT | `_dmarc` | Brevo propone `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com` | **Se combina con el actual** sin perder `adkim` ni `aspf`: `v=DMARC1; p=none; adkim=s; aspf=r; rua=mailto:rua@dmarc.brevo.com`. Los informes agregados no llevan datos personales |
+  | Marca | CNAME | `send` | `send-entrevecinos-org.brand.brevosend.com` | Nuevo. Dominio de envío y rebotes con la marca del proyecto |
+  | Redirección | CNAME | `r.send` | `send-entrevecinos-org.r.brand.brevosend.com` | Nuevo; solo sirve con el seguimiento de clics, que se desactiva (ver abajo) |
+  | Imágenes | CNAME | `img.send` | `send-entrevecinos-org.img.brand.brevosend.com` | Nuevo; solo sirve con el seguimiento de aperturas |
+
+  - **Prefijo `send`, nunca `mail`:** `mail.entrevecinos.org` es el `MAIL FROM` de SES, con sus registros MX y SPF, y un CNAME no puede convivir con otros registros en el mismo nombre. Brevo los generó primero con `mail` y se cambiaron a `send` (confirmado el 2026-11-06).
+  - **SPF:** la raíz mantiene `v=spf1 -all`. Brevo no pide SPF: DMARC pasa por DKIM alineado y los rebotes van al dominio con marca.
+  - **Seguimiento de clics desactivado** en el correo transaccional de Brevo: si no, reescribiría el enlace de validación, con su *token*, a través de su servidor de redirección (el mismo motivo por el que TK-091 lo quitó de los registros).
 - **Secretos:**
   - `/entrevecinos/prod/smtp/username` y `/entrevecinos/prod/smtp/password` (`SecureString`), creados a mano con `aws ssm put-parameter` (Terraform no conoce los valores; así no quedan en el estado);
   - `deploy.sh` los lee en la misma llamada que el resto y los exporta solo por entorno;
@@ -60,7 +70,7 @@ Brevo solo acepta envíos por SMTP y por la API desde las IP que se le autorizan
 
 - STARTTLS obligatorio: la configuración de la API lo exige en producción.
 - Credenciales nunca en el repositorio, el estado de Terraform, ficheros de la instancia ni registros (`deploy.sh` sin traza).
-- `make tf-plan`: solo cambian el TXT de la raíz, los CNAME de DKIM, el grupo de seguridad, el documento de SSM, la IP elástica nueva y el origen de CloudFront (por el nuevo nombre DNS de la instancia); ningún registro de la web ni de SES. La instancia no se reemplaza.
+- `make tf-plan`: solo cambian el TXT de la raíz, el DMARC, los cinco CNAME nuevos, el grupo de seguridad, el documento de SSM, la IP elástica nueva y el origen de CloudFront (por el nuevo nombre DNS de la instancia); ningún registro de la web ni de SES. La instancia no se reemplaza.
 - `make tf-lint` y `make shellcheck` sin avisos.
 
 ## 4. Criterios de aceptación
@@ -92,7 +102,7 @@ Brevo solo acepta envíos por SMTP y por la API desde las IP que se le autorizan
 
 ## 5. Plan de tareas
 
-1. Autenticación del dominio en Brevo: valores de la cuenta; registros TXT y CNAME en Terraform.
+1. Registros DNS de Brevo en Terraform; seguimiento de clics desactivado en Brevo.
 2. Parámetros de las credenciales; `deploy.sh` y Compose de producción.
 3. IP elástica y regla de salida 587; IP autorizada en Brevo.
 4. `make tf-lint`, `make shellcheck`, `make tf-plan`, `make tf-apply` y despliegue.
@@ -119,7 +129,7 @@ aws ec2 describe-security-group-rules --profile entrevecinos \
 
 ## 8. Riesgos y decisiones abiertas
 
-- **SPF de la raíz:** depende de lo que exija Brevo (ver Alcance); con DKIM alineado, DMARC pasa sin él.
+- **SPF de la raíz:** se mantiene `v=spf1 -all`; con DKIM alineado, DMARC pasa sin él.
 - **Salida SMTP abierta:** el puerto 587 a cualquier destino amplía la salida de la instancia; un proceso comprometido podría enviar correo por otros servidores. Mitigación: solo la API tiene la red `egress`; restringir el destino si Brevo publica rangos.
 - **Límite de 300 al día:** al agotarlo, Brevo rechaza los envíos y salta la alarma de fallos de envío (TK-097).
 - **Dependencia externa:** alta y claves fuera de Terraform; la rotación de la clave SMTP es manual (nueva clave en Brevo, `put-parameter --overwrite` y desplegar).

@@ -39,10 +39,10 @@ Descartados: Mailjet (el plan gratuito lleva su logo), SMTP2GO (1.000 al mes), M
 
 **Incluye**
 - **Alta en Brevo** con el correo del proyecto, plan gratuito, sin tarjeta. Activar el envío transaccional (SMTP): Brevo puede pedir datos de la empresa o revisar la cuenta antes de activarlo.
-- **Comprobaciones del plan gratuito** con un envío de prueba desde la interfaz de Brevo a una dirección propia:
-  - **marca:** que el correo transaccional no lleve logo ni pie de Brevo; los anuncios de Brevo solo lo atribuyen a las campañas, sin confirmarlo para el transaccional;
+- **Comprobaciones del plan gratuito:**
   - **límites:** 300 al día, por SMTP;
   - **datos y RGPD:** contrato de tratamiento de datos (DPA) de Brevo y ubicación de los datos.
+  - Una posible marca de Brevo en el pie del correo transaccional se acepta en esta fase (decisión del 2026-11-06).
 - **Credenciales SMTP:** la clave SMTP propia (no la de la API) y el usuario de SMTP. Se crean en Brevo, se guardan directamente en Parameter Store (TK-098) y nunca en el repositorio, en el chat ni en ficheros.
 - **Decisión** en `infra/aws/README.md`, «Decisiones de arquitectura»:
   - nueva entrada «Correo transaccional con Brevo en lugar de SES (TK-096)», con el estado de SES, la comparación anterior, el coste, los riesgos y cómo volver a SES;
@@ -65,10 +65,10 @@ Descartados: Mailjet (el plan gratuito lleva su logo), SMTP2GO (1.000 al mes), M
 - **When** reviso su configuración
 - **Then** el envío transaccional (SMTP) está activo en el plan gratuito y hay una clave SMTP creada para producción
 
-**AC2 — Plan gratuito válido**
-- **Given** un envío transaccional de prueba desde Brevo
-- **When** lo abro en el cliente de correo
-- **Then** no lleva logo ni pie de Brevo; si los lleva, se decide (aceptarlo, pagar la retirada o pasar a Resend) y se registra antes de seguir
+**AC2 — Dominio preparado**
+- **Given** la cuenta de Brevo
+- **When** consulto el dominio `entrevecinos.org`
+- **Then** Brevo ha dado los registros de autenticación y de marca, con el prefijo `send`, que crea TK-098
 
 **AC3 — Decisión documentada (HU-40 AC4)**
 - **Given** `infra/aws/README.md`
@@ -78,7 +78,7 @@ Descartados: Mailjet (el plan gratuito lleva su logo), SMTP2GO (1.000 al mes), M
 ## 5. Plan de tareas
 
 1. Alta en Brevo y activación del envío transaccional.
-2. Envío de prueba: marca y límites; DPA.
+2. Límites y DPA; registros DNS del dominio en Brevo (prefijo `send`).
 3. Clave SMTP de producción (se guarda en TK-098).
 4. Decisión y paso 6 en `infra/aws/README.md`.
 
@@ -98,7 +98,7 @@ En Brevo: *Transactional* → *Settings* (SMTP activo) y *SMTP & API* → *SMTP 
 
 ## 8. Riesgos y decisiones abiertas
 
-- **Marca en el plan gratuito:** sin confirmar en fuentes oficiales; lo resuelve AC2.
+- **Marca en el plan gratuito:** puede aparecer un pie de Brevo; se acepta por ahora.
 - **Activación de la cuenta:** Brevo puede tardar en activar el SMTP o pedir más información.
 - **Dependencia externa:** una cuenta fuera de AWS y de Terraform, con sus propios límites (300 al día) y disponibilidad. La alarma de fallos de envío (TK-097) avisa si se agotan.
 - **Volumen:** por encima de 300 al día hay que pasar a un plan de pago (≈ 9 USD/mes) dentro del límite de gasto, o volver a SES si ya tiene acceso de producción.
