@@ -452,7 +452,20 @@ Producción está en `https://entrevecinos.org`, en la región `eu-north-1` de A
 - **Correo:** SES, con el dominio verificado (DKIM, SPF y DMARC).
 - **Operación:** registros, métricas y alarmas en CloudWatch con aviso por correo, y procedimientos de recuperación ensayados (RPO 6 horas, RTO 4 horas). Sin SSH: la instancia se opera con Session Manager.
 
-**Base de datos y disponibilidad.** La arquitectura prevista usaba una base de datos gestionada con alta disponibilidad. Se ha optado por **PostgreSQL en la instancia y sin alta disponibilidad para ahorrar costes mientras el proyecto no escale** (unos 15 USD/mes menos que Amazon RDS, dentro del límite de 40 €/mes). El precio es un RPO de 6 horas y que un fallo de la instancia corta el servicio hasta recuperarla. Se mitiga con copias cada 6 horas comprobadas y una alarma si falta una, un volumen de datos separado que sobrevive a la instancia, *snapshots* diarios y un usuario de aplicación sin privilegios de DDL ([decisión](infra/aws/README.md#base-de-datos-en-la-instancia-tk-082)). Con más tráfico, el paso siguiente es Amazon RDS.
+#### Diferencias con la arquitectura prevista
+
+La arquitectura prevista usaba contenedores gestionados detrás de un balanceador, PostgreSQL gestionado con alta disponibilidad, CDN con WAF y un gestor de secretos. Producción es distinta **para ahorrar costes mientras el proyecto no escale**, dentro del límite de 40 €/mes: unos 20 USD/mes, frente a más de 100 con lo previsto (los costes evitados se detallan en la guía).
+
+| Área | Previsto | Elegido | Evolución cuando el proyecto escale |
+|---|---|---|---|
+| Cómputo | Contenedores gestionados y balanceador o API Gateway | Una instancia EC2 con Docker Compose, sin alta disponibilidad | ECS Fargate con ALB |
+| Base de datos | PostgreSQL gestionado con alta disponibilidad | PostgreSQL 16 en la instancia, sin alta disponibilidad, con copias cada 6 horas (RPO 6 h) y volumen propio | Amazon RDS y después Multi-AZ |
+| Protección web | CDN + WAF | CloudFront sin WAF y límites de peticiones en el proxy | WAF (plan de CloudFront o Web ACL) |
+| DNS | Sin detallar | Route 53, sin DNSSEC | DNSSEC |
+| Red | Base de datos en red privada | Subred pública sin NAT; base solo en la red interna de Compose; origen por HTTP con cabecera secreta | Origen cifrado y orígenes VPC de CloudFront |
+| Secretos | Gestor de secretos | Parameter Store, solo por entorno | Secrets Manager para la contraseña de RDS |
+
+Cada diferencia, con su motivo, coste evitado y riesgo aceptado, está en [«Decisiones de arquitectura»](infra/aws/README.md#decisiones-de-arquitectura); los pasos de evolución, en orden y con su señal de disparo y su coste, en [«Evolución»](infra/aws/README.md#evolución).
 
 #### Integración y despliegue continuos
 

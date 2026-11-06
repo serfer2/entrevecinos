@@ -619,6 +619,47 @@ Terraform separa el volumen (parando la instancia), destruye la instancia, crea 
 
 ## Decisiones de arquitectura
 
+El `readme.md` §2.4 preveía contenedores gestionados detrás de un balanceador o API Gateway, PostgreSQL gestionado con alta disponibilidad, CDN con WAF y un gestor de secretos. Producción es distinta por **ahorro de costes mientras el proyecto no escale**, dentro del límite de 40 €/mes (TK-078). Resumen frente a lo previsto (costes aproximados a precio de lista, `eu-north-1`, noviembre de 2026; se revisan al dar cada paso de «Evolución»):
+
+| Área | Previsto en el `readme.md` | Elegido | Coste evitado | Riesgo aceptado | Entrada |
+|---|---|---|---|---|---|
+| Cómputo | Contenedores gestionados detrás de un balanceador o API Gateway | Una EC2 `t4g.small` con Docker Compose, sin balanceador | ≈ 30-40 USD/mes (ALB y Fargate) | Sin alta disponibilidad; web, API y base en el mismo host; parches del sistema a cargo del proyecto; cortes de segundos al desplegar | [TK-085](#instancia-única-endurecida-tk-085), [TK-086](#despliegue-por-ssm-con-secretos-solo-por-entorno-tk-086) |
+| Base de datos | PostgreSQL gestionado con alta disponibilidad, copias y PITR | PostgreSQL 16 en la instancia, volumen EBS propio, copias cada 6 h y *snapshots* | ≈ 15 USD/mes (RDS) | RPO de 6 h, sin conmutación por error, mantenimiento propio, base accesible si se compromete la instancia | [TK-082](#base-de-datos-en-la-instancia-tk-082), [TK-092](#restauración-en-una-base-nueva-con-cambio-de-nombre-tk-092) |
+| Protección web | CDN + WAF | CloudFront **sin WAF**; límites de peticiones por IP en nginx (el plan del proyecto no admite el plan gratuito de CloudFront) | ≈ 10 USD/mes (Web ACL) | Sin reglas gestionadas contra patrones maliciosos ni bots; los límites consumen CPU de la instancia | [TK-087](#cloudfront-sin-waf-y-con-origen-http-tk-087) |
+| DNS | DNS, sin detallar | Route 53 gestionado por Terraform, dominio en Dinahosting, sin DNSSEC | ≈ 1 USD/mes (clave KMS) | Zona sin firmar | [TK-084](#route-53-sin-dnssec-tk-084) |
+| Origen | — | CloudFront → instancia por HTTP, con cabecera secreta y la lista de prefijos de CloudFront | ≈ 0 (sin certificado de origen ni ALB) | Tramo CloudFront-origen sin cifrar | [TK-087](#cloudfront-sin-waf-y-con-origen-http-tk-087) |
+| Red | Red privada para la base de datos | Una subred pública sin NAT; la base solo en la red interna de Compose | ≈ 35 USD/mes (NAT) | IP pública en la instancia (solo admite tráfico de CloudFront) | [TK-079](#subred-pública-sin-nat-tk-079) |
+| Secretos | Gestor de secretos | Parameter Store `SecureString`, solo por entorno | ≈ 1,5 USD/mes (Secrets Manager) | Sin rotación gestionada; secretos visibles para *root* con `docker inspect` | [TK-083](#parameter-store-en-lugar-de-secrets-manager-tk-083), [TK-086](#despliegue-por-ssm-con-secretos-solo-por-entorno-tk-086) |
+
+Las entradas siguientes amplían cada decisión (qué, por qué, impacto, mitigaciones, cuándo revisarla y evolución) e incluyen otras que no estaban en el `readme.md` (CI/CD, alertas, restauración). Cada cambio de una decisión actualiza su entrada (regla de TK-094).
+
+### Subred pública sin NAT (TK-079)
+
+- **Qué:** una VPC con una sola subred pública para la instancia, con IP pública e Internet Gateway; sin subredes privadas ni NAT. PostgreSQL no está en una subred: solo existe en la red interna de Compose, sin puerto publicado. Endpoint *gateway* de S3 (gratuito) y *flow logs* del tráfico rechazado.
+- **Por qué:** **ahorro de costes mientras el proyecto no escale**: un NAT Gateway cuesta ≈ 35 USD/mes, casi el doble de todo lo demás, y con una sola instancia no hay nada que separar en subredes.
+- **Impacto:** la instancia tiene IP pública; si el grupo de seguridad se abriera por error, quedaría expuesta.
+- **Mitigaciones:** el grupo de seguridad solo admite HTTP desde la lista de prefijos de CloudFront y solo sale por HTTPS; el proxy exige la cabecera de origen; sin SSH; el grupo por defecto, sin reglas; *flow logs* de los rechazos.
+- **Cuándo revisarla:** al pasar a varias instancias o a ECS (paso 3 de «Evolución»).
+- **Evolución:** subredes privadas con orígenes VPC de CloudFront (paso 7).
+
+### Parameter Store en lugar de Secrets Manager (TK-083)
+
+- **Qué:** los secretos (contraseñas de PostgreSQL, clave de los JWT, cabecera de origen) en Parameter Store como `SecureString` de nivel estándar, cifrados con la clave gestionada `aws/ssm`.
+- **Por qué:** **ahorro de costes mientras el proyecto no escale**: el nivel estándar es gratuito; Secrets Manager cobra 0,40 USD/mes por secreto (≈ 1,5 USD/mes) y su ventaja, la rotación gestionada, solo sirve de verdad con RDS.
+- **Impacto:** la rotación es manual (subir la versión, `make tf-apply` y desplegar); sin historial de rotación ni rotación programada.
+- **Mitigaciones:** valores generados sin quedar en el estado de Terraform (salvo la cabecera de origen), solo por entorno (TK-086), lectura limitada al rol de la instancia y procedimiento de rotación en el *runbook*.
+- **Cuándo revisarla:** al migrar a RDS (contraseña gestionada por RDS en Secrets Manager) o si una norma exige rotación periódica.
+- **Evolución:** contraseña maestra de RDS gestionada en Secrets Manager; el resto puede seguir en Parameter Store.
+
+### Route 53 sin DNSSEC (TK-084)
+
+- **Qué:** el DNS de `entrevecinos.org` en una zona de Route 53 gestionada entera por Terraform; el dominio sigue registrado en Dinahosting. Sin DNSSEC ni registro de consultas.
+- **Por qué:** los registros de CloudFront (alias) y de SES viven junto al resto de la infraestructura y sin deriva; DNSSEC necesita una clave KMS en `us-east-1` (≈ 1 USD/mes) y el registro `DS` en Dinahosting, y se deja para cuando la infraestructura esté estable (**ahorro de costes mientras el proyecto no escale**).
+- **Impacto:** la zona no está firmada: un ataque de envenenamiento de la caché DNS no se detectaría.
+- **Mitigaciones:** HTTPS con HSTS en toda la web (un certificado falso no se aceptaría), CAA que solo permite a Amazon emitir certificados, y SPF, DKIM y DMARC en el correo.
+- **Cuándo revisarla:** en cuanto la infraestructura esté estable; no depende del tráfico.
+- **Evolución:** DNSSEC en Route 53 (paso 5).
+
 ### Base de datos en la instancia (TK-082)
 
 - **Qué:** PostgreSQL 16 en un contenedor de la instancia EC2, con volumen EBS propio, sin alta disponibilidad, en lugar de Amazon RDS.
@@ -635,7 +676,7 @@ Terraform separa el volumen (parando la instancia), destruye la instancia, crea 
 - **Impacto:** la seguridad del sistema operativo queda a cargo del proyecto (parches, acceso y permisos), y la web y la API comparten host y rol: un fallo en la web daría acceso a las credenciales de la API. Sin alta disponibilidad: un fallo de la instancia corta el servicio hasta que se recupera.
 - **Mitigaciones:** sin SSH (Session Manager con registro), IMDSv2, rol de mínimo privilegio, parches automáticos, recuperación automática y contenedores sin privilegios ni socket de Docker (TK-086).
 - **Cuándo revisarla:** CPU o memoria saturadas de forma sostenida, necesidad de más de una instancia o de separar web y API.
-- **Evolución:** ECS Fargate con ALB y una tarea por servicio (TK-095).
+- **Evolución:** ECS Fargate con ALB y una tarea por servicio (paso 3 de «Evolución»).
 
 ### Despliegue por SSM con secretos solo por entorno (TK-086)
 
@@ -688,7 +729,7 @@ Terraform separa el volumen (parando la instancia), destruye la instancia, crea 
 - **Impacto:** si falla la cuenta, la región o CloudWatch, no hay aviso; `web-5xx` no ve un proxy caído ni los errores de CloudFront; los umbrales son iniciales; la suscripción de correo se confirma a mano.
 - **Mitigaciones:** `instance-down` y `backup-missing` tratan la falta de datos como alarma; avisos también al volver a `OK`; *runbook* por alarma.
 - **Cuándo revisarla:** con usuarios que dependan de la web a diario, más de una persona de guardia o ruido de alertas.
-- **Evolución:** un *canary* de CloudWatch Synthetics (≈ 1-2 USD/mes) o un servicio externo gratuito de disponibilidad; avisos a un canal de chat; con el plan de pago, la alarma sobre `5xxErrorRate` de CloudFront en `us-east-1` (TK-095).
+- **Evolución:** un *canary* de CloudWatch Synthetics (≈ 1-2 USD/mes) o un servicio externo gratuito de disponibilidad; avisos a un canal de chat; con el plan de pago, la alarma sobre `5xxErrorRate` de CloudFront en `us-east-1` (ver «Evolución», otras mejoras).
 
 ### Restauración en una base nueva con cambio de nombre (TK-092)
 
@@ -697,17 +738,34 @@ Terraform separa el volumen (parando la instancia), destruye la instancia, crea 
 - **Impacto:** la base anterior ocupa el volumen de datos hasta que se borra a mano; RPO de 6 horas (TK-082) y copias en la misma cuenta y región.
 - **Mitigaciones:** alarma `disk-data` (TK-091), copias que la instancia no puede borrar (TK-082), *snapshots* diarios y ensayos cada 3 meses.
 - **Cuándo revisarla:** al migrar a RDS (recuperación a un punto en el tiempo) o si los datos no pueden perder 6 horas.
-- **Evolución:** S3 Object Lock en modo *governance* en el bucket de copias (también contra el borrado por error de un administrador) y, con el plan de pago, copias en otra cuenta (TK-095).
+- **Evolución:** S3 Object Lock en modo *governance* en el bucket de copias (también contra el borrado por error de un administrador) y, con el plan de pago, copias en otra cuenta (ver «Evolución», otras mejoras).
 
 ### Excepciones de checkov
 
 `.checkov.yaml` omite, con su motivo, las comprobaciones que chocan con decisiones de coste o con el plan del proyecto: claves KMS propias (≈ 1 USD/mes cada una; se usan las gestionadas por AWS), réplica entre regiones (no permitida), registro de accesos y notificaciones de S3, y retenciones de registros de un año. Las excepciones puntuales van en el propio recurso con `#checkov:skip`; entre ellas, DNSSEC y el registro de consultas de la zona de Route 53 (TK-084: DNSSEC necesita una clave KMS y se deja para la evolución), en la instancia la IP pública (sin NAT es su única salida) y la monitorización detallada (TK-085), y en CloudFront la restricción geográfica, el origen de respaldo y la política de cabeceras de respuesta (las pone Next.js), con los registros v2 que checkov no reconoce, y la falta de WAF (TK-087), el usuario IAM con política propia de GitHub Actions (TK-088), y el tema SNS sin KMS y la configuración del agente como `String` (TK-091).
 
-*Pendiente: TK-095* (resto de decisiones frente a la arquitectura prevista en el `readme.md` §2.4).
-
 ## Evolución
 
-*Pendiente: TK-095.* Pasos recomendados cuando el proyecto sea maduro y tenga mucho tráfico, con su señal de disparo y su coste.
+Pasos recomendados **cuando el proyecto sea maduro y tenga mucho tráfico**, en orden. Ninguno está implementado. Las señales son orientativas: se fijan con las métricas reales de «Observabilidad y alertas» tras unas semanas en producción. Costes aproximados a precio de lista (`eu-north-1`, noviembre de 2026); cada paso suma su coste al límite de gasto de TK-078, que habrá que subir.
+
+| Orden | Paso | Señal para darlo | Coste añadido | Dependencias y referencia |
+|---|---|---|---|---|
+| 1 | **RDS PostgreSQL** (copias automáticas y PITR) | Datos que no pueden perder 6 horas, memoria de la instancia saturada por PostgreSQL (`memory`) o necesidad de recuperación a un punto en el tiempo | ≈ +15 USD/mes | *Runbook*, «Migrar a Amazon RDS» |
+| 2 | **RDS Multi-AZ** (`multi_az = true`) | Requisito de disponibilidad de la base (p. ej. ≥ 99,9 %) o caídas de zona que afecten a usuarios | ≈ +15 USD/mes | Paso 1 |
+| 3 | **ECS Fargate + ALB** (tareas de web y API, despliegues sin corte, autoescalado) | CPU o memoria sostenidas > 70 % incluso en `t4g.medium` (`cpu`, `memory`, `cpu-credits`), más de una réplica o despliegues sin corte | ≈ +30-40 USD/mes | Paso 1 (la base no puede seguir en la instancia); sustituye `deploy.sh` por despliegues de ECS |
+| 4 | **WAF** (plan Free o Pro de CloudFront si el plan de AWS lo admite, o Web ACL propia con reglas gestionadas) | Ataques o bots que los límites del proxy no frenan (`RateLimited`, `web-5xx`), o carga de la instancia por tráfico abusivo | ≈ 0-10 USD/mes | Plan de pago de AWS para el plan de CloudFront; los límites de nginx pueden quedarse como segunda capa |
+| 5 | **DNSSEC en Route 53** (clave KMS en `us-east-1` y `DS` en Dinahosting) | En cuanto la infraestructura esté estable; no depende del tráfico | ≈ +1 USD/mes | Ninguna |
+| 6 | **Origen cifrado** (`origin.entrevecinos.org` con Let's Encrypt por DNS-01 en Route 53 y origen `https-only`, o certificado de ACM en el ALB del paso 3) | Antes de manejar datos más sensibles o al salir del MVP | ≈ 0 (o incluido en el ALB) | Ninguna (o el paso 3) |
+| 7 | **Orígenes VPC de CloudFront** (aplicación en subredes privadas, sin IP pública ni cabecera secreta) | Junto con el paso 3, cuando la aplicación pase a subredes privadas | ≈ +35 USD/mes de NAT, o endpoints de interfaz | Paso 3 |
+
+El orden es una recomendación: los pasos 5 y 6 son baratos y se pueden adelantar; el 7 solo tiene sentido con el 3. Cada paso actualiza su entrada de «Decisiones de arquitectura» (regla de TK-094) y esta guía.
+
+**Otras mejoras sin dependencia del tráfico**, recogidas en sus decisiones:
+
+- **OIDC para GitHub Actions** en lugar de la clave del usuario de CI, cuando el plan de AWS lo admita (TK-088).
+- **S3 Object Lock** en modo *governance* en el bucket de copias, contra el borrado por error de un administrador; con el plan de pago, copias en otra cuenta (TK-092).
+- **Monitorización externa** (*canary* de CloudWatch Synthetics, ≈ 1-2 USD/mes, o un servicio gratuito de disponibilidad) y, con el plan de pago, la alarma de `5xxErrorRate` de CloudFront (TK-091).
+- **Despliegue *blue/green*** detrás del proxy, sin corte, mientras siga la instancia única (TK-086, TK-090).
 
 ## Destruir el entorno
 
