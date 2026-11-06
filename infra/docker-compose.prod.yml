@@ -96,13 +96,18 @@ services:
       DATABASE_URL: postgresql+psycopg://entrevecinos_app:${ENTREVECINOS_APP_PASSWORD:?Lo define deploy.sh}@db:5432/entrevecinos
       CORS_ORIGINS: https://entrevecinos.org
       JWT_SECRET: ${JWT_SECRET:?Lo define deploy.sh}
-      # S3 y SES con las credenciales del rol de la instancia (TK-081), sin claves.
+      # S3 con las credenciales del rol de la instancia (TK-081), sin claves.
       STORAGE_BUCKET: entrevecinos-media-995006761619
       STORAGE_REGION: eu-north-1
       STORAGE_ADDRESSING_STYLE: virtual
-      MAIL_BACKEND: ses
-      SES_REGION: eu-north-1
-      SES_CONFIGURATION_SET: entrevecinos-prod
+      # Correo por SMTP con Brevo (TK-098); SES queda configurado en AWS como vuelta atrás: para volver,
+      # MAIL_BACKEND: ses, SES_REGION: eu-north-1 y SES_CONFIGURATION_SET: entrevecinos-prod.
+      MAIL_BACKEND: smtp
+      SMTP_HOST: smtp-relay.brevo.com
+      SMTP_PORT: "587"
+      SMTP_STARTTLS: "true"
+      SMTP_USERNAME: ${SMTP_USERNAME:?Lo define deploy.sh}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?Lo define deploy.sh}
       MAIL_FROM: EntreVecinos <no-reply@entrevecinos.org>
       WEB_PUBLIC_URL: https://entrevecinos.org
     tmpfs:

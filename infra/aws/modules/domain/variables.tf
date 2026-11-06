@@ -15,3 +15,15 @@ variable "wait_for_certificate_validation" {
   type        = bool
   default     = false
 }
+
+variable "root_txt_records" {
+  description = "Valores TXT adicionales de la raíz (verificación de servicios); el SPF se añade siempre."
+  type        = list(string)
+  default     = []
+}
+
+variable "dmarc_rua" {
+  description = "Direcciones que reciben los informes agregados de DMARC (rua)."
+  type        = list(string)
+  default     = []
+}

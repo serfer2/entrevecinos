@@ -1,4 +1,5 @@
 import smtplib
+import ssl
 from email.message import EmailMessage
 
 from entrevecinos.application.users.ports import OutgoingEmail
@@ -34,7 +35,9 @@ class SmtpEmailSender:
 
         with smtplib.SMTP(self._host, self._port, timeout=self._timeout) as smtp:
             if self._starttls:
-                smtp.starttls()
+                # Contexto que verifica el certificado y el nombre del servidor: sin él, smtplib usa
+                # uno sin verificación y un intermediario podría robar las credenciales SMTP.
+                smtp.starttls(context=ssl.create_default_context())
             if self._username:
                 smtp.login(self._username, self._password)
             smtp.send_message(message)

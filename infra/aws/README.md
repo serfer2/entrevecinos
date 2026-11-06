@@ -23,7 +23,7 @@ infra/aws/
 │   ├── domain/         zona de Route 53, políticas de correo y certificado HTTPS (TK-084)
 │   ├── edge/           CloudFront, redirección de www, registros de acceso y alias (TK-087)
 │   ├── ci/             usuario y rol de despliegue de GitHub Actions (TK-088)
-│   └── mail/           SES (configuration set, dominio con DKIM y MAIL FROM) y secreto de los JWT (TK-083, TK-084)
+│   └── mail/           SES (configuration set, dominio con DKIM y MAIL FROM), registros de Brevo y secreto de los JWT (TK-083, TK-084, TK-098)
 ├── .tflint.hcl         reglas de tflint
 └── .checkov.yaml       comprobaciones de checkov omitidas, con su motivo
 infra/docker-compose.prod.yml   Compose de producción: proxy, web, api y db (TK-086)
@@ -289,19 +289,22 @@ El dominio `entrevecinos.org` sigue **registrado en Dinahosting** (renovación a
 
 | Nombre | Tipo | Valor | Para qué |
 |---|---|---|---|
-| `entrevecinos.org` | `TXT` | `v=spf1 -all` | La raíz no envía correo |
-| `_dmarc.entrevecinos.org` | `TXT` | `v=DMARC1; p=none; adkim=s; aspf=r` | DMARC en observación |
+| `entrevecinos.org` | `TXT` | `v=spf1 -all` y `brevo-code:63e65be7…` (un solo conjunto: Route 53 no admite dos por nombre) | La raíz no envía correo con su propio sobre; verificación del dominio en Brevo (TK-098) |
+| `_dmarc.entrevecinos.org` | `TXT` | `v=DMARC1; p=none; adkim=s; aspf=r; rua=mailto:rua@dmarc.brevo.com` | DMARC en observación; informes agregados a Brevo |
 | `entrevecinos.org` | `CAA` | `amazon.com`, `amazontrust.com`, `awstrust.com`, `amazonaws.com` e `issuewild ";"` | Solo Amazon emite certificados; ningún comodín |
 | `_<hash>.entrevecinos.org`, `_<hash>.www.entrevecinos.org` | `CNAME` | Validación de ACM | Emisión y renovación del certificado |
 | `<token>._domainkey.entrevecinos.org` (×3) | `CNAME` | `<token>.dkim.amazonses.com` | DKIM de SES |
 | `mail.entrevecinos.org` | `MX` | `10 feedback-smtp.eu-north-1.amazonses.com` | MAIL FROM (rebotes) |
 | `mail.entrevecinos.org` | `TXT` | `v=spf1 include:amazonses.com -all` | SPF del MAIL FROM |
+| `brevo1._domainkey`, `brevo2._domainkey` | `CNAME` | `b1`/`b2.entrevecinos-org.dkim.brevo.com` | DKIM de Brevo (`d=entrevecinos.org`, alineado con DMARC estricto) |
+| `send`, `r.send`, `img.send` | `CNAME` | `send-entrevecinos-org.{brand,r.brand,img.brand}.brevosend.com` | Dominio de marca de Brevo (envío y rebotes; los dos últimos solo sirven con el seguimiento, desactivado). Prefijo `send`: `mail` es el MAIL FROM de SES |
 | `entrevecinos.org`, `www.entrevecinos.org` | `A` y `AAAA` alias | Distribución de CloudFront (`modules/edge`) | Web; `www` redirige a la raíz |
 
 Los alias no tienen TTL propio y siguen a la distribución si se recrea. TTL de 300 s durante la puesta en marcha; se subirá a 3600 (`dns_ttl`) cuando esté estable.
 
 - **Certificado:** ACM en `us-east-1` (lo exige CloudFront) para `entrevecinos.org` y `www.entrevecinos.org`, validado por DNS. Se renueva solo mientras existan sus registros.
-- **Correo:** identidad de dominio de SES con Easy DKIM RSA 2048 y el *configuration set* `entrevecinos-prod`; MAIL FROM `mail.entrevecinos.org`. Remitente de producción: `MAIL_FROM="EntreVecinos <no-reply@entrevecinos.org>"` (lo fija el Compose de producción, TK-086). Nadie lee las respuestas: no hay `MX` en la raíz.
+- **Correo de producción:** Brevo por SMTP (TK-096, TK-098), con los registros de la tabla en `modules/mail/brevo.tf` y `modules/domain` (valores en `envs/prod/main.tf`, dados por Brevo).
+- **SES (vuelta atrás):** identidad de dominio de SES con Easy DKIM RSA 2048 y el *configuration set* `entrevecinos-prod`; MAIL FROM `mail.entrevecinos.org`. Remitente de producción: `MAIL_FROM="EntreVecinos <no-reply@entrevecinos.org>"` (lo fija el Compose de producción, TK-086). Nadie lee las respuestas: no hay `MX` en la raíz.
 
 **Delegación desde Dinahosting** (una sola vez):
 
@@ -336,6 +339,7 @@ Todos los secretos viven en SSM Parameter Store como `SecureString` (nivel está
 | `/entrevecinos/prod/db/app-password` | `entrevecinos_app` (la API) | TK-082 |
 | `/entrevecinos/prod/db/{host,port,name}` | Conexión (`String`, no secretos): `db`, `5432`, `entrevecinos` | TK-082 |
 | `/entrevecinos/prod/origin-verify` | Cabecera `X-Origin-Verify` entre CloudFront y el proxy (48 caracteres) | TK-086 |
+| `/entrevecinos/prod/smtp/username`, `/entrevecinos/prod/smtp/password` | Usuario y clave SMTP de Brevo. **Creados a mano** (`aws ssm put-parameter`, ver «Puesta en marcha», paso 6): Terraform no los conoce ni los guarda | TK-096, TK-098 |
 
 - Los valores (salvo `origin-verify`) se generan con `ephemeral "random_password"` y se escriben con argumentos de solo escritura (`value_wo`): **no quedan en el estado de Terraform**.
 - No tienen rotación automática. Para rotar: sube `jwt_secret_version` o `db_password_version` en `prod.tfvars`, `make tf-apply` y vuelve a desplegar (TK-086 aplica las contraseñas nuevas a PostgreSQL y recrea los contenedores). Rotar el secreto de los JWT invalida todas las sesiones.
@@ -354,6 +358,9 @@ Todos los secretos viven en SSM Parameter Store como `SecureString` (nivel está
 ### Instancia de aplicación (TK-085)
 
 Una sola instancia `entrevecinos-prod-app` (`t4g.small`, arm64, Amazon Linux 2023) en `eu-north-1a`, con IP pública y el grupo de seguridad que solo admite HTTP desde CloudFront. Ejecuta Docker Compose (TK-086).
+
+- **IP pública fija** (TK-098): IP elástica `entrevecinos-prod-app` (`make tf-output` → `instance_public_ip`), con `prevent_destroy`. Es la única IP autorizada en Brevo y el origen de CloudFront usa su nombre DNS. Cuesta lo mismo que la IP automática anterior. **Si cambia** (p. ej. al recrear el entorno), hay que actualizar las IP autorizadas de Brevo o el correo dejará de salir.
+- **Salida:** HTTPS (443) hacia los servicios de AWS y SMTP con STARTTLS (587) hacia Brevo; nada más.
 
 - **Acceso solo con Session Manager:** sin par de claves, sin puerto 22 y con `sshd` desactivado. Cada sesión queda registrada en `/entrevecinos/prod/ssm-sessions` (30 días); se cierra tras 20 minutos inactiva y dura como máximo 60.
 
@@ -598,6 +605,13 @@ make tf ARGS="apply -var-file=prod.tfvars -replace=module.compute.aws_instance.a
 
 Terraform separa el volumen (parando la instancia), destruye la instancia, crea otra con la última AMI y el *user data* actual, adjunta el volumen y actualiza CloudFront (nuevo origen), las alarmas y las asociaciones de State Manager. Después: `DEPLOY_INSTANCE_ID` en el entorno `production` de GitHub con el nuevo ID (`make -s tf-output`) y un despliegue (*Run workflow*). Unos 15 minutos sin servicio; la protección contra la terminación vuelve a activarse con la instancia nueva.
 
+**Correo (Brevo, TK-098):**
+
+- **Comprobar el envío:** un registro de prueba en la web y, en Brevo, *Transactional* → *Logs* (entregado, rebotado o bloqueado). En la API, `/entrevecinos/prod/app/api` muestra «No se pudo enviar el correo» si el servidor lo rechaza.
+- **Rotar la clave SMTP:** nueva clave en Brevo (*SMTP & API* → *SMTP*), `aws ssm put-parameter --overwrite --type SecureString --name /entrevecinos/prod/smtp/password --value '<clave>'` desde una terminal, desplegar y borrar la antigua en Brevo.
+- **La IP de salida cambia:** añadir la nueva en Brevo (IP autorizadas) antes de desplegar; con la IP elástica solo pasa al recrear el entorno.
+- **Volver a SES** (si tiene acceso de producción): en `infra/docker-compose.prod.yml`, `MAIL_BACKEND: ses`, `SES_REGION: eu-north-1` y `SES_CONFIGURATION_SET: entrevecinos-prod` en lugar de las variables `SMTP_*`; `make tf-apply` y desplegar. La identidad, DKIM y el MAIL FROM de SES siguen configurados.
+
 **Alarmas:** qué hacer con cada una, en «Observabilidad y alertas». **Restaurar copias, *snapshots* o imágenes:** «Recuperación».
 
 ## Costes
@@ -824,7 +838,7 @@ Para dejar de gastar créditos cuando producción ya no haga falta. **Borra la w
    make tf ARGS="state rm module.database.module.backups_bucket"
    ```
 
-   Y `prevent_destroy = false` en `modules/database/main.tf` (volumen), `modules/domain/main.tf` (zona) y `modules/private-bucket/main.tf` (bucket de imágenes).
+   Y `prevent_destroy = false` en `modules/database/main.tf` (volumen), `modules/domain/main.tf` (zona), `modules/private-bucket/main.tf` (bucket de imágenes) y `modules/compute/main.tf` (IP elástica). En Brevo, retirar la IP autorizada y, si no se va a volver, eliminar la cuenta o sus claves SMTP.
 5. **Vaciar lo que Terraform no borra con contenido:** el bucket de imágenes (con todas sus versiones) y los repositorios de ECR:
 
    ```bash
