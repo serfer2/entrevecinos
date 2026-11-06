@@ -7,7 +7,8 @@
 # 1. Credenciales de ECR con el rol de la instancia (credential helper: ningún token en disco).
 # 2. Secretos de Parameter Store solo al entorno de este proceso: ni .env ni ficheros temporales.
 # 3. PostgreSQL en marcha y roles al día (aplica también las contraseñas rotadas).
-# 4. Migraciones como entrevecinos_owner.
+# 4. Si hay migraciones pendientes, copia previa con backup.sh (TK-092); después, las migraciones
+#    como entrevecinos_owner.
 # 5. Servicios nuevos, healthy y respondiendo por el proxy; si no, vuelta a los digests anteriores
 #    (sin deshacer migraciones) y error.
 # 6. Digests guardados, temporizador de copias instalado e imágenes antiguas eliminadas.
@@ -120,6 +121,19 @@ rollback() {
   fail "el despliegue ha fallado; se han restaurado los digests anteriores"
 }
 
+# Copia antes de migrar (TK-092): solo si la base ya tiene esquema y hay migraciones pendientes
+# (`alembic current` de la imagen nueva no marca «(head)»). Si la copia falla, no se migra.
+backup_before_migrations() {
+  local current
+  current="$(compose run --rm --no-deps -T -e DATABASE_URL api alembic current 2>/dev/null)"
+  if [[ -z $current || $current == *"(head)"* ]]; then
+    echo "Sin migraciones pendientes sobre una base existente: no hace falta copia previa"
+    return
+  fi
+  BACKUP_BUCKET=entrevecinos-backups-995006761619 "$app_dir/prod/backup.sh" ||
+    fail "la copia previa a las migraciones ha fallado; no se ha migrado ni desplegado"
+}
+
 install_backups() {
   # Configuración no secreta de backup.sh; la contraseña la lee el propio script.
   printf 'BACKUP_BUCKET=entrevecinos-backups-995006761619\nAWS_REGION=%s\n' "$AWS_REGION" \
@@ -145,6 +159,7 @@ compose exec -T db bash /docker-entrypoint-initdb.d/10-roles.sh
 log "Migraciones"
 DATABASE_URL="postgresql+psycopg://entrevecinos_owner:${ENTREVECINOS_OWNER_PASSWORD}@db:5432/entrevecinos"
 export DATABASE_URL
+backup_before_migrations
 compose run --rm --no-deps -T -e DATABASE_URL api alembic upgrade head
 unset DATABASE_URL
 

@@ -13,7 +13,7 @@ env_value = $(or $(shell grep -E '^$(1)=' $(ENV_FILE) 2>/dev/null | tail -1 | cu
 
 .PHONY: help check-env build-frontend build-backend build dev migrate clean \
         ci-api ci-web shellcheck \
-        tf-bootstrap tf-init tf-plan tf-apply tf-output tf-lint
+        tf-bootstrap tf-init tf-plan tf-apply tf tf-output tf-lint
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -96,6 +96,9 @@ tf-plan: check-tfvars ## Muestra los cambios de la infraestructura de producció
 
 tf-apply: check-tfvars ## Aplica los cambios en producción (pide confirmación)
 	$(call terraform,$(TF_ENV_DIR),apply -var-file=$(TF_VARS))
+
+tf: ## Terraform de producción con ARGS (p. ej. ARGS="state list"; recuperación, TK-092)
+	$(call terraform,$(TF_ENV_DIR),$(ARGS))
 
 tf-output: ## Muestra las salidas de Terraform de producción
 	$(call terraform,$(TF_ENV_DIR),output)

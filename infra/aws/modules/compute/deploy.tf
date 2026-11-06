@@ -37,6 +37,7 @@ locals {
     "docker-compose.prod.yml"          = { mode = "644", source = "docker-compose.prod.yml" }
     "prod/deploy.sh"                   = { mode = "755", source = "prod/deploy.sh" }
     "prod/backup.sh"                   = { mode = "755", source = "prod/backup.sh" }
+    "prod/restore.sh"                  = { mode = "755", source = "prod/restore.sh" }
     "prod/initdb/10-roles.sh"          = { mode = "755", source = "prod/initdb/10-roles.sh" }
     "prod/proxy/default.conf.template" = { mode = "644", source = "prod/proxy/default.conf.template" }
     "prod/systemd/entrevecinos-backup.service" = {

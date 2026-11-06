@@ -35,6 +35,7 @@ infra/prod/             ficheros que se copian a la instancia (TK-082, TK-086)
 ├── proxy/              nginx: exige la cabecera de origen de CloudFront
 ├── initdb/10-roles.sh  roles de PostgreSQL
 ├── backup.sh           copia de PostgreSQL a S3
+├── restore.sh          restauración de una copia, de ensayo o de producción (TK-092)
 └── systemd/            servicio y temporizador de las copias (registro en /var/log/entrevecinos/backup.log)
 ```
 
@@ -46,6 +47,7 @@ Versiones fijadas: Terraform 1.16.7 (`>= 1.11` en el código), proveedor `hashic
 | `make tf-init` | Inicializa `envs/prod` con el estado en S3 |
 | `make tf-plan` / `make tf-apply` | Muestra o aplica los cambios con `prod.tfvars` (`apply` pide confirmación) |
 | `make tf-output` | Muestra las salidas |
+| `make tf ARGS="…"` | Cualquier otra orden de Terraform sobre `envs/prod` (`state list`, `import`…; ver «Recuperación») |
 | `make tf-lint` | `terraform fmt` y `validate`, tflint y checkov; no necesita credenciales |
 
 Las credenciales temporales de `aws login` se pasan al contenedor por entorno (`aws configure export-credentials`), sin escribirlas en disco. Recursos de CloudFront que AWS gestiona desde `us-east-1` (certificado, distribución y registros de acceso) usan el proveedor `aws.us_east_1`; el resto, `eu-north-1`. Todos llevan las etiquetas `Project = entrevecinos`, `Environment = prod` y `ManagedBy = terraform`.
@@ -343,7 +345,7 @@ Una sola instancia `entrevecinos-prod-app` (`t4g.small`, arm64, Amazon Linux 202
   - leer los parámetros de `/entrevecinos/prod/`. `AmazonSSMManagedInstanceCore` concede `ssm:GetParameter(s)` sobre `*`, así que la política deniega expresamente cualquier otro parámetro de la cuenta (solo quedan además los públicos de AWS, `/aws/*`);
   - descargar imágenes de los dos repositorios de ECR;
   - escribir en los grupos de logs `/entrevecinos/prod/app/*` y de sesiones, y publicar métricas en `Entrevecinos/Backup` y `CWAgent`.
-- **Reemplazar la instancia** (nueva AMI, cambio de *user data*): procedimiento en TK-093.
+- **Reemplazar la instancia** tras perderla o cambiar de zona: ver «Recuperación», procedimiento 3. Nueva AMI o cambio de *user data* sin pérdida: TK-093.
 
 ### Aplicación (TK-086)
 
@@ -379,10 +381,91 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Copias con `pg_dump`** cada 6 horas (`entrevecinos-backup.timer` a las 00, 06, 12 y 18 UTC): `backup.sh` sube la copia en *streaming* a `s3://entrevecinos-backups-995006761619/postgres/AAAA/MM/DD/`, comprueba su tamaño y que `pg_restore --list` la lee, y publica la métrica `Entrevecinos/Backup BackupSucceeded`. Se conservan 30 días.
 - **Snapshots** diarios del volumen a las 03:00 UTC con Data Lifecycle Manager; se conservan 7.
 - **Copias protegidas:** la política del bucket deniega el borrado a todos salvo a los roles de `admin_role_arns`; la instancia solo escribe y lee.
-- Copia a demanda (p. ej. antes de una migración destructiva): `sudo systemctl start entrevecinos-backup.service` en la instancia.
-- `deploy.sh` instala el script y el temporizador en cada despliegue (`/opt/entrevecinos/prod/backup.sh`). El script localiza el contenedor `db` con `docker` (por sus etiquetas de Compose), así que no necesita los secretos del despliegue.
+- **Copia antes de migrar:** `deploy.sh` ejecuta `backup.sh` antes de las migraciones si hay alguna pendiente (TK-092); si la copia falla, no migra ni despliega. A demanda: `sudo systemctl start entrevecinos-backup.service` en la instancia.
+- `deploy.sh` instala los scripts y el temporizador en cada despliegue (`/opt/entrevecinos/prod/backup.sh` y `restore.sh`). El script localiza el contenedor `db` con `docker` (por sus etiquetas de Compose), así que no necesita los secretos del despliegue.
 
-*Pendiente: TK-092 y TK-093* (restauración probada y *runbook*).
+*Pendiente: TK-093* (*runbook* completo).
+
+### Recuperación (TK-092)
+
+**Objetivos del MVP:** **RPO 6 horas** (la última copia de `pg_dump`; los *snapshots* diarios no lo mejoran) y **RTO 4 horas**. Se ensaya cada 3 meses (ver «Registro de ensayos»).
+
+| Qué hay | Frecuencia | Se conserva | Dónde |
+|---|---|---|---|
+| `pg_dump` (`backup.sh`) | cada 6 h y antes de migrar | 30 días | `s3://entrevecinos-backups-995006761619/postgres/AAAA/MM/DD/` |
+| *Snapshot* del volumen de datos | diario, 03:00 UTC | 7 | EC2 → *Snapshots*, etiqueta `Name = entrevecinos-prod-postgres` |
+| Versiones anteriores de las imágenes | cada cambio o borrado | 30 días | bucket `entrevecinos-media-995006761619` |
+
+**`restore.sh`** (en la instancia, como *root*: `sudo -i` en Session Manager):
+
+```bash
+aws s3 ls s3://entrevecinos-backups-995006761619/postgres/ --recursive --profile entrevecinos | tail -3   # copias recientes
+/opt/entrevecinos/prod/restore.sh postgres/<AAAA/MM/DD>/<copia>.dump                     # ensayo en entrevecinos_restore
+/opt/entrevecinos/prod/restore.sh --production --yes postgres/<AAAA/MM/DD>/<copia>.dump  # sustituye producción
+/opt/entrevecinos/prod/restore.sh --drop entrevecinos_restore                            # borra una base de ensayo o la anterior
+```
+
+Siempre restaura en una base nueva como `entrevecinos_owner`, aplica los permisos de `entrevecinos_app` y muestra los recuentos de `users`, `community`, `listing` y `media_asset` de la restaurada y de la actual; producción no cambia salvo con `--production --yes`. Con `--production`, además: copia previa de la base actual, API parada, `entrevecinos` → `entrevecinos_anterior_<fecha>`, la restaurada → `entrevecinos` y API arrancada (corte de segundos). La base anterior se conserva para volver atrás (el mismo cambio de nombre al revés) y se borra a mano. Solo admite bases `entrevecinos_*`.
+
+Consultas en una base restaurada:
+
+```bash
+docker exec -it "$(docker ps -q --filter label=com.docker.compose.service=db)" \
+  psql -U postgres -d entrevecinos_restore -c 'SELECT count(*) FROM listing'
+```
+
+**1. Error de datos** (borrado o corrupción lógica, p. ej. un anuncio borrado por error):
+
+1. Elegir la última copia **anterior** al error (`aws s3 ls …`, la hora va en el nombre, UTC).
+2. Restaurarla en `entrevecinos_restore` y comprobar en ella los datos afectados.
+3. Si el error afecta a pocas filas, copiarlas a producción con `psql` (`\copy` de una base a otra) y borrar `entrevecinos_restore`. Si afecta a mucho, `restore.sh --production --yes <copia>`: se pierden los cambios posteriores a la copia (como mucho 6 horas).
+
+**2. Fallo del volumen de datos** (`db` no arranca, errores de E/S, `db-errors`):
+
+```bash
+P=--profile=entrevecinos
+SNAP=$(aws ec2 describe-snapshots $P --owner-ids self --filters Name=tag:Name,Values=entrevecinos-prod-postgres \
+  --query 'reverse(sort_by(Snapshots,&StartTime))[0].SnapshotId' --output text)
+NEW=$(aws ec2 create-volume $P --snapshot-id "$SNAP" --availability-zone eu-north-1a --volume-type gp3 --encrypted \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=entrevecinos-prod-postgres},{Key=Snapshot,Value=entrevecinos-postgres}]' \
+  --query VolumeId --output text)
+aws ec2 wait volume-available $P --volume-ids "$NEW"
+# Terraform pasa a gestionar el volumen nuevo; el dañado queda fuera (bórralo a mano cuando ya no haga falta).
+make tf ARGS="state rm module.database.aws_ebs_volume.postgres"
+make tf ARGS="import -var-file=prod.tfvars module.database.aws_ebs_volume.postgres $NEW"
+echo yes | make tf-apply     # reemplaza el adjunto: para la instancia, cambia el volumen y la arranca
+```
+
+Después, un despliegue (*Run workflow*) y, si hay una copia de `pg_dump` posterior al *snapshot*, `restore.sh --production --yes <copia>`. El montaje es por UUID: el volumen creado desde el *snapshot* lo conserva.
+
+**3. Pérdida de la instancia o cambio de zona:**
+
+- **Instancia perdida, misma zona:** `make tf-plan` muestra la instancia y el adjunto como nuevos; `make tf-apply` la crea, el *user data* monta el volumen existente (no lo formatea porque ya tiene sistema de ficheros) y un despliegue arranca la aplicación. El ID cambia: actualizar `DEPLOY_INSTANCE_ID` en el entorno `production` de GitHub.
+- **Otra zona** (fallo de la zona): crear el volumen desde el último *snapshot* en la zona nueva (procedimiento 2, con su `--availability-zone`), cambiar `availability_zone` en `prod.tfvars`, `state rm` + `import` del volumen nuevo y `make tf-apply` (crea la subred y la instancia en la zona nueva); después despliegue, `DEPLOY_INSTANCE_ID` y, si hace falta, `restore.sh --production --yes` con la última copia.
+
+**4. Imagen borrada** (versiones anteriores durante 30 días):
+
+```bash
+P=--profile=entrevecinos; B=entrevecinos-media-995006761619
+aws s3api list-object-versions $P --bucket $B --prefix <clave> \
+  --query '{versiones:Versions[].[VersionId,IsLatest,LastModified],borrados:DeleteMarkers[].[VersionId,IsLatest]}'
+# Si la última es un marcador de borrado, quitarlo devuelve la versión anterior:
+aws s3api delete-object $P --bucket $B --key <clave> --version-id <id del marcador>
+# Si se sobrescribió, copiar la versión buena encima:
+aws s3api copy-object $P --bucket $B --key <clave> --copy-source "$B/<clave>?versionId=<id>"
+```
+
+La clave está en `media_asset.object_key` (o en la ruta de la URL prefirmada de la imagen, sin la consulta).
+
+#### Registro de ensayos
+
+| Fecha | Ensayo | Copia o *snapshot* | Resultado | Tiempo | Incidencias |
+|---|---|---|---|---|---|
+| 2026-11-06 | 1. `restore.sh` en `entrevecinos_restore` (AC1) | `postgres/2026/11/06/20261106T130240Z.dump` | Correcto: `users` 1, `community` 1, `listing` 1, `media_asset` 2, igual que producción; base de ensayo borrada | 1 s de restauración, 10 s en total | Ninguna |
+| 2026-11-06 | 2. PostgreSQL sobre un volumen desde *snapshot* (AC2) | `snap-014026de9c3d67f8c` (03:23 UTC) | Correcto: recuperación del WAL y mismos recuentos; último usuario de las 00:03 UTC, anterior al *snapshot*; volumen borrado | 47 s hasta los datos | Primer intento con un error de la consulta de recuentos del guion de ensayo, no del procedimiento |
+| 2026-11-06 | 4. Imagen borrada (AC3) | `media/288d9b22-…/0cca8a82-….jpg` | Correcto: marcador de borrado quitado, mismo ETag | Segundos | Ninguna |
+
+Próximo ensayo: 2027-02 (cada 3 meses). Los guiones de ensayo lanzan los mismos pasos con Run Command desde el equipo; el procedimiento 3 (pérdida de la instancia) no se ensaya: recrea la instancia de producción.
 
 ### Observabilidad y alertas (TK-091)
 
@@ -519,6 +602,15 @@ Sin monitorización externa: si la cuenta de AWS o CloudWatch fallan, no llega n
 - **Mitigaciones:** `instance-down` y `backup-missing` tratan la falta de datos como alarma; avisos también al volver a `OK`; *runbook* por alarma.
 - **Cuándo revisarla:** con usuarios que dependan de la web a diario, más de una persona de guardia o ruido de alertas.
 - **Evolución:** un *canary* de CloudWatch Synthetics (≈ 1-2 USD/mes) o un servicio externo gratuito de disponibilidad; avisos a un canal de chat; con el plan de pago, la alarma sobre `5xxErrorRate` de CloudFront en `us-east-1` (TK-095).
+
+### Restauración en una base nueva con cambio de nombre (TK-092)
+
+- **Qué:** `restore.sh` restaura siempre en una base nueva y, para producción, cambia los nombres (la actual pasa a `entrevecinos_anterior_<fecha>`), en lugar de `pg_restore --clean` sobre la base de producción; copia previa en cada restauración y antes de cada migración pendiente.
+- **Por qué:** la base anterior queda intacta para volver atrás al instante, el corte es de segundos y se evitan los fallos de `--clean` con el esquema `public` y la extensión `unaccent`.
+- **Impacto:** la base anterior ocupa el volumen de datos hasta que se borra a mano; RPO de 6 horas (TK-082) y copias en la misma cuenta y región.
+- **Mitigaciones:** alarma `disk-data` (TK-091), copias que la instancia no puede borrar (TK-082), *snapshots* diarios y ensayos cada 3 meses.
+- **Cuándo revisarla:** al migrar a RDS (recuperación a un punto en el tiempo) o si los datos no pueden perder 6 horas.
+- **Evolución:** S3 Object Lock en modo *governance* en el bucket de copias (también contra el borrado por error de un administrador) y, con el plan de pago, copias en otra cuenta (TK-095).
 
 ### Excepciones de checkov
 
