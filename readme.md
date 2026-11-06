@@ -29,11 +29,11 @@ La plataforma funciona como un escaparate y tablón de anuncios digital, donde c
 
 ### **0.4. URL del proyecto:**
 
-**Pendiente**. Se proporcionará al completar el presente proyecto.
+https://entrevecinos.org (producción en AWS; ver §2.4).
 
 ### 0.5. URL o archivo comprimido del repositorio
 
-https://github.com/serfer2/AI4Devs-finalproject
+https://github.com/serfer2/entrevecinos
 
 
 ---
@@ -205,9 +205,58 @@ La Épica 11 (HU-28 a HU-32, TK-066 a TK-072) fija la identidad visual y mejora 
 ### **1.4. Instrucciones de instalación:**
 > Documenta de manera precisa las instrucciones para instalar y poner en marcha el proyecto en local (librerías, backend, frontend, servidor, base de datos, migraciones y semillas de datos, etc.)
 
-**Pendiente**. Se proporcionará una vez completado el desarrollo de backend y frontend.
+Todo se ejecuta en contenedores: no hace falta instalar Python, Node.js ni PostgreSQL en el equipo.
 
-Mientras tanto, el entorno local se levanta con `cp .env.example .env` y `make dev` (detalle en `infra/README.md`). Además de la web (`http://localhost:3000`) y la API (`http://localhost:8000/docs`), `make dev` levanta **Mailpit**, el buzón de desarrollo donde llegan los correos de validación del registro: `http://localhost:8025`. Un `.env` creado antes de la validación del correo necesita las variables nuevas de la sección «Correo (SMTP)» de `.env.example` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `MAIL_FROM`, `WEB_PUBLIC_URL`, `EMAIL_VERIFICATION_TTL_HOURS` y `MAIL_UI_HOST_PORT`); sin ellas, la API no arranca.
+**Requisitos:** Git, Docker con el plugin Compose v2 (`docker compose version`) y `make`. Puertos libres: 3000 (web), 8000 (API) y 8025 (buzón de correo); se cambian en `.env`.
+
+**1. Código y variables de entorno**
+
+```bash
+git clone https://github.com/serfer2/entrevecinos.git && cd entrevecinos
+cp .env.example .env    # cambia al menos POSTGRES_PASSWORD; el resto vale para desarrollo
+```
+
+`.env` no se sube al repositorio. Los valores de `.env.example` son ficticios y solo sirven en local.
+
+**2. Arrancar**
+
+```bash
+make dev
+```
+
+Construye las imágenes de la web y la API, levanta PostgreSQL, MinIO (imágenes), Mailpit (correo), la API y la web, aplica las migraciones y muestra las direcciones:
+
+| Servicio | Dirección |
+|---|---|
+| Web | http://localhost:3000 |
+| API (documentación interactiva) | http://localhost:8000/docs |
+| Buzón de correo de desarrollo (Mailpit) | http://localhost:8025 |
+
+**3. Datos iniciales.** Las migraciones crean el esquema y las 10 categorías de anuncios; no hay más datos de ejemplo. Para probar:
+
+1. Regístrate en http://localhost:3000/registro y abre el enlace de validación que llega a Mailpit.
+2. Para tener un administrador de plataforma, que aprueba comunidades y entra en todas, promueve tu cuenta:
+
+   ```bash
+   docker compose --env-file .env -f infra/docker-compose.yml exec db \
+     psql -U entrevecinos -d entrevecinos -c "UPDATE users SET platform_role = 'platform_admin' WHERE email = '<tu correo>'"
+   ```
+
+3. Crea una comunidad (la de un `platform_admin` queda activa al momento), publica anuncios con fotografías y, con otra cuenta, solicita acceso a la comunidad.
+
+**4. Comandos habituales**
+
+| Comando | Qué hace |
+|---|---|
+| `make migrate` | Aplica las migraciones pendientes |
+| `make ci-api` / `make ci-web` | Lint, tipos y pruebas de la API y de la web, igual que la CI (ver §2.6) |
+| `make build-backend` / `make build-frontend` | Reconstruye una imagen tras cambiar dependencias |
+| `make clean` | Elimina contenedores e imágenes; **conserva** los datos |
+| `make help` | Lista todos los comandos |
+
+Para borrar también los datos: `docker compose --env-file .env -f infra/docker-compose.yml down -v`. Más detalle en [`infra/README.md`](infra/README.md), [`apps/api/README.md`](apps/api/README.md) y [`apps/web/README.md`](apps/web/README.md).
+
+**Producción.** La instalación en AWS (Terraform, despliegue, operación y costes) está en [`infra/aws/README.md`](infra/aws/README.md).
 
 ---
 
@@ -302,19 +351,23 @@ La seguridad de la API se aplica dentro de FastAPI, en este orden: CORS restring
 ```
 entrevecinos/
 ├── apps/
-│   ├── web/                         # Aplicación web
+│   ├── web/                         # Aplicación web (Next.js)
 │   │   ├── src/
-│   │   │   ├── app/                 # Rutas y layouts de Next.js
-│   │   │   ├── features/            # Funcionalidades organizadas por dominio
-│   │   │   │   ├── auth/
+│   │   │   ├── app/                 # Rutas y layouts; zona privada en app/(privado)/
+│   │   │   ├── features/            # Código por funcionalidad
+│   │   │   │   ├── auth/            #   registro, inicio de sesión, sesión y validación del correo
 │   │   │   │   ├── communities/
 │   │   │   │   ├── listings/
-│   │   │   │   └── messaging/
-│   │   │   ├── components/          # Componentes compartidos de interfaz
-│   │   │   ├── lib/                 # Clientes API y utilidades
-│   │   │   └── styles/              # Estilos globales y configuración visual
+│   │   │   │   ├── media/
+│   │   │   │   ├── messaging/       #   versión futura
+│   │   │   │   ├── platform-admin/
+│   │   │   │   └── profile/
+│   │   │   ├── components/          # Componentes compartidos de interfaz (ui/)
+│   │   │   ├── lib/                 # Cliente de la API y utilidades
+│   │   │   ├── styles/              # Tema visual y estilos globales
+│   │   │   └── proxy.ts             # Content-Security-Policy con nonce por petición
 │   │   ├── public/                  # Recursos estáticos
-│   │   ├── Dockerfile
+│   │   ├── Dockerfile               # Etapas dev y prod
 │   │   └── package.json
 │   │
 │   └── api/                         # API de Python y FastAPI
@@ -322,33 +375,46 @@ entrevecinos/
 │       │   └── entrevecinos/
 │       │       ├── domain/          # Entidades y reglas de negocio
 │       │       ├── application/     # Casos de uso y puertos
-│       │       ├── infrastructure/ # PostgreSQL, imágenes y servicios externos
+│       │       ├── infrastructure/  # PostgreSQL, S3, correo, seguridad y configuración
 │       │       └── presentation/    # Endpoints, esquemas y dependencias FastAPI
+│       ├── migrations/              # Migraciones de Alembic
 │       ├── tests/
-│       ├── Dockerfile
-│       └── pyproject.toml
-│
-├── packages/                        # Código compartido, si es necesario
-│   └── api-contracts/               # Contratos o esquemas compartidos
+│       ├── Dockerfile               # Etapas dev y prod
+│       └── pyproject.toml           # Dependencias con uv (uv.lock)
 │
 ├── infra/
-│   ├── docker-compose.yml           # Servicios y redes locales
-│   ├── postgres/                    # Inicialización y configuración de PostgreSQL
-│   └── storage/                     # Configuración del almacenamiento de imágenes
+│   ├── docker-compose.yml           # Entorno local: db, storage, mail, api y web
+│   ├── postgres/                    # Inicialización de PostgreSQL en local
+│   ├── storage/                     # Inicialización de MinIO en local
+│   ├── docker-compose.prod.yml      # Compose de producción: proxy, web, api y db
+│   ├── prod/                        # Scripts de la instancia: despliegue, copias, restauración y proxy
+│   └── aws/                         # Terraform de producción y guía de operación (README.md)
 │
-├── docs/                            # Arquitectura y documentación del proyecto
+├── .github/
+│   ├── workflows/                   # CI en cada pull request (ci.yml) y despliegue continuo (deploy.yml)
+│   ├── dependabot.yml
+│   └── pull_request_template.md
+│
+├── docs/
+│   ├── api/                         # Contrato OpenAPI multi-fichero (openapi.yaml)
+│   └── product/                     # Historias de usuario y tickets
+│
+├── openspec/                        # Especificaciones vigentes y cambios por ticket
+├── Makefile                         # Atajos: make dev, ci-api, ci-web, tf-*…
+├── AGENTS.md                        # Instrucciones para agentes de código
 ├── .env.example                     # Variables de entorno de ejemplo
-├── .gitignore
-└── README.md
+├── prompts.md                       # Prompts utilizados con asistentes de código
+└── readme.md
 ```
 
 #### Propósito de las carpetas
 
 - **`apps/web`** contiene la aplicación React con Next.js. `app/` define las rutas; `features/` agrupa pantallas, componentes y lógica de cada funcionalidad; y `components/` reúne elementos reutilizables.
 - **`apps/api`** contiene el backend FastAPI. Separa las reglas de negocio de los detalles del framework, la base de datos y otros servicios.
-- **`packages/`** aloja contratos compartidos cuando frontend y backend necesitan una definición común. Conviene evitar duplicar lógica de negocio entre aplicaciones.
-- **`infra/`** guarda la configuración para ejecutar servicios como la API, PostgreSQL y el almacenamiento de imágenes.
-- **`docs/`** contiene diagramas, decisiones de arquitectura e información técnica complementaria.
+- **`infra/`** guarda la configuración para ejecutar los servicios en local (Docker Compose) y en producción (Compose de producción, scripts de la instancia y Terraform de AWS).
+- **`.github/`** contiene la integración y el despliegue continuos y la plantilla de *pull request*.
+- **`docs/`** contiene el contrato de la API, que es la fuente de verdad (`docs/api/openapi.yaml`), y la planificación del producto: épicas, historias de usuario y tickets.
+- **`openspec/`** guarda las especificaciones vigentes y un cambio archivado por cada ticket implementado.
 
 #### Arquitectura y buenas prácticas
 
@@ -518,7 +584,33 @@ Medidas implementadas en la aplicación y en producción (detalle en [`infra/aws
 
 > Describe brevemente algunos de los tests realizados
 
-**Pendiente** para la entrega 2.
+Cada ticket se implementa con sus pruebas (regla de OpenSpec: las tareas que cambian comportamiento incluyen las pruebas) y todas se ejecutan en contenedores, igual en local que en la integración continua. Recuento de la entrega 3: **485 pruebas de la API** y **358 de la web**.
+
+```bash
+make ci-api    # ruff (lint y formato), alembic check y pytest con PostgreSQL de pruebas
+make ci-web    # ESLint, TypeScript y Vitest
+make tf-lint   # Terraform: fmt, validate, tflint y checkov
+make shellcheck
+```
+
+**API** (`apps/api/tests/`, pytest y el cliente de pruebas de FastAPI):
+
+- **Casos de uso con dobles** (`tests/fakes.py`): reglas de negocio sin base de datos, p. ej. las transiciones de estado de un anuncio (`test_listing_status_rules.py`), el registro con correo pendiente de validar (`test_register_user.py`) o la visibilidad de los anuncios (`test_listing_visibility.py`).
+- **Endpoints**: peticiones HTTP completas con autenticación y roles, p. ej. que un miembro sin aprobar no puede publicar (`test_listings_publish.py`), que un `community_admin` bloquea y expulsa miembros (`test_members_management.py`) o que la búsqueda ignora acentos (`test_listings_search.py`).
+- **Integración con PostgreSQL** (marcador `db`, base `<POSTGRES_DB>_test` que se crea y migra sola): restricciones, consultas y migraciones reales, p. ej. que una cuenta activa debe tener el correo validado salvo un `platform_admin` (`test_db_users.py`) o que cada migración se puede deshacer.
+- **Almacenamiento** (marcador `storage`, MinIO real) y **adaptadores de AWS** (S3 con URL prefirmadas y SES, con respuestas simuladas de boto3, `test_aws_adapters.py`).
+- **Arquitectura** (`test_architecture.py`): `domain` no importa frameworks y `application` solo depende de `domain`.
+- **Contrato** (`test_contract_scope.py`): las rutas implementadas son exactamente las operaciones `x-mvp: true` de `docs/api/openapi.yaml`.
+
+**Web** (`apps/web/src/**/*.test.ts(x)`, Vitest y Testing Library, junto al código):
+
+- **Server Actions y acceso a la API**: validación con zod, errores de la API convertidos en mensajes del formulario y redirecciones, p. ej. `features/auth/actions.test.ts` o `features/listings/actions.test.ts`.
+- **Componentes**: formularios, galería a pantalla completa con teclado (`ListingGallery.test.tsx`), diálogos de confirmación y acciones según el rol (`ListingActions.test.tsx`).
+- **Seguridad**: la `Content-Security-Policy` con *nonce* (`lib/security/csp.test.ts`, `proxy.test.ts`) y que el inicio de sesión guarda el JWT en una *cookie* `HttpOnly` (`features/auth/login.test.ts`).
+
+**Integración continua** (`.github/workflows/ci.yml`): en cada *pull request* se ejecutan las comprobaciones anteriores, se construyen las imágenes de producción para arm64 y se comprueba que los cambios de infraestructura actualizan su guía; ninguna fusión a `main` sin que pasen.
+
+**Producción**: cada despliegue comprueba la salud de los contenedores y la web a través del proxy (con vuelta atrás automática) y termina con una prueba de humo contra `https://entrevecinos.org`. La recuperación de copias, *snapshots* e imágenes se ha ensayado en producción ([registro de ensayos](infra/aws/README.md#registro-de-ensayos)).
 
 ---
 
@@ -982,10 +1074,11 @@ info:
     - **Imágenes:** se suben con `POST /media` y se asocian después a anuncios, perfiles o al avatar por su `id`.
     - **Borrado:** usuarios, anuncios y mensajes usan borrado lógico.
 servers:
-- url: https://api.entrevecinos.example.com/v1
-  description: Producción
 - url: http://localhost:8000/v1
   description: Desarrollo local
+- url: http://api:8000/v1
+  description: Producción, solo en la red interna de Docker (la API no es pública; la llama el servidor
+    de la web)
 security:
 - bearerAuth: []
 tags:
@@ -2542,3 +2635,54 @@ Resultado: 461 pruebas de API (más `ruff`, `alembic check` y `redocly lint`) y 
 
 **Pull Request 3**
 
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/6
+
+#### Título
+
+```
+Feature/entrega 3 sfg producción en AWS (TK-078 a TK-089), rediseño de la web y documentación
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+Tercera entrega. Pone EntreVecinos en producción en AWS (Épica 13, HU-36 y HU-37) e incluye el rediseño de la web (Épica 11) y la documentación de HU-33 a HU-35.
+
+### Producción en AWS (Épica 13)
+
+`https://entrevecinos.org` funciona en AWS. Guía, operación, costes y decisiones: `infra/aws/README.md`.
+
+| Ticket | Cambio |
+|---|---|
+| TK-078 a TK-084 | Terraform en contenedores (`make tf-*`), presupuesto, red, ECR y bucket de imágenes, PostgreSQL con copias, SES, Parameter Store, DNS en Route 53 y certificado de ACM |
+| TK-081 | La API usa las credenciales del rol para S3 y envía el correo con SES |
+| TK-085 | Instancia EC2 `t4g.small` endurecida: sin SSH (Session Manager), IMDSv2, rol de mínimo privilegio y parches automáticos |
+| TK-086 | Compose de producción endurecido (proxy nginx, web, api y db) y despliegue por SSM con migraciones, salud y vuelta atrás automática; secretos solo por entorno |
+| TK-087 | CloudFront con HTTPS, redirección de `www`, caché de estáticos y origen protegido por cabecera; límites por IP en el proxy |
+| TK-088 | Identidad de GitHub Actions de mínimo privilegio para el despliegue continuo |
+| TK-089 | CI en cada *pull request*: `api`, `web`, `infra`, `images` (arm64) y `docs-infra`; Dependabot |
+
+Decisiones que se apartan de los tickets (detalle en «Decisiones de arquitectura» de la guía):
+- **Sin WAF:** el plan gratuito de AWS deniega el plan Free de CloudFront (`pricingplanmanager:*`). Los límites por IP los pone nginx (`429`).
+- **Sin OIDC:** el plan gratuito deniega `iam:CreateOpenIDConnectProvider`. GitHub usa la clave de un usuario IAM que solo puede asumir el rol de despliegue; la clave está solo en el entorno `production`, limitado a `main`.
+- **nginx en lugar de Caddy:** el binario oficial de Caddy no arranca sin *root* con `no-new-privileges`.
+
+Verificado en producción: despliegue y vuelta atrás, aislamiento de redes, contenedores endurecidos, ningún secreto en disco, redirecciones, HSTS y CSP, caché, límites, y el recorrido completo (registro con correo real por SES, comunidad y anuncio con dos fotografías).
+
+### Otros cambios
+
+- **Épica 11:** rediseño de la web con estética natural.
+- **HU-33 a HU-35:** dónde se aplica la seguridad, alcance del MVP del modelo de datos y la API, y `docs/api/openapi.yaml` como fuente de verdad.
+- `AGENTS.md` con las instrucciones para agentes, contexto de OpenSpec y regla de documentación de la infraestructura (TK-094).
+
+## Comprobaciones
+
+- [x] Pruebas, lint y formato pasan en contenedores (ver `AGENTS.md`, «Entorno y comandos»): `make ci-api` (485 pruebas) y `make ci-web` (358 pruebas).
+- [x] Si cambia una petición o respuesta de la API, he actualizado `docs/api/openapi.yaml`.
+- [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()`.
+- [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md`.
+~~~

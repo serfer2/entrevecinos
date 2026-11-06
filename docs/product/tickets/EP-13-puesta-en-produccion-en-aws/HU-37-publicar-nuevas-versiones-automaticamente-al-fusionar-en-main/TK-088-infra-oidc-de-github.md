@@ -9,6 +9,8 @@
 | **Depende de** | TK-080, TK-085 |
 | **Referencias** | Documentación de GitHub «Configuring OpenID Connect in Amazon Web Services»; `aws-actions/configure-aws-credentials` |
 
+> **Implementado sin OIDC.** La política de control de servicios del plan FREE de AWS deniega `iam:CreateOpenIDConnectProvider`. GitHub Actions usa la clave de un usuario IAM que solo puede asumir, con un identificador externo, el rol de despliegue de mínimo privilegio; la clave vive en el entorno `production` de GitHub, limitado a `main`. Decisión y evolución a OIDC: `infra/aws/README.md`, «Usuario IAM para GitHub Actions en lugar de OIDC (TK-088)».
+
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.
 
 ## 1. Contexto y objetivo

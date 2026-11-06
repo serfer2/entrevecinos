@@ -4,11 +4,11 @@ Puedes añadir adicionalmente la conversación completa como link o archivo adju
 
 ## Índice
 
-- [0. Resumen del trabajo y herramientas utilizadas](#resumen-del-trabajo-y-herramientas-utilizadas)
-- [1. Herramientas](#1-herramientas)
-- [2. Modelos y tareas](#2-modelos-y-tareas)
-- [3. Skills, subagentes, rules y comandos](#3-skills-subagentes-rules-y-comandos)
-- [4. Prompts y workflows principales](#4-prompts-y-workflows-principales)
+- [0. Resumen del trabajo y herramientas utilizadas](#0-resumen-del-trabajo-y-herramientas-utilizadas)
+  - [Herramientas](#herramientas)
+  - [Modelos y tareas](#modelos-y-tareas)
+  - [Skills, subagentes, rules y comandos](#skills-subagentes-rules-y-comandos)
+  - [Prompts y workflows principales](#prompts-y-workflows-principales)
 - [1. Descripción general del producto](#1-descripción-general-del-producto)
 - [2. Arquitectura del Sistema](#2-arquitectura-del-sistema)
   - [**2.1. Diagrama de arquitectura:**](#21-diagrama-de-arquitectura)
@@ -21,6 +21,7 @@ Puedes añadir adicionalmente la conversación completa como link o archivo adju
 - [4. Especificación de la API](#4-especificación-de-la-api)
 - [5. Historias de Usuario](#5-historias-de-usuario)
 - [6. Tickets de Trabajo](#6-tickets-de-trabajo)
+  - [6.1 Implementación de tickets de trabajo](#61-implementación-de-tickets-de-trabajo)
 - [7. Pull Requests](#7-pull-requests)
 
 ---
@@ -29,39 +30,40 @@ Puedes añadir adicionalmente la conversación completa como link o archivo adju
 
 ### Herramientas
 
-- **Codex:** se utilizó para revisar y completar la documentación del proyecto en `readme.md`: definición del MVP, arquitectura, estructura del monorepositorio, infraestructura, seguridad, modelo de datos, especificación OpenAPI y user stories.
-- **Claude Code:** según `prompts.md`, se utilizó para completar la especificación amplia de la API, redactar historias de usuario y preparar tickets de arranque.
-- **Cursor:** no aparece documentado en `prompts.md`.
-- **ChatGPT:** no aparece como herramienta separada en el registro; las interacciones documentadas con GPT se atribuyen a Codex.
+- **Codex:** documentación inicial del `readme.md`: definición del MVP, arquitectura, estructura del monorepositorio, infraestructura, seguridad, modelo de datos, primeros endpoints OpenAPI e historias de usuario.
+- **Claude Code:** el asistente principal del resto del proyecto. Especificación completa de la API, historias de usuario, tickets y su refinamiento, implementación de todas las épicas (MVP, mejoras, validación del correo, experiencia de usuario, documentación técnica y producción en AWS), pruebas, *pull requests* y revisión de la documentación.
+- **Cursor** y **ChatGPT** (como herramienta separada): no aparecen en el registro de trabajo.
 
 ### Modelos y tareas
 
-Según `prompts.md`:
-
-- **GPT-5.6 Luna:** descripción del propósito y las funcionalidades del producto.
-- **GPT-6 Luna:** definición del MVP y elaboración de los apartados de arquitectura, estructura del proyecto, infraestructura, seguridad, entidades del modelo de datos, diagrama entidad-relación y primeros endpoints OpenAPI.
-- **Claude Code (Sonnet 5):** especificación completa de la API en varios ficheros, historias de usuario y selección de las tres historias más relevantes, además de tickets iniciales para infraestructura, backend y frontend.
-
-En esta conversación, Codex ayudó a desarrollar y revisar esos contenidos y actualizó referencias de tablas en el punto 3.2 para mantener los nombres de entidades en singular.
+- **GPT-5.6 Luna** (Codex): propósito y funcionalidades del producto.
+- **GPT-6 Luna** (Codex): MVP, arquitectura, estructura del proyecto, infraestructura, seguridad, entidades, diagrama entidad-relación y primeros endpoints OpenAPI.
+- **Claude Sonnet 5** (Claude Code): especificación completa de la API en varios ficheros, historias de usuario, selección de las tres principales y tickets de arranque.
+- **Claude Opus 5.5** (Claude Code): tickets de todas las épicas y su refinamiento, implementación de TK-001 a TK-095, infraestructura de AWS con Terraform, CI/CD con GitHub Actions, verificación en producción, documentación y revisiones.
 
 ### Skills, subagentes, rules y comandos
 
-- **Skills de Claude:** el usuario indica que utilizó **Caveman** y **OpenSpec**.
-- **Skills de Codex:** no se aplicó ninguna skill específica durante este trabajo.
-- **Subagentes:** no se utilizaron.
-- **Rules y comandos personalizados:** `prompts.md` no documenta reglas ni comandos personalizados utilizados.
-- **Instrucciones del proyecto:** `AGENTS.md` hacía referencia a `RTK.md`, pero esos archivos no estaban disponibles en la carpeta cuando se revisaron.
+- **OpenSpec** (`/opsx:propose`, `/opsx:apply`, `/opsx:archive`): cada ticket se implementa como un cambio de OpenSpec con propuesta, diseño, especificaciones y tareas, que se archiva al terminar y actualiza `openspec/specs/`. Con «implementa TK-xxx», el agente encadena los tres pasos sin pedir confirmación entre ellos (regla guardada en la memoria del proyecto).
+- **Skill `commit`** (propia): mensajes en Conventional Commits, en inglés y con el porqué en el cuerpo.
+- **Caveman:** respuestas abreviadas del agente para ahorrar contexto.
+- **Plugin de Playwright:** recorrido de extremo a extremo de la web en producción (registro, comunidad y anuncio con fotografías).
+- **Subagentes:** el de lectura web, para consultar documentación de AWS (p. ej. los campos de los registros de CloudFront).
+- **Rules del proyecto:**
+  - `AGENTS.md`: comandos, arquitectura, convenciones y límites, enlazado desde `CLAUDE.md`, junto con la guía de AWS para la cuenta del proyecto;
+  - `openspec/config.yaml`: contexto del proyecto y reglas para cada artefacto (p. ej. que los cambios de infraestructura actualicen `infra/aws/README.md`).
+- **Herramientas de apoyo:** AWS CLI con sesión temporal (`aws login`), Terraform, Docker y `make` en contenedores. El servidor MCP de AWS no llegó a conectarse, así que se usó la AWS CLI.
 
 ### Prompts y workflows principales
 
-`prompts.md` organiza el trabajo siguiendo las secciones del README y registra los prompts empleados en distintas fases:
+`prompts.md` sigue las secciones del `readme.md`:
 
-1. **Definición del producto y del MVP:** prompts para explicar el propósito, valor y funcionalidades de EntreVecinos y, a partir de estas, acotar las capacidades básicas del MVP.
-2. **Diseño de la solución:** prompts para crear diagramas Mermaid de arquitectura e infraestructura, describir componentes, proponer la estructura de un monorepositorio modular con arquitectura limpia y documentar prácticas de seguridad.
-3. **Datos y API:** prompts para listar entidades, campos, tipos, constraints e índices; generar el diagrama ER; y especificar en OpenAPI los endpoints prioritarios. Claude Code recibió después la tarea de completar la especificación de la API en varios ficheros.
-4. **Planificación del producto y desarrollo:** prompts para redactar user stories del MVP con criterios Gherkin y marcar inferencias con `(asumido)`, seleccionar historias prioritarias y preparar tickets iniciales para PostgreSQL en Docker Compose, la estructura del backend FastAPI y la configuración del frontend.
-
-Los apartados de tests y pull requests de `prompts.md` siguen vacíos. En el README, la sección de tests también figura como pendiente.
+1. **Producto y MVP** (§1): propósito, valor, funcionalidades y alcance del MVP.
+2. **Diseño de la solución** (§2): diagramas Mermaid de arquitectura e infraestructura, componentes, monorepositorio con arquitectura limpia y seguridad.
+3. **Datos y API** (§3 y §4): entidades, diagrama ER y contrato OpenAPI multi-fichero.
+4. **Planificación** (§5 y §6): historias de usuario con criterios Gherkin, tickets por épica y refinamiento; las inferencias se marcan con `(asumido)`.
+5. **Implementación** (§6.1): un cambio de OpenSpec y un commit por ticket o por historia, con sus pruebas, siempre en contenedores.
+6. **Producción** (§6 y §6.1): épica de AWS, refinamiento por coste y seguridad, e implementación ticket a ticket con verificación en producción (despliegue continuo, alarmas, ensayos de recuperación).
+7. **Pruebas y entregas** (§2.6 y §7): verificación de extremo a extremo y *pull requests* de cada entrega.
 
 ---
 
@@ -161,11 +163,43 @@ Añade ejemplos cuando sea pertinente y elabora tu respuesta en formato Markdown
 
 ### **2.6. Tests**
 
-**Prompt 1:**
+Las pruebas unitarias y de integración no tienen *prompts* propios: forman parte de cada ticket (regla de `openspec/config.yaml`: «Incluir las pruebas en la tarea que implementa el comportamiento») y el agente las ejecuta con `make ci-api` y `make ci-web` antes de dar el ticket por terminado. Los *prompts* de esta sección son los de verificación sobre producción.
 
-**Prompt 2:**
+**Prompt 1:** Recorrido de extremo a extremo con Playwright
 
-**Prompt 3:**
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** CloudFront ya sirve la web (TK-087); falta comprobar el recorrido completo en producción
+
+```
+drive it with Playwright, I'll click the email link
+```
+
+**Nota**
+
+El agente registra una cuenta en `https://entrevecinos.org`, espera a que se pulse el enlace de validación que llega por SES, crea una comunidad y publica un anuncio con dos fotografías, comprobando cada página y la consola del navegador.
+
+**Prompt 2:** Permisos de la identidad de GitHub Actions
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Creados el usuario de CI y el rol de despliegue (TK-088)
+
+```
+run the test script
+```
+
+**Nota**
+
+El script crea una clave temporal del usuario de CI, comprueba 12 casos permitidos y denegados (ECR, SSM, Parameter Store, IAM) y borra la clave al terminar.
+
+**Prompt 3:** Ensayos de recuperación
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Implementado `restore.sh` (TK-092)
+
+```
+implement ticket 092
+```
+
+**Nota**
+
+El agente prepara los guiones de ensayo y se ejecutan en producción: restauración de una copia en una base aparte, PostgreSQL sobre un volumen creado desde un *snapshot* y recuperación de una imagen borrada. El resultado queda registrado en `infra/aws/README.md`.
 
 ---
 
@@ -345,7 +379,7 @@ Esto es el refinement de los tickets creados para las épicas 02 a 06.
    - Un ticket de frontend con los botones «Marcar como reservado», «Quitar reserva» y «Marcar como finalizado» en el detalle, visibles solo para el autor.
 ```
 
-**Prompt 5.1:** Refinement tickets Épicas 02 a 06
+**Prompt 5.2:** Refinement tickets Épicas 02 a 06
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets han sido refinados y documentación actualizada
 
@@ -413,7 +447,7 @@ Esto forma parte del MVP. Actualiza la documentación si es necesario.
 Implementa la hisotria de usuario y haz un solo commit que incluya los cambios en la documentación
 ```
 
-**Prompt 9:** Validación del email
+**Prompt 10:** Validación del email
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** El MVP no incluía la validación de la dirección de correo electrónico
 
@@ -429,7 +463,7 @@ Para dicha épica, crea una o varias historias de usuario con sus corespondiente
 Esto forma parte del MVP. Crea uno o varios tickets para actualizar la documentación. No implementes los cambios, quiero revisar los tickets primero.
 ```
 
-**Prompt 10:** Validación del email (refinement)
+**Prompt 11:** Validación del email (refinement)
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** Los tickets para validación de correo electrónico han sido creados pero no refinados
 
@@ -440,7 +474,7 @@ Aplica este refinement para los siguientes tickets
 Implementa las historias de usuario y haz un commit por cada HU
 ```
 
-**Prompt 11:** Fix de comportamiento de link de validación expirado
+**Prompt 12:** Fix de comportamiento de link de validación expirado
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** La validación de email funciona pero los links expirados dan falso OK
 
@@ -449,7 +483,7 @@ Si alguien abre un enlace antiguo que fue reemplazado por uno enviado nuevamente
 Crea una historia de usuario con los tickets necesarios para ello e impleméntala.
 ```
 
-**Prompt 12:** Look & Feel y mejoras de usabilidad
+**Prompt 13:** Look & Feel y mejoras de usabilidad
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** Desarrollo del MVP completado. Fase de mejoras y depuración
 
@@ -475,7 +509,7 @@ Acabo de publicar un anuncio en la comunidad "Barrio HU21" y no aparece. Se debe
 Las imágenes en la ficha del anuncio se ven pequeñas. Quiero que al hacer click en ellas, se vean en grande en primer plano y pueda hacer carrusel a izquierda o derecha pusando botones o arrastrando el dedo en dispositivo táctil.
 ```
 
-**Prompt 13:** Aplicar sugerencias del Feedback de entrega 1
+**Prompt 14:** Aplicar sugerencias del Feedback de entrega 1
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** El feedback de la 1a entrega muestra deficiencias en la doc.
 
@@ -485,7 +519,7 @@ En la doc, el diagrama dibuja una capa de seguridad entre el frontend y el backe
 No lo implementes aún, quiero revisar los tickets
 ```
 
-**Prompt 14:** Ajustar las definiciones de la doc del API
+**Prompt 15:** Ajustar las definiciones de la doc del API
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** El feedback de la 1a entrega muestra deficiencias en la doc del API y en el alcance del MVP
 
@@ -496,7 +530,7 @@ No lo implementes aún, quiero revisar los tickets
   como la fuente de verdad y de que el fragmento incluido en él coincide.
 ```
 
-**Prompt 15:** Creación de las tareas para puesta en producción en AWS
+**Prompt 16:** Creación de las tareas para puesta en producción en AWS
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** El proyecto está listo para poner en producción. Es necesario preparar la infra en AWS
 
@@ -507,7 +541,7 @@ NOTAS:
 - Añade un límite de gasto mensual en AWS de 40 euros al mes
 ```
 
-**Prompt 16:** Refinement de tickets de la épica 13 - reducción de costes
+**Prompt 17:** Refinement de tickets de la épica 13 - reducción de costes
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** Los tickets y las historias de usuario de la épica 13 han sido creados y es necesario refinarlos/corregirlos y tomar decisiones que han quedado abiertas 
 
@@ -515,7 +549,7 @@ NOTAS:
 Vamos a intentar recortar costes: De momento no es necesario alta disponibilidad, no nos preocupamos por eso hasta que el proyecto sea maduro y tenga mucho tráfico. Teninendo esto en cuenta, refactoriza la infrastructura y refleja los cambios en la documentación. Si tienes dudas pregúntame
 ```
 
-**Prompt 16:** Refinement de tickets de la épica 13 - seguridad (secretos)
+**Prompt 18:** Refinement de tickets de la épica 13 - seguridad (secretos)
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** Los tickets y las historias de usuario de la épica 13 han sido creados y es necesario refinarlos/corregirlos y tomar decisiones que han quedado abiertas 
 
@@ -523,7 +557,7 @@ Vamos a intentar recortar costes: De momento no es necesario alta disponibilidad
 De acuerdo con el ticket 086, se pretende almacenar las los secretos en en fichero .env dentro de la propia instancia. Evítalo usando la alternativa mencionada: pasarlos solo por entorno al proceso de Compose. Documenta el cambio y dime cuales tickets se modifican.
 ```
 
-**Prompt 17:** Refinement de tickets de la épica 13 - Documentación al día
+**Prompt 19:** Refinement de tickets de la épica 13 - Documentación al día
 
 **Agente:** Claude Code (Opus 5.5) - **Contexto:** Los tickets y las historias de usuario de la épica 13 han sido creados y es necesario refinarlos/corregirlos y tomar decisiones que han quedado abiertas 
 
@@ -579,9 +613,33 @@ Implementa los tickets de la épica 11
 Implementa los tickets de la épica 12
 ```
 
-##### Importante
+**Prompt 6:** Implementar los tickets de la Épica 13 (producción en AWS)
 
-En esta fase, se implementan los tickets de las 6 primeras épicas (hasta el Tk-049). Las épicas posteriores, junto con sus historias de usuario y tickets, se han ido implementando a la vez que se iban creando y refinando.
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Tickets de la épica 13 refinados. Se implementan uno a uno, en orden, porque cada uno se aplica en AWS y se verifica en producción antes del siguiente
+
+```
+let's start with 087. Tell me if I've to do any manual step and/or configuration
+```
+
+```
+implementa TK-087
+```
+
+**Nota**
+
+El mismo *prompt* («implementa TK-0xx») se usa de TK-078 a TK-095. El agente encadena propuesta, implementación y archivo de OpenSpec, se detiene cuando hace falta una decisión o un paso manual y la persona aplica Terraform y confirma los correos. Las decisiones que se apartan de los tickets se tomaron así, con alternativas y coste: sin WAF ni OIDC porque la política del plan FREE de AWS los deniega, o la alarma de errores de la web medida en el proxy porque SNS no está permitido en `us-east-1`.
+
+**Prompt 7:** Revisión de la documentación
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Épica 13 terminada; antes de la entrega se revisa toda la documentación
+
+```
+Eres un gestor de proyectos experimentado. Revisa minuciosamente TODA la documentación del proyecto, incluyendo prompts.md. Quiero que me digas si hay partes por completar, desactualizadas o si falta algún aspecto importante que no se haya cubierto
+```
+
+```
+prepara los puntos 2 a 5
+```
 
 ---
 
@@ -608,3 +666,13 @@ Haz git push y prepara una PR. No hagas la PR (gh client y el token necesario no
 ```
 
 **Prompt 3:**
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Épica 13 terminada (TK-091 a TK-095) en la rama de la tercera entrega
+
+```
+give me a PR description ready to copy in GH
+```
+
+**Nota**
+
+El agente lista los commits pendientes de `main` y redacta título y descripción siguiendo la plantilla de *pull request* del repositorio, con el resultado de las comprobaciones y lo que ocurrirá al fusionar (despliegue continuo).
