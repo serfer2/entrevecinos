@@ -93,7 +93,7 @@ En Brevo: *Transactional* → *Settings* (SMTP activo) y *SMTP & API* → *SMTP 
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
+- [x] Los criterios de aceptación se cumplen.
 - [ ] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas

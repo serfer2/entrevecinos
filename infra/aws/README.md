@@ -87,7 +87,23 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
    aws sesv2 get-account --profile entrevecinos --query '{prod:ProductionAccessEnabled,review:Details.ReviewDetails}'
    ```
 
-   `--contact-language` solo admite `EN` o `JA`, y la descripción va en inglés. Mientras AWS no la apruebe, SES solo envía a direcciones verificadas y como máximo 200 correos al día. Solicitada el 2026-11-06 (TK-087): revisión `GRANTED`.
+   `--contact-language` solo admite `EN` o `JA`, y la descripción va en inglés. Mientras AWS no la apruebe, SES solo envía a direcciones verificadas y como máximo 200 correos al día.
+
+   **Estado real (2026-11-06):** solicitada en TK-087. `get-account` muestra la revisión `GRANTED`, pero `ProductionAccessEnabled` sigue en `false` y la cuota en 200 al día. **SES sigue en *sandbox***: solo entrega a direcciones verificadas, así que los vecinos no pueden validar su cuenta. Por eso el correo de producción pasa a **Brevo** por SMTP (TK-096; ver «Decisiones de arquitectura»). SES se conserva configurado como vuelta atrás.
+
+   **Alta en Brevo** (manual, TK-096; la integración es TK-098):
+
+   1. Cuenta en el plan gratuito con el correo del proyecto y envío transaccional (SMTP) activado.
+   2. Dominio `entrevecinos.org` en *Senders, domains & dedicated IPs*, con el prefijo de marca **`send`** (nunca `mail`, que es el `MAIL FROM` de SES). Brevo da 7 registros DNS que crea Terraform (TK-098); no se crean a mano.
+   3. **Seguimiento de clics desactivado** en el correo transaccional (*Transactional* → *Settings*): si no, Brevo reescribe el enlace de validación, con su *token*, a través de su servidor.
+   4. Clave SMTP propia (no la de la API) y su usuario, guardados solo en Parameter Store, desde una terminal y nunca en ficheros ni en el chat:
+
+      ```bash
+      aws ssm put-parameter --profile entrevecinos --type SecureString --name /entrevecinos/prod/smtp/username --value '<usuario SMTP>'
+      aws ssm put-parameter --profile entrevecinos --type SecureString --name /entrevecinos/prod/smtp/password --value '<clave SMTP>'
+      ```
+
+   5. IP autorizadas: la IP elástica de la instancia (`make tf-output`, TK-098).
 
 7. **Primer despliegue** de la aplicación: ver «Despliegue». El mismo `make tf-apply` crea CloudFront y los alias de la web (ver «Web pública»), sin pasos en consola.
 8. **Acceso de GitHub Actions** (manual en GitHub): entorno `production`, clave del usuario de CI y variables; ver «Acceso de GitHub Actions».
@@ -615,6 +631,7 @@ Terraform separa el volumen (parando la instancia), destruye la instancia, crea 
 
 - **Logs de la aplicación** (TK-086): unos MB al día con el tráfico del MVP, dentro de los 5 GB de ingesta gratuitos al mes; 14 días de retención (30 los despliegues).
 - **Observabilidad** (TK-091): 13 alarmas con la de recuperación; `web-5xx` usa dos métricas y cuenta como dos, así que son 14 métricas de alarma (las 10 primeras gratuitas; ≈ 0,40 USD/mes el resto). Panel, filtros de métricas y tema SNS por correo, gratuitos; métricas del agente (4 series) y de los filtros, dentro de las 10 personalizadas gratuitas o céntimos.
+- **Correo** (TK-096): Brevo en el plan gratuito (300 correos al día, 0 USD); su plan de pago más barato cuesta ≈ 9 USD/mes por 5.000 correos. SES, conservado como vuelta atrás, no cuesta nada sin envíos.
 - **CloudFront** (TK-087): pago por uso, dentro de su capa gratuita permanente (1 TB y 10 millones de peticiones al mes) con el tráfico del MVP; Shield Standard incluido. Registros de acceso en CloudWatch Logs (`us-east-1`): céntimos al mes, 7 días de retención. Sin WAF: el plan Free de CloudFront no está disponible en el plan del proyecto y no se contrata una web ACL (≈ 10 USD/mes).
 
 ## Decisiones de arquitectura
@@ -629,6 +646,7 @@ El `readme.md` §2.4 preveía contenedores gestionados detrás de un balanceador
 | DNS | DNS, sin detallar | Route 53 gestionado por Terraform, dominio en Dinahosting, sin DNSSEC | ≈ 1 USD/mes (clave KMS) | Zona sin firmar | [TK-084](#route-53-sin-dnssec-tk-084) |
 | Origen | — | CloudFront → instancia por HTTP, con cabecera secreta y la lista de prefijos de CloudFront | ≈ 0 (sin certificado de origen ni ALB) | Tramo CloudFront-origen sin cifrar | [TK-087](#cloudfront-sin-waf-y-con-origen-http-tk-087) |
 | Red | Red privada para la base de datos | Una subred pública sin NAT; la base solo en la red interna de Compose | ≈ 35 USD/mes (NAT) | IP pública en la instancia (solo admite tráfico de CloudFront) | [TK-079](#subred-pública-sin-nat-tk-079) |
+| Correo | Proveedor transaccional, sin detallar (SMTP en el `readme.md`) | Brevo por SMTP en el plan gratuito (300 al día); SES configurado como vuelta atrás | ≈ 0 (SES necesitaba salir del *sandbox* o pasar al plan de pago) | Dependencia de una cuenta externa, con su límite diario y la marca de Brevo en el plan gratuito | [TK-096](#correo-transaccional-con-brevo-en-lugar-de-ses-tk-096) |
 | Secretos | Gestor de secretos | Parameter Store `SecureString`, solo por entorno | ≈ 1,5 USD/mes (Secrets Manager) | Sin rotación gestionada; secretos visibles para *root* con `docker inspect` | [TK-083](#parameter-store-en-lugar-de-secrets-manager-tk-083), [TK-086](#despliegue-por-ssm-con-secretos-solo-por-entorno-tk-086) |
 
 Las entradas siguientes amplían cada decisión (qué, por qué, impacto, mitigaciones, cuándo revisarla y evolución) e incluyen otras que no estaban en el `readme.md` (CI/CD, alertas, restauración). Cada cambio de una decisión actualiza su entrada (regla de TK-094).
@@ -659,6 +677,23 @@ Las entradas siguientes amplían cada decisión (qué, por qué, impacto, mitiga
 - **Mitigaciones:** HTTPS con HSTS en toda la web (un certificado falso no se aceptaría), CAA que solo permite a Amazon emitir certificados, y SPF, DKIM y DMARC en el correo.
 - **Cuándo revisarla:** en cuanto la infraestructura esté estable; no depende del tráfico.
 - **Evolución:** DNSSEC en Route 53 (paso 5).
+
+### Correo transaccional con Brevo en lugar de SES (TK-096)
+
+- **Qué:** el correo de la aplicación (validación de la cuenta y reenvío) sale por SMTP con Brevo, en su plan gratuito, en lugar de por SES. SES sigue configurado (identidad, DKIM, `MAIL FROM` y *configuration set*) como vuelta atrás.
+- **Por qué:** SES sigue en *sandbox* en `eu-north-1`. La revisión del acceso de producción figura como `GRANTED`, pero `ProductionAccessEnabled` es `false`, sin número de caso ni explicación en la documentación, y la cuenta está en el plan FREE. Salir del *sandbox* depende de un caso de soporte de plazo incierto o del plan de pago, y mientras tanto nadie puede validar su cuenta. Se compararon los proveedores con el coste como primer criterio y la integración como segundo:
+
+  | Proveedor | Gratis | Si se supera | Por qué |
+  |---|---|---|---|
+  | **Brevo** (elegido) | 300 al día | ≈ 9 USD/mes (5.000) | Mayor margen gratuito; empresa y datos en la UE; SMTP con STARTTLS |
+  | Resend | 100 al día | 20 USD/mes | Más sencillo, pero los datos de la cuenta se guardan en EE. UU. |
+  | Scaleway TEM | 300 al mes | 0,25 € por 1.000 | En la UE, pero otra cuenta cloud y poco margen gratuito |
+
+  Descartados: Mailjet (logo en el plan gratuito), SMTP2GO, Mailgun, Postmark y SendGrid (sin plan gratuito o con menos margen).
+- **Impacto:** una cuenta y unas credenciales fuera de AWS y de Terraform (alta, clave SMTP e IP autorizadas); límite de 300 correos al día; el plan gratuito puede añadir un pie de Brevo (se acepta por ahora); la instancia necesita salida SMTP (puerto 587) y una IP fija autorizada en Brevo.
+- **Mitigaciones:** credenciales solo en Parameter Store y por entorno; dominio autenticado con DKIM alineado (DMARC estricto); seguimiento de clics desactivado; alarma de fallos de envío (TK-097) y límite propio de envíos por coste (TK-099).
+- **Cuándo revisarla:** si AWS activa el acceso de producción de SES, si el volumen supera el plan gratuito o si la marca del pie molesta.
+- **Evolución:** volver a SES cuando tenga acceso de producción (solo configuración: variables del Compose, `make tf-apply` y despliegue) o pasar al plan de pago de Brevo.
 
 ### Base de datos en la instancia (TK-082)
 
