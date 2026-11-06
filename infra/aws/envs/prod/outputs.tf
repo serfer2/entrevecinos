@@ -82,3 +82,18 @@ output "distribution_domain_name" {
   description = "Nombre *.cloudfront.net (pruebas antes del DNS)."
   value       = module.edge.distribution_domain_name
 }
+
+output "github_user" {
+  description = "Usuario IAM de GitHub Actions (su clave, en el entorno production de GitHub, TK-088)."
+  value       = module.ci.user_name
+}
+
+output "github_deploy_role_arn" {
+  description = "Rol de despliegue de GitHub Actions (variable AWS_DEPLOY_ROLE_ARN)."
+  value       = module.ci.deploy_role_arn
+}
+
+output "github_deploy_external_id" {
+  description = "ExternalId del rol de despliegue (variable AWS_DEPLOY_ROLE_EXTERNAL_ID)."
+  value       = module.ci.external_id
+}

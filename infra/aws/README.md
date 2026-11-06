@@ -21,6 +21,7 @@ infra/aws/
 │   ├── database/       volumen de PostgreSQL, snapshots, bucket de copias y contraseñas (TK-082)
 │   ├── domain/         zona de Route 53, políticas de correo y certificado HTTPS (TK-084)
 │   ├── edge/           CloudFront, redirección de www, registros de acceso y alias (TK-087)
+│   ├── ci/             usuario y rol de despliegue de GitHub Actions (TK-088)
 │   └── mail/           SES (configuration set, dominio con DKIM y MAIL FROM) y secreto de los JWT (TK-083, TK-084)
 ├── .tflint.hcl         reglas de tflint
 └── .checkov.yaml       comprobaciones de checkov omitidas, con su motivo
@@ -70,6 +71,7 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
    `--contact-language` solo admite `EN` o `JA`, y la descripción va en inglés. Mientras AWS no la apruebe, SES solo envía a direcciones verificadas y como máximo 200 correos al día. Solicitada el 2026-11-06 (TK-087): revisión `GRANTED`.
 
 7. **Primer despliegue** de la aplicación: ver «Despliegue». El mismo `make tf-apply` crea CloudFront y los alias de la web (ver «Web pública»), sin pasos en consola.
+8. **Acceso de GitHub Actions** (manual en GitHub): entorno `production`, clave del usuario de CI y variables; ver «Acceso de GitHub Actions».
 
 ## Despliegue
 
@@ -132,6 +134,51 @@ aws ssm list-command-invocations --profile entrevecinos --region eu-north-1 --de
 ```
 
 `docker login` deja el token de ECR (válido 12 horas) en `~/.docker/config.json` del equipo; `docker logout "$registry"` lo borra.
+
+### Acceso de GitHub Actions (TK-088)
+
+La política de control de servicios del proyecto deniega los proveedores OIDC (`iam:CreateOpenIDConnectProvider`), así que GitHub Actions entra con la clave de acceso de un usuario IAM, `entrevecinos-github-actions`, **cuyo único permiso es asumir el rol** `entrevecinos-github-deploy` con el `ExternalId` `entrevecinos-github-actions` (`modules/ci`). Cada ejecución obtiene credenciales temporales del rol (1 hora como máximo).
+
+| Permiso del rol | Recursos |
+|---|---|
+| `ecr:GetAuthorizationToken` | `*` (no admite recursos concretos) |
+| Subir imágenes (`BatchCheckLayerAvailability`, `InitiateLayerUpload`, `UploadLayerPart`, `CompleteLayerUpload`, `PutImage`, `BatchGetImage`) | `entrevecinos/api` y `entrevecinos/web` |
+| `ssm:SendCommand` | documento `entrevecinos-deploy` e instancia de producción (con `--instance-ids`) |
+| `ssm:GetCommandInvocation`, `ssm:ListCommandInvocations` | `*` (no admiten recursos concretos; solo leen resultados) |
+
+No puede borrar imágenes, leer Parameter Store ni ejecutar otros documentos.
+
+**Puesta en marcha (una vez, tras `make tf-apply`)**, en GitHub, *Settings → Environments*:
+
+1. Entorno `production` con *Deployment branches and tags* → *Selected branches and tags* → `main`. Otras ramas y los *forks* no reciben sus secretos. Opcional: *Required reviewers*.
+2. Variables del entorno (no secretos): `AWS_REGION` = `eu-north-1`, `AWS_DEPLOY_ROLE_ARN` (salida `github_deploy_role_arn`), `AWS_DEPLOY_ROLE_EXTERNAL_ID` (salida `github_deploy_external_id`) y `DEPLOY_INSTANCE_ID` (salida `instance_id`).
+3. Secretos del entorno `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY` con una clave nueva del usuario. Con la CLI de GitHub (`gh auth login`), sin mostrarla ni escribirla en disco:
+
+   ```bash
+   aws iam create-access-key --user-name entrevecinos-github-actions --profile entrevecinos \
+     --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text |
+     { read -r id secret
+       printf %s "$id" | gh secret set AWS_ACCESS_KEY_ID --env production --repo serfer2/entrevecinos
+       printf %s "$secret" | gh secret set AWS_SECRET_ACCESS_KEY --env production --repo serfer2/entrevecinos; }
+   ```
+
+   Sin `gh`, la misma orden sin la tubería muestra la clave una sola vez para pegarla en la web; no la guardes en ningún otro sitio. **Nunca** como secreto del repositorio ni en Terraform (`aws_iam_access_key` la dejaría en el estado).
+
+Uso en un *workflow* (TK-090), en un *job* con `environment: production`:
+
+```yaml
+- uses: aws-actions/configure-aws-credentials@v4
+  with:
+    aws-region: ${{ vars.AWS_REGION }}
+    aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+    role-external-id: ${{ vars.AWS_DEPLOY_ROLE_EXTERNAL_ID }}
+    role-duration-seconds: 3600
+    role-skip-session-tagging: true   # el usuario no tiene sts:TagSession
+```
+
+**Rotación cada 90 días** (como mucho dos claves a la vez): crear una nueva y actualizar los secretos con la orden anterior, comprobar que un despliegue funciona y borrar la antigua (`aws iam list-access-keys` y `aws iam delete-access-key --access-key-id <antigua>`). **Si se filtra:** `aws iam update-access-key --user-name entrevecinos-github-actions --access-key-id <id> --status Inactive` y crear otra.
 
 *Pendiente: TK-090* (despliegue continuo desde GitHub Actions).
 
@@ -223,6 +270,7 @@ Todos los secretos viven en SSM Parameter Store como `SecureString` (nivel está
 - `docker compose` sin esas variables falla: cualquier recreación de contenedores pasa por `deploy.sh` (para operar, `docker`; ver «Operación»). Tras un reinicio de la instancia, Docker vuelve a arrancar los contenedores existentes con su configuración guardada.
 - **Rotar** cualquier secreto exige volver a desplegar, que recrea los contenedores afectados (si cambian las contraseñas de PostgreSQL, también `db`).
 - **Riesgo residual:** Docker guarda el entorno de cada contenedor en `/var/lib/docker/containers/` y `docker inspect` lo muestra. Solo *root* accede (el usuario `deploy` no está en el grupo `docker`).
+- **Fuera de Parameter Store:** la clave de acceso del usuario de GitHub Actions vive solo en los secretos del entorno `production` de GitHub (ver «Acceso de GitHub Actions»), no en AWS ni en el estado.
 - `origin-verify` se genera con `random_password` y, a diferencia del resto, **queda en el estado de Terraform**: CloudFront lo necesita como cabecera de origen, que no admite valores de solo escritura. Solo sirve para que nadie salte CloudFront. Se rota con `origin_verify_version`.
 
 ## Operación
@@ -340,9 +388,18 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Cuándo revisarla:** al pasar el proyecto al plan de pago de AWS (probar de nuevo el plan Free de CloudFront: `aws_pricingplanmanager_subscription`, ya disponible en el proveedor), con ataques que los límites del proxy no frenen o con datos más sensibles.
 - **Evolución:** plan Free (o Pro) de CloudFront con su WAF; origen HTTPS con `origin.entrevecinos.org` y Let's Encrypt por DNS-01; con presupuesto, origen VPC sin IP pública.
 
+### Usuario IAM para GitHub Actions en lugar de OIDC (TK-088)
+
+- **Qué:** GitHub Actions usa la clave de un usuario IAM que solo puede asumir el rol de despliegue, en lugar de un proveedor OIDC de GitHub.
+- **Por qué:** la política de control de servicios del proyecto (plan FREE de AWS) deniega `iam:CreateOpenIDConnectProvider`. Entre las alternativas del ticket, se elige la que no da permisos a la clave: todo pasa por un rol de mínimo privilegio con sesiones de 1 hora.
+- **Impacto:** hay una clave de larga duración fuera de AWS (en GitHub) que hay que rotar a mano; AWS no puede comprobar la rama ni el repositorio de origen, así que esa restricción depende del entorno `production` de GitHub.
+- **Mitigaciones:** la clave solo asume el rol (con `ExternalId`), vive en un entorno limitado a `main` (los *forks* nunca la reciben), no está en Terraform ni en el repositorio, se rota cada 90 días y su uso queda en CloudTrail. Sin rol de `terraform plan` para *pull requests*: sería otra clave al alcance de cualquier rama.
+- **Cuándo revisarla:** al activar las funciones avanzadas de la cuenta o pasar a un plan que admita OIDC.
+- **Evolución:** proveedor OIDC de GitHub y confianza del rol con `token.actions.githubusercontent.com:sub = repo:serfer2/entrevecinos:environment:production`; borrar el usuario y su clave.
+
 ### Excepciones de checkov
 
-`.checkov.yaml` omite, con su motivo, las comprobaciones que chocan con decisiones de coste o con el plan del proyecto: claves KMS propias (≈ 1 USD/mes cada una; se usan las gestionadas por AWS), réplica entre regiones (no permitida), registro de accesos y notificaciones de S3, y retenciones de registros de un año. Las excepciones puntuales van en el propio recurso con `#checkov:skip`; entre ellas, DNSSEC y el registro de consultas de la zona de Route 53 (TK-084: DNSSEC necesita una clave KMS y se deja para la evolución), en la instancia la IP pública (sin NAT es su única salida) y la monitorización detallada (TK-085), y en CloudFront la restricción geográfica, el origen de respaldo y la política de cabeceras de respuesta (las pone Next.js), con los registros v2 que checkov no reconoce, y la falta de WAF (TK-087).
+`.checkov.yaml` omite, con su motivo, las comprobaciones que chocan con decisiones de coste o con el plan del proyecto: claves KMS propias (≈ 1 USD/mes cada una; se usan las gestionadas por AWS), réplica entre regiones (no permitida), registro de accesos y notificaciones de S3, y retenciones de registros de un año. Las excepciones puntuales van en el propio recurso con `#checkov:skip`; entre ellas, DNSSEC y el registro de consultas de la zona de Route 53 (TK-084: DNSSEC necesita una clave KMS y se deja para la evolución), en la instancia la IP pública (sin NAT es su única salida) y la monitorización detallada (TK-085), y en CloudFront la restricción geográfica, el origen de respaldo y la política de cabeceras de respuesta (las pone Next.js), con los registros v2 que checkov no reconoce, y la falta de WAF (TK-087), y el usuario IAM con política propia de GitHub Actions (TK-088).
 
 *Pendiente: TK-095* (resto de decisiones frente a la arquitectura prevista en el `readme.md` §2.4).
 

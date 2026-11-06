@@ -74,3 +74,11 @@ module "edge" {
   origin_domain_name = module.compute.public_dns
   origin_verify      = module.compute.origin_verify
 }
+
+module "ci" {
+  source = "../../modules/ci"
+
+  ecr_repository_arns  = values(module.storage.ecr_repository_arns)
+  instance_id          = module.compute.instance_id
+  deploy_document_name = module.compute.deploy_document_name
+}
