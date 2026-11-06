@@ -26,4 +26,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
+# Prueba de TK-090 (AC3): la API no arranca en producción; se revierte enseguida. Las pruebas
+# usan create_app() con ENVIRONMENT=development, así que CI no lo detecta.
+if get_settings().environment == "production":
+    raise RuntimeError("TK-090 AC3: fallo de arranque provocado para probar la vuelta atrás.")
+
 app = create_app()
