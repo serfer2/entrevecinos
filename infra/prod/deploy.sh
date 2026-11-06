@@ -79,6 +79,13 @@ use_images() {
   export WEB_IMAGE="$registry/entrevecinos/web@$2"
 }
 
+# nginx lee su plantilla solo al arrancar y Compose no recrea el contenedor si solo cambia un
+# fichero montado: la huella de la plantilla va en una etiqueta del proxy (TK-087).
+proxy_config_hash() {
+  export PROXY_CONFIG_HASH
+  PROXY_CONFIG_HASH="$(cat "$app_dir"/prod/proxy/* | sha256sum | cut -c1-16)"
+}
+
 # La web responde a través del proxy con la cabecera de origen (por la entrada estándar de curl,
 # para que no aparezca en la lista de procesos).
 check_origin() {
@@ -126,6 +133,7 @@ log "Despliegue: api $new_api, web $new_web"
 configure_ecr
 load_secrets
 use_images "$new_api" "$new_web"
+proxy_config_hash
 
 log "Descarga de imágenes"
 compose pull --quiet

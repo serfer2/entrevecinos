@@ -25,6 +25,9 @@ services:
     # Comprueba la cabecera secreta de CloudFront (TK-087); el TLS lo termina CloudFront. Imagen sin
     # root y sin capacidades de fichero (las de Caddy no arrancan con no-new-privileges).
     image: nginxinc/nginx-unprivileged:1.30.4-alpine
+    labels:
+      # Cambia con la plantilla y obliga a recrear el contenedor (deploy.sh).
+      org.entrevecinos.proxy-config: ${PROXY_CONFIG_HASH:?Lo define deploy.sh}
     environment:
       ORIGIN_VERIFY: ${ORIGIN_VERIFY:?Lo define deploy.sh}
       NGINX_ENVSUBST_FILTER: ^ORIGIN_VERIFY$$

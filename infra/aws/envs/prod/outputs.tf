@@ -72,3 +72,13 @@ output "deploy_document_name" {
   description = "Documento de SSM que despliega la aplicación (TK-086)."
   value       = module.compute.deploy_document_name
 }
+
+output "distribution_id" {
+  description = "Distribución de CloudFront de la web (TK-087)."
+  value       = module.edge.distribution_id
+}
+
+output "distribution_domain_name" {
+  description = "Nombre *.cloudfront.net (pruebas antes del DNS)."
+  value       = module.edge.distribution_domain_name
+}

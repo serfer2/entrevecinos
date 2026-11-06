@@ -59,3 +59,18 @@ module "compute" {
   ses_configuration_set_arn = module.mail.configuration_set_arn
   origin_verify_version     = var.origin_verify_version
 }
+
+# CloudFront y sus registros: globales, gestionados desde us-east-1.
+module "edge" {
+  source = "../../modules/edge"
+
+  providers = {
+    aws = aws.us_east_1
+  }
+
+  domain             = module.domain.domain
+  zone_id            = module.domain.zone_id
+  certificate_arn    = module.domain.certificate_arn
+  origin_domain_name = module.compute.public_dns
+  origin_verify      = module.compute.origin_verify
+}

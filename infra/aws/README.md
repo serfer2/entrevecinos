@@ -2,7 +2,7 @@
 
 Guía de operación de producción de EntreVecinos y registro de sus decisiones de arquitectura. La infraestructura se define con Terraform en este directorio y se despliega en el proyecto de AWS `995006761619`, región `eu-north-1`. Todo cambio en `infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/` debe actualizar esta guía en el mismo cambio (ver `AGENTS.md`, §Convenciones).
 
-> **Estado:** en construcción. La Épica 13 (`docs/product/tickets/EP-13-puesta-en-produccion-en-aws/`) completa cada sección con el ticket indicado. Ya están escritos el límite de gasto y la base de Terraform (TK-078), la red (TK-079), el registro de imágenes y el bucket de fotografías (TK-080), PostgreSQL con sus copias (TK-082), SES con los secretos (TK-083) el DNS con el certificado (TK-084) y la instancia (TK-085); el despliegue y CloudFront llegan en TK-086 y TK-087.
+> **Estado:** en construcción. La Épica 13 (`docs/product/tickets/EP-13-puesta-en-produccion-en-aws/`) completa cada sección con el ticket indicado. Ya están escritos el límite de gasto y la base de Terraform (TK-078), la red (TK-079), el registro de imágenes y el bucket de fotografías (TK-080), PostgreSQL con sus copias (TK-082), SES con los secretos (TK-083), el DNS con el certificado (TK-084), la instancia (TK-085), el despliegue (TK-086) y CloudFront (TK-087).
 
 ## Estructura
 
@@ -20,6 +20,7 @@ infra/aws/
 │   ├── storage/        repositorios ECR y bucket de imágenes (TK-080)
 │   ├── database/       volumen de PostgreSQL, snapshots, bucket de copias y contraseñas (TK-082)
 │   ├── domain/         zona de Route 53, políticas de correo y certificado HTTPS (TK-084)
+│   ├── edge/           CloudFront, redirección de www, registros de acceso y alias (TK-087)
 │   └── mail/           SES (configuration set, dominio con DKIM y MAIL FROM) y secreto de los JWT (TK-083, TK-084)
 ├── .tflint.hcl         reglas de tflint
 └── .checkov.yaml       comprobaciones de checkov omitidas, con su motivo
@@ -42,7 +43,7 @@ Versiones fijadas: Terraform 1.16.7 (`>= 1.11` en el código), proveedor `hashic
 | `make tf-output` | Muestra las salidas |
 | `make tf-lint` | `terraform fmt` y `validate`, tflint y checkov; no necesita credenciales |
 
-Las credenciales temporales de `aws login` se pasan al contenedor por entorno (`aws configure export-credentials`), sin escribirlas en disco. Recursos de CloudFront que AWS exige en `us-east-1` (certificado y WAF) usan el proveedor `aws.us_east_1`; el resto, `eu-north-1`. Todos llevan las etiquetas `Project = entrevecinos`, `Environment = prod` y `ManagedBy = terraform`.
+Las credenciales temporales de `aws login` se pasan al contenedor por entorno (`aws configure export-credentials`), sin escribirlas en disco. Recursos de CloudFront que AWS gestiona desde `us-east-1` (certificado, distribución y registros de acceso) usan el proveedor `aws.us_east_1`; el resto, `eu-north-1`. Todos llevan las etiquetas `Project = entrevecinos`, `Environment = prod` y `ManagedBy = terraform`.
 
 ## Puesta en marcha
 
@@ -61,16 +62,14 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
    ```bash
    aws sesv2 put-account-details --profile entrevecinos \
      --mail-type TRANSACTIONAL --website-url https://entrevecinos.org \
-     --contact-language ES --additional-contact-email-addresses <correo-de-contacto> \
-     --use-case-description "Correo transaccional de EntreVecinos (validación de la cuenta al registrarse). Sin envíos comerciales; rebotes y quejas gestionados con un configuration set y la lista de supresión de la cuenta."
+     --contact-language EN --additional-contact-email-addresses <correo-de-contacto> \
+     --use-case-description "Transactional email for EntreVecinos, a private classifieds board for neighbourhood communities in Spain: account verification links sent once at sign-up (and on request). No marketing or bulk email. Recipients are users who just registered on https://entrevecinos.org. Bounces and complaints are tracked with an SES configuration set and the account-level suppression list; DKIM, SPF (custom MAIL FROM) and DMARC are configured for entrevecinos.org."
    aws sesv2 get-account --profile entrevecinos --query '{prod:ProductionAccessEnabled,review:Details.ReviewDetails}'
    ```
 
-   Mientras AWS no la apruebe, SES solo envía a direcciones verificadas y como máximo 200 correos al día.
+   `--contact-language` solo admite `EN` o `JA`, y la descripción va en inglés. Mientras AWS no la apruebe, SES solo envía a direcciones verificadas y como máximo 200 correos al día. Solicitada el 2026-11-06 (TK-087): revisión `GRANTED`.
 
-7. **Primer despliegue** de la aplicación: ver «Despliegue».
-
-*Pendiente: TK-087* (CloudFront).
+7. **Primer despliegue** de la aplicación: ver «Despliegue». El mismo `make tf-apply` crea CloudFront y los alias de la web (ver «Web pública»), sin pasos en consola.
 
 ## Despliegue
 
@@ -83,7 +82,7 @@ La instancia ejecuta `infra/docker-compose.prod.yml` con cuatro servicios: `prox
 | `data` | `api`, `db` | no |
 | `egress` | `api` | sí (S3, SES e IMDS) |
 
-- **Proxy de origen:** responde `403` a toda petición sin la cabecera `X-Origin-Verify` con el valor de `/entrevecinos/prod/origin-verify` (la añade CloudFront, TK-087) y la quita antes de reenviar a la web. Mientras no haya CloudFront, la web solo se prueba desde la instancia.
+- **Proxy de origen:** responde `403` a toda petición sin la cabecera `X-Origin-Verify` con el valor de `/entrevecinos/prod/origin-verify` (la añade CloudFront, TK-087) y la quita antes de reenviar a la web. Identifica al visitante por el último valor de `X-Forwarded-For` (lo añade CloudFront; el visitante no puede falsearlo) y limita por IP con `limit_req`: 4 `POST` por minuto con ráfaga de 10 a `/iniciar-sesion` y `/registro` (≈ 20 en 5 minutos) y 5 peticiones por segundo con ráfaga de 100 en general, con `429`. Su registro de accesos lleva la IP del visitante. nginx lee la plantilla solo al arrancar: `deploy.sh` pone su huella en la etiqueta `org.entrevecinos.proxy-config`, así que cambiarla recrea el proxy en el siguiente despliegue.
 - **Contenedores endurecidos:** `proxy`, `web` y `api` sin *root*, con el sistema de ficheros de solo lectura (`tmpfs` donde hace falta), sin capacidades, con `no-new-privileges`, límites de memoria, CPU y procesos, y sin el socket de Docker. `db` mantiene solo las capacidades que usa la imagen oficial.
 - **Logs** con el *driver* `awslogs` en `/entrevecinos/prod/app/{proxy,web,api,db}`, y la salida de cada despliegue en `/entrevecinos/prod/app/deploy` (30 días).
 
@@ -136,6 +135,31 @@ aws ssm list-command-invocations --profile entrevecinos --region eu-north-1 --de
 
 *Pendiente: TK-090* (despliegue continuo desde GitHub Actions).
 
+## Web pública
+
+`https://entrevecinos.org` sirve la web con CloudFront (`modules/edge`). CloudFront termina el HTTPS (certificado de TK-084, TLS 1.2 mínimo, HTTP/2 y HTTP/3, IPv4 e IPv6) y reenvía por HTTP al puerto 80 de la instancia, con la cabecera `X-Origin-Verify` que exige el proxy (TK-086). El grupo de seguridad solo admite el rango de CloudFront (TK-079).
+
+| Ruta | Caché | Política de petición al origen |
+|---|---|---|
+| `/_next/static/*` | `Managed-CachingOptimized` (nombres con *hash*) | ninguna |
+| resto (páginas, RSC, Server Actions) | `Managed-CachingDisabled` | `Managed-AllViewer`: `Host`, cookies, *query* y cabeceras del visitante |
+
+- **Redirecciones:** `http://` → `https://` (CloudFront) y `www.entrevecinos.org/<ruta>?<query>` → `301` a `https://entrevecinos.org/<ruta>?<query>` (CloudFront Function `entrevecinos-www-redirect`).
+- **Cabeceras de seguridad:** las pone Next.js (CSP con *nonce*, HSTS…); CloudFront no añade ni sustituye ninguna.
+- **Sin WAF.** El plan de tarifa plana Free de CloudFront (WAF y DDoS sin coste) no está disponible: el proyecto está en el plan FREE de AWS y su política de control de servicios deniega `pricingplanmanager:*` (también desde la consola). No se contrata una web ACL por separado (≈ 10 USD/mes). DDoS: Shield Standard de CloudFront, gratuito.
+- **Límites por IP en el proxy** (`infra/prod/proxy/default.conf.template`, ver «Despliegue»): `429` a partir de unos 20 `POST` en 5 minutos a `/iniciar-sesion` y `/registro`, o de 5 peticiones por segundo sostenidas.
+- **Registros de acceso:** estándar (v2), en JSON, a `/entrevecinos/prod/cloudfront` en `us-east-1`, 7 días.
+
+Comprobaciones:
+
+```bash
+dig +short A entrevecinos.org; dig +short AAAA entrevecinos.org; dig +short A www.entrevecinos.org
+curl -sI http://entrevecinos.org/ | head -3                                  # 301 → https
+curl -sI 'https://www.entrevecinos.org/iniciar-sesion?a=1' | grep -i '^location' # https://entrevecinos.org/iniciar-sesion?a=1
+curl -sI https://entrevecinos.org/iniciar-sesion | grep -i 'strict-transport\|content-security'
+for i in $(seq 1 14); do curl -s -o /dev/null -w '%{http_code} ' -X POST https://entrevecinos.org/iniciar-sesion; done  # 429 desde la 12.ª
+```
+
 ## DNS
 
 El dominio `entrevecinos.org` sigue **registrado en Dinahosting** (renovación automática y bloqueo de transferencia activos, DNSSEC desactivado). Su **DNS está en Route 53**, en una zona alojada que gestiona entera Terraform (`modules/domain`, con `prevent_destroy`). **No se crean registros a mano** en la consola: un `make tf-plan` sin cambios demuestra que no hay deriva.
@@ -149,8 +173,9 @@ El dominio `entrevecinos.org` sigue **registrado en Dinahosting** (renovación a
 | `<token>._domainkey.entrevecinos.org` (×3) | `CNAME` | `<token>.dkim.amazonses.com` | DKIM de SES |
 | `mail.entrevecinos.org` | `MX` | `10 feedback-smtp.eu-north-1.amazonses.com` | MAIL FROM (rebotes) |
 | `mail.entrevecinos.org` | `TXT` | `v=spf1 include:amazonses.com -all` | SPF del MAIL FROM |
+| `entrevecinos.org`, `www.entrevecinos.org` | `A` y `AAAA` alias | Distribución de CloudFront (`modules/edge`) | Web; `www` redirige a la raíz |
 
-Los alias de la raíz y de `www` hacia CloudFront llegan en TK-087. TTL de 300 s durante la puesta en marcha; se subirá a 3600 (`dns_ttl`) cuando esté estable.
+Los alias no tienen TTL propio y siguen a la distribución si se recrea. TTL de 300 s durante la puesta en marcha; se subirá a 3600 (`dns_ttl`) cuando esté estable.
 
 - **Certificado:** ACM en `us-east-1` (lo exige CloudFront) para `entrevecinos.org` y `www.entrevecinos.org`, validado por DNS. Se renueva solo mientras existan sus registros.
 - **Correo:** identidad de dominio de SES con Easy DKIM RSA 2048 y el *configuration set* `entrevecinos-prod`; MAIL FROM `mail.entrevecinos.org`. Remitente de producción: `MAIL_FROM="EntreVecinos <no-reply@entrevecinos.org>"` (lo fija el Compose de producción, TK-086). Nadie lee las respuestas: no hay `MX` en la raíz.
@@ -175,8 +200,6 @@ aws sesv2 get-email-identity --email-identity entrevecinos.org --profile entreve
 ```
 
 **Volver atrás:** poner de nuevo `ns{,2,3,4}.dinahosting.com` en Dinahosting. La zona de Route 53 no se borra (`prevent_destroy`).
-
-*Pendiente: TK-087* (alias de la web y redirección de `www`).
 
 ## Secretos
 
@@ -241,6 +264,19 @@ cat /opt/entrevecinos/current-digests           # versión desplegada
 
 Para cambiar imágenes, configuración o secretos, siempre un despliegue nuevo (ver «Despliegue»).
 
+### Web pública (TK-087)
+
+```bash
+# Rechazos por límite de peticiones en el proxy (IP del visitante en el registro de accesos)
+aws logs filter-log-events --profile entrevecinos --log-group-name /entrevecinos/prod/app/proxy \
+  --filter-pattern '"limiting requests"' --start-time "$(date -d '-1 hour' +%s)000" --query 'events[].message'
+# Registros de acceso recientes
+aws logs tail /entrevecinos/prod/cloudfront --region us-east-1 --profile entrevecinos --since 10m
+# Vaciar la caché de estáticos (no suele hacer falta: cambian de nombre en cada versión)
+aws cloudfront create-invalidation --profile entrevecinos \
+  --distribution-id "$(make -s tf-output | awk -F'"' '/^distribution_id/ {print $2}')" --paths '/_next/static/*'
+```
+
 ### Base de datos y copias (TK-082)
 
 PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un volumen EBS propio (`entrevecinos-prod-postgres`, 10 GB, cifrado) que sobrevive a la instancia.
@@ -262,6 +298,7 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Instancia** (TK-085): `t4g.small` ≈ 12 USD/mes más el volumen raíz de 20 GB (≈ 1,6 USD/mes). Entra en la capa gratuita del plan FREE, así que se paga con los créditos. Con créditos de CPU `standard` no hay cargos por exceso.
 
 - **Logs de la aplicación** (TK-086): unos MB al día con el tráfico del MVP, dentro de los 5 GB de ingesta gratuitos al mes; 30 días de retención.
+- **CloudFront** (TK-087): pago por uso, dentro de su capa gratuita permanente (1 TB y 10 millones de peticiones al mes) con el tráfico del MVP; Shield Standard incluido. Registros de acceso en CloudWatch Logs (`us-east-1`): céntimos al mes, 7 días de retención. Sin WAF: el plan Free de CloudFront no está disponible en el plan del proyecto y no se contrata una web ACL (≈ 10 USD/mes).
 
 *Pendiente: TK-093* (estimación por servicio con la infraestructura completa).
 
@@ -294,9 +331,18 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Cuándo revisarla:** al automatizar con GitHub Actions (TK-090) o al pasar a ECS, que inyecta secretos de Parameter Store por su cuenta.
 - **Evolución:** que la API y el proxy lean los secretos al arrancar con el rol, y despliegue *blue/green* detrás del proxy.
 
+### CloudFront sin WAF y con origen HTTP (TK-087)
+
+- **Qué:** CloudFront delante de la IP pública de la instancia, con origen HTTP y una cabecera secreta, sin WAF; los límites de peticiones por IP los pone el proxy nginx. El ticket preveía el plan de tarifa plana Free de CloudFront, que incluye WAF.
+- **Por qué:** el proyecto está en el plan FREE de AWS y su política de control de servicios deniega `pricingplanmanager:*`, así que no se puede suscribir el plan Free (ni por Terraform ni por consola). Una web ACL propia costaría ≈ 10 USD/mes y un origen VPC ≈ 35 USD/mes de NAT: **coste 0 mientras el proyecto no escale**. La política de petición `AllViewer` (no `AllViewerExceptHostHeader`) conserva el `Host` del visitante, que Next.js compara con `Origin` en las Server Actions; con origen HTTP no hay certificado que deba coincidir.
+- **Impacto:** sin reglas gestionadas contra patrones maliciosos ni bots; los límites se aplican en la instancia (consumen su CPU) y con `429`; el tráfico CloudFront → instancia viaja sin cifrar y la IP de la instancia es pública.
+- **Mitigaciones:** grupo de seguridad limitado a CloudFront, proxy que exige `X-Origin-Verify` (`403` sin ella), límites por la IP real del visitante, Shield Standard, cookies `Secure` y HSTS, y validación de entradas en la API.
+- **Cuándo revisarla:** al pasar el proyecto al plan de pago de AWS (probar de nuevo el plan Free de CloudFront: `aws_pricingplanmanager_subscription`, ya disponible en el proveedor), con ataques que los límites del proxy no frenen o con datos más sensibles.
+- **Evolución:** plan Free (o Pro) de CloudFront con su WAF; origen HTTPS con `origin.entrevecinos.org` y Let's Encrypt por DNS-01; con presupuesto, origen VPC sin IP pública.
+
 ### Excepciones de checkov
 
-`.checkov.yaml` omite, con su motivo, las comprobaciones que chocan con decisiones de coste o con el plan del proyecto: claves KMS propias (≈ 1 USD/mes cada una; se usan las gestionadas por AWS), réplica entre regiones (no permitida), registro de accesos y notificaciones de S3, y retenciones de registros de un año. Las excepciones puntuales van en el propio recurso con `#checkov:skip`; entre ellas, DNSSEC y el registro de consultas de la zona de Route 53 (TK-084: DNSSEC necesita una clave KMS y se deja para la evolución), y en la instancia la IP pública (sin NAT es su única salida) y la monitorización detallada (TK-085).
+`.checkov.yaml` omite, con su motivo, las comprobaciones que chocan con decisiones de coste o con el plan del proyecto: claves KMS propias (≈ 1 USD/mes cada una; se usan las gestionadas por AWS), réplica entre regiones (no permitida), registro de accesos y notificaciones de S3, y retenciones de registros de un año. Las excepciones puntuales van en el propio recurso con `#checkov:skip`; entre ellas, DNSSEC y el registro de consultas de la zona de Route 53 (TK-084: DNSSEC necesita una clave KMS y se deja para la evolución), en la instancia la IP pública (sin NAT es su única salida) y la monitorización detallada (TK-085), y en CloudFront la restricción geográfica, el origen de respaldo y la política de cabeceras de respuesta (las pone Next.js), con los registros v2 que checkov no reconoce, y la falta de WAF (TK-087).
 
 *Pendiente: TK-095* (resto de decisiones frente a la arquitectura prevista en el `readme.md` §2.4).
 
