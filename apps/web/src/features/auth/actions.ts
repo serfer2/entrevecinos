@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { errorCodeOf, invalidBodyFields } from "@/lib/api/errors";
+import { type ApiError, errorCodeOf, invalidBodyFields } from "@/lib/api/errors";
 import { apiFetch } from "@/lib/api/server";
 
 import { postLoginPath } from "./destination";
@@ -32,6 +32,14 @@ export type SignupState =
     }
   | undefined;
 
+/** Cupo de correos del periodo agotado (TK-099): la API no crea la cuenta ni envía nada. */
+const EMAIL_QUOTA_MESSAGE =
+  "Ahora mismo no podemos enviar correos de validación. Inténtalo de nuevo en unos días.";
+
+function isEmailQuotaExceeded(error: ApiError): boolean {
+  return error.status === 503 && errorCodeOf(error) === "email_quota_exceeded";
+}
+
 function text(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value : "";
@@ -55,6 +63,7 @@ export async function signup(_state: SignupState, formData: FormData): Promise<S
   });
 
   if (!result.ok) {
+    if (isEmailQuotaExceeded(result.error)) return { formError: EMAIL_QUOTA_MESSAGE, values };
     if (result.error.status === 409) {
       if (errorCodeOf(result.error) === "email_pending_verification") {
         return {
@@ -142,7 +151,10 @@ export async function resendVerification(
     method: "POST",
     body: { email: text(formData, "email") },
   });
-  if (!result.ok) return { error: "No se pudo reenviar el correo. Inténtalo de nuevo." };
+  if (!result.ok) {
+    if (isEmailQuotaExceeded(result.error)) return { error: EMAIL_QUOTA_MESSAGE };
+    return { error: "No se pudo reenviar el correo. Inténtalo de nuevo." };
+  }
   return { sent: true };
 }
 

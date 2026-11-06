@@ -83,6 +83,7 @@ Cambios del contrato durante el desarrollo del MVP (compatibles salvo que se ind
 | TK-059 | `registerUser`: el `409` usa `RegistrationConflict` (`Error` + `code`): `email_in_use` o `email_pending_verification`. Nuevo `resendEmailVerification` (`POST /auth/email-verification/resend`): siempre `202`. |
 | TK-064 | `verifyEmail`: el `400` distingue `verification_invalid`, `email_already_verified` y `verification_superseded` (con `email`). Compatible para clientes que solo miran el estado. |
 | TK-074 | `x-mvp` pasa a significar «implementada en el MVP». `deleteCurrentUser`, `listMyListings`, `createCategory`, `updateCategory`, `updateCommunity` y `deleteMedia` pasan a `x-mvp: false` (versión futura): no las usa ninguna historia del MVP. |
+| TK-099 | `registerUser` y `resendEmailVerification`: `503` con `EmailQuotaExceeded` (`Error` + `code: email_quota_exceeded`) y `Retry-After` cuando se agota el cupo de correos del periodo (límite por coste). Compatible: un estado nuevo. |
 
 ## Resumen de endpoints
 

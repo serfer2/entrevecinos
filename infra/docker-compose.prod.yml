@@ -109,6 +109,10 @@ services:
       SMTP_USERNAME: ${SMTP_USERNAME:?Lo define deploy.sh}
       SMTP_PASSWORD: ${SMTP_PASSWORD:?Lo define deploy.sh}
       MAIL_FROM: EntreVecinos <no-reply@entrevecinos.org>
+      # Cupo de correos por periodo (del día 6 al día 6, TK-099): restricción de costes, el plan
+      # más barato de Brevo. Subirlo se decide con el presupuesto (infra/aws/README.md, «Decisiones»).
+      EMAIL_MONTHLY_LIMIT: "5000"
+      EMAIL_QUOTA_RESET_DAY: "6"
       WEB_PUBLIC_URL: https://entrevecinos.org
     tmpfs:
       - /tmp:size=32m

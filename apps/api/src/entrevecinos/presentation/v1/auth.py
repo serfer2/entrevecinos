@@ -18,6 +18,7 @@ from entrevecinos.presentation.dependencies import (
 from entrevecinos.presentation.v1.schemas.auth import (
     AuthResponse,
     EmailNotVerifiedResponse,
+    EmailQuotaExceededResponse,
     EmailVerificationRequest,
     LoginRequest,
     RegisterRequest,
@@ -52,7 +53,11 @@ def send_in_background(sender: EmailSender, email: OutgoingEmail) -> None:
         "Crea una cuenta inactiva con rol `user` y envía un correo con el enlace de validación. "
         "La cuenta se activa al validar el correo (`POST /auth/email-verification`)."
     ),
-    responses={409: {"model": RegistrationConflictResponse}, **VALIDATION_ERROR},
+    responses={
+        409: {"model": RegistrationConflictResponse},
+        503: {"model": EmailQuotaExceededResponse},
+        **VALIDATION_ERROR,
+    },
 )
 def register(
     body: RegisterRequest,
@@ -105,7 +110,7 @@ def verify_email(
         "Envía un enlace de validación nuevo si la cuenta está pendiente. Responde lo mismo exista "
         "o no la cuenta, para no revelar qué correos están registrados. Acceso público."
     ),
-    responses={**VALIDATION_ERROR},
+    responses={503: {"model": EmailQuotaExceededResponse}, **VALIDATION_ERROR},
 )
 def resend_email_verification(
     body: ResendVerificationRequest,

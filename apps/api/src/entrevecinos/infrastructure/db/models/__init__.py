@@ -9,12 +9,14 @@ from entrevecinos.infrastructure.db.models.listing import (
     ListingModel,
     MediaAssetModel,
 )
+from entrevecinos.infrastructure.db.models.mail import EmailQuotaModel
 from entrevecinos.infrastructure.db.models.user import EmailVerificationModel, UserModel
 
 __all__ = [
     "CategoryModel",
     "CommunityMembershipModel",
     "CommunityModel",
+    "EmailQuotaModel",
     "EmailVerificationModel",
     "ListingImageModel",
     "ListingModel",

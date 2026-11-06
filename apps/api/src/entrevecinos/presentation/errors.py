@@ -18,6 +18,7 @@ from entrevecinos.domain.listings.errors import (
     ListingLocked,
     ListingStatusConflict,
 )
+from entrevecinos.domain.mail.errors import EmailQuotaExceeded
 from entrevecinos.domain.media.errors import EmptyImage, ImageTooLarge, UnsupportedImageType
 from entrevecinos.domain.users.errors import (
     EmailAlreadyRegistered,
@@ -67,6 +68,18 @@ async def email_pending_verification_handler(
             "detail": "Este correo está pendiente de validación.",
             "code": "email_pending_verification",
         },
+    )
+
+
+async def email_quota_exceeded_handler(request: Request, exc: EmailQuotaExceeded) -> JSONResponse:
+    # Cupo de correos agotado (TK-099): `Retry-After` hasta el inicio del periodo siguiente.
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "detail": "Ahora mismo no podemos enviar correos. Inténtalo de nuevo más tarde.",
+            "code": "email_quota_exceeded",
+        },
+        headers={"Retry-After": str(exc.retry_after_seconds)},
     )
 
 
@@ -255,6 +268,7 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(EmailAlreadyRegistered, email_already_registered_handler)
     app.add_exception_handler(EmailPendingVerification, email_pending_verification_handler)
+    app.add_exception_handler(EmailQuotaExceeded, email_quota_exceeded_handler)
     app.add_exception_handler(InvalidCredentials, invalid_credentials_handler)
     app.add_exception_handler(EmailNotVerified, email_not_verified_handler)
     app.add_exception_handler(VerificationInvalid, verification_invalid_handler)

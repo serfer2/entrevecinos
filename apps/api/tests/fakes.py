@@ -3,7 +3,7 @@
 import dataclasses
 import uuid
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from entrevecinos.application.users.ports import AccessToken, OutgoingEmail
 from entrevecinos.domain.communities.entities import (
@@ -236,3 +236,19 @@ class InMemoryObjectStorage:
 
     def presigned_get_url(self, key: str, expires_in: int) -> str:
         return f"{self.public_endpoint}/bucket/{key}?X-Amz-Expires={expires_in}&X-Amz-Signature=x"
+
+
+class InMemoryEmailQuotaRepository:
+    """Contador del cupo de correos por periodo (TK-099)."""
+
+    def __init__(self) -> None:
+        self.counts: dict[date, int] = {}
+
+    def sent(self, period_start: date) -> int:
+        return self.counts.get(period_start, 0)
+
+    def reserve(self, period_start: date, limit: int) -> int | None:
+        if self.sent(period_start) >= limit:
+            return None
+        self.counts[period_start] = self.sent(period_start) + 1
+        return self.counts[period_start]

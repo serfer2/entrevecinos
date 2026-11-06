@@ -1,0 +1,12 @@
+description: >-
+  Cupo de correos del periodo agotado (extensión de `Error`, TK-099). Por coste, la aplicación
+  envía como mucho un número fijo de correos entre el día 6 de un mes y el día 6 del siguiente;
+  al llegar al límite no crea la cuenta ni el enlace y no envía nada.
+allOf:
+  - $ref: ./Error.yaml
+  - type: object
+    required: [code]
+    properties:
+      code:
+        type: string
+        enum: [email_quota_exceeded]

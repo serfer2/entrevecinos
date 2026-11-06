@@ -535,6 +535,8 @@ Sin datos sensibles: la API solo registra el asunto de los correos y la clave de
 | `api-errors` | > 10 errores en `/entrevecinos/prod/app/api` en 5 min | Leer las trazas; si empezó con un despliegue, redesplegar el commit anterior (ver «Despliegue continuo») |
 | `web-5xx` | `Proxy5xx` / `ProxyRequests` > 5 % en 5 min, con 10 peticiones o más | `docker ps` (¿web caída?) y `/entrevecinos/prod/app/{proxy,web}`. No ve un proxy caído (CloudFront responde `502` sin llegar a él): mirar `5xxErrorRate` de CloudFront en el panel |
 | `ses-bounces` / `ses-complaints` | `Reputation.BounceRate` > 5 % / `Reputation.ComplaintRate` > 0,1 % | Revisar los rebotes en SES; AWS revisa la cuenta (y puede pausar el envío) a partir del 5 % y del 0,1 % |
+| `email-quota-80` | Se ha reservado el 80 % del cupo de correos del periodo (4.000 de 5.000) | Revisar si el crecimiento es real o un abuso (registros de la API y del proxy: muchos `POST /registro` desde pocas IP); si es real, valorar subir el límite con el presupuesto |
+| `email-quota-exceeded` | Envío bloqueado por cupo agotado (registro y reenvío responden `503` hasta el día 6) | Si es un abuso, bloquear el origen y esperar al día 6; si es crecimiento real, subir `EMAIL_MONTHLY_LIMIT` en el Compose (y el plan de Brevo y el límite de gasto si hace falta), `make tf-apply` y desplegar |
 
 ```bash
 # Probar un aviso (llega un correo de ALARM y, en la siguiente evaluación, otro de OK)
@@ -627,7 +629,7 @@ Terraform separa el volumen (parando la instancia), destruye la instancia, crea 
   | IPv4 pública (TK-085) | 0,005 USD/hora | ≈ 3,7 |
   | EBS (TK-082, TK-085) | 20 GB raíz y 10 GB de datos `gp3`, y 7 *snapshots* incrementales | ≈ 2,8 |
   | Route 53 (TK-084) | zona alojada y consultas (las de alias a CloudFront no se cobran) | ≈ 0,5 |
-  | CloudWatch (TK-086, TK-091) | 14 métricas de alarma (10 gratuitas), registros dentro de los 5 GB gratuitos | ≈ 0,4 |
+  | CloudWatch (TK-086, TK-091, TK-099) | 16 métricas de alarma (10 gratuitas), registros dentro de los 5 GB gratuitos | ≈ 0,6 |
   | S3 y ECR (TK-080, TK-082) | copias, imágenes de los anuncios y de los contenedores (pocos GB) | < 0,5 |
   | CloudFront, SES, SNS, Parameter Store, KMS gestionada | capas gratuitas o céntimos | ≈ 0 |
   | **Total** | | **≈ 20** |
@@ -644,8 +646,8 @@ Terraform separa el volumen (parando la instancia), destruye la instancia, crea 
 - **Instancia** (TK-085): con créditos de CPU `standard` no hay cargos por exceso.
 
 - **Logs de la aplicación** (TK-086): unos MB al día con el tráfico del MVP, dentro de los 5 GB de ingesta gratuitos al mes; 14 días de retención (30 los despliegues).
-- **Observabilidad** (TK-091): 13 alarmas con la de recuperación; `web-5xx` usa dos métricas y cuenta como dos, así que son 14 métricas de alarma (las 10 primeras gratuitas; ≈ 0,40 USD/mes el resto). Panel, filtros de métricas y tema SNS por correo, gratuitos; métricas del agente (4 series) y de los filtros, dentro de las 10 personalizadas gratuitas o céntimos.
-- **Correo** (TK-096): Brevo en el plan gratuito (300 correos al día, 0 USD); su plan de pago más barato cuesta ≈ 9 USD/mes por 5.000 correos. SES, conservado como vuelta atrás, no cuesta nada sin envíos.
+- **Observabilidad** (TK-091, TK-099): 15 alarmas con la de recuperación; `web-5xx` usa dos métricas y cuenta como dos, así que son 16 métricas de alarma (las 10 primeras gratuitas; ≈ 0,60 USD/mes el resto). Panel, filtros de métricas y tema SNS por correo, gratuitos; métricas del agente y de los filtros, dentro de las 10 personalizadas gratuitas o céntimos.
+- **Correo** (TK-096, TK-099): Brevo en el plan gratuito (300 correos al día, 0 USD); su plan de pago más barato cuesta ≈ 9 USD/mes por 5.000 correos. **La aplicación no envía más de 5.000 correos por periodo** (del día 6 al día 6), así que el correo nunca puede costar más que ese plan. SES, conservado como vuelta atrás, no cuesta nada sin envíos.
 - **CloudFront** (TK-087): pago por uso, dentro de su capa gratuita permanente (1 TB y 10 millones de peticiones al mes) con el tráfico del MVP; Shield Standard incluido. Registros de acceso en CloudWatch Logs (`us-east-1`): céntimos al mes, 7 días de retención. Sin WAF: el plan Free de CloudFront no está disponible en el plan del proyecto y no se contrata una web ACL (≈ 10 USD/mes).
 
 ## Decisiones de arquitectura
@@ -692,6 +694,15 @@ Las entradas siguientes amplían cada decisión (qué, por qué, impacto, mitiga
 - **Cuándo revisarla:** en cuanto la infraestructura esté estable; no depende del tráfico.
 - **Evolución:** DNSSEC en Route 53 (paso 5).
 
+### Límite de 5.000 correos por periodo, por coste (TK-099)
+
+- **Qué:** la API envía como mucho 5.000 correos (registro y reenvío del enlace de validación) entre el día 6 de un mes a las 00:00 (hora de Madrid) y el día 6 del siguiente. Al llegar, responde `503` (`email_quota_exceeded`) sin crear la cuenta ni enviar nada, hasta el periodo siguiente. Contador en PostgreSQL (`email_quota`) con reserva atómica; configurable con `EMAIL_MONTHLY_LIMIT` y `EMAIL_QUOTA_RESET_DAY`.
+- **Por qué:** **restricción de costes.** El correo no puede costar más que el plan de pago más barato de Brevo (5.000 correos al mes, ≈ 9 USD/mes), y el gasto total debe seguir dentro del límite de 40 €/mes. Un tope en la propia aplicación lo garantiza aunque falle otra protección (un error que envíe en bucle o registros masivos).
+- **Impacto:** al agotarse, nadie puede registrarse ni pedir otro enlace hasta el día 6; una plaza se consume aunque el envío falle después (criterio conservador).
+- **Mitigaciones:** límites por IP del proxy contra los registros masivos; alarmas `email-quota-80` y `email-quota-exceeded`; el reenvío comprueba el cupo antes de buscar la cuenta, así que el `503` no revela qué correos existen.
+- **Cuándo revisarla:** cuando el crecimiento real de registros se acerque al límite (alarma del 80 %).
+- **Cómo subirlo:** decidirlo con el presupuesto; `EMAIL_MONTHLY_LIMIT` en `infra/docker-compose.prod.yml`, el plan de Brevo si hace falta, `make tf-apply` y desplegar.
+
 ### Correo transaccional con Brevo en lugar de SES (TK-096)
 
 - **Qué:** el correo de la aplicación (validación de la cuenta y reenvío) sale por SMTP con Brevo, en su plan gratuito, en lugar de por SES. SES sigue configurado (identidad, DKIM, `MAIL FROM` y *configuration set*) como vuelta atrás.
@@ -705,7 +716,7 @@ Las entradas siguientes amplían cada decisión (qué, por qué, impacto, mitiga
 
   Descartados: Mailjet (logo en el plan gratuito), SMTP2GO, Mailgun, Postmark y SendGrid (sin plan gratuito o con menos margen).
 - **Impacto:** una cuenta y unas credenciales fuera de AWS y de Terraform (alta, clave SMTP e IP autorizadas); límite de 300 correos al día; el plan gratuito puede añadir un pie de Brevo (se acepta por ahora); **Brevo reescribe los enlaces del correo para su seguimiento de clics y no permite desactivarlo** (solo a petición o en Enterprise): el enlace de validación, con su *token*, pasa por su redirección (`r.send.entrevecinos.org`) y queda en sus registros. **Riesgo aceptado** el 2026-11-06: el *token* es de un solo uso y caduca en 24 horas, Brevo es encargado del tratamiento (DPA) y la alternativa (cambiar de proveedor) se descartó; la instancia necesita salida SMTP (puerto 587) y una IP fija autorizada en Brevo.
-- **Mitigaciones:** credenciales solo en Parameter Store y por entorno; dominio autenticado con DKIM alineado (DMARC estricto); alarma de fallos de envío (TK-097) y límite propio de envíos por coste (TK-099).
+- **Mitigaciones:** credenciales solo en Parameter Store y por entorno; dominio autenticado con DKIM alineado (DMARC estricto); alarma de fallos de envío (TK-097) y límite propio de 5.000 envíos por periodo, por coste (TK-099).
 - **Cuándo revisarla:** si AWS activa el acceso de producción de SES, si el volumen supera el plan gratuito o si la marca del pie molesta.
 - **Evolución:** volver a SES cuando tenga acceso de producción (solo configuración: variables del Compose, `make tf-apply` y despliegue) o pasar al plan de pago de Brevo.
 
