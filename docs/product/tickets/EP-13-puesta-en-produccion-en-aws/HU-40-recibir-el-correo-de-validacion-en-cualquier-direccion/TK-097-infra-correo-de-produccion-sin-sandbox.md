@@ -89,8 +89,8 @@ aws cloudwatch set-alarm-state --profile entrevecinos --alarm-name entrevecinos-
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] Ninguna dirección real en el repositorio.
+- [x] Los criterios de aceptación se cumplen.
+- [x] Ninguna dirección real en el repositorio.
 - [ ] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas

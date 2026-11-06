@@ -66,14 +66,14 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
    | `monthly_budget_usd` | Presupuesto mensual, equivalente al límite de gasto | `44` |
    | `availability_zone` | Zona de la subred, la instancia y el volumen de datos | `eu-north-1a` |
    | `admin_role_arns` | Roles que pueden borrar copias de la base | — (obligatoria) |
-   | `ses_test_recipients` | Destinatarios verificados mientras SES esté en *sandbox* | `[]` |
+   | `ses_test_recipients` | Destinatarios verificados si se vuelve a SES mientras siga en *sandbox*; vacío con Brevo (TK-097) | `[]` |
    | `db_password_version`, `jwt_secret_version`, `origin_verify_version` | Subirlas rota el secreto (ver «Secretos») | `1` |
    | `wait_for_certificate_validation` | `true` cuando el dominio ya esté delegado en Route 53 | `false` |
 
    Salidas útiles (`make tf-output`): `instance_id` (`DEPLOY_INSTANCE_ID` de GitHub), `name_servers` (delegación), `distribution_id`, `ecr_repository_urls`, `backups_bucket`, `media_bucket`, `github_user`, `github_deploy_role_arn`, `github_deploy_external_id` y `alerts_topic_arn`.
 4. **Infraestructura:** `make tf-init`, `make tf-plan` y `make tf-apply`. Un segundo `make tf-plan` no debe mostrar cambios.
 5. **Pasos manuales tras el `apply`:**
-   - cada destinatario de `ses_test_recipients` recibe un correo de AWS y debe pulsar el enlace de verificación;
+   - si `ses_test_recipients` no está vacío (solo para volver a SES mientras siga en *sandbox*), cada destinatario recibe un correo de AWS y debe pulsar el enlace de verificación. En producción está vacío: el correo va por Brevo (TK-097);
    - los avisos de AWS Budgets llegan directamente al correo configurado (no necesitan confirmación);
    - **correo «AWS Notification - Subscription Confirmation»** (tema `entrevecinos-prod-alerts`): pulsa *Confirm subscription* o no llegará ninguna alarma (TK-091);
    - **delegación del dominio** en Dinahosting (ver «DNS»), y después `wait_for_certificate_validation = true` en `prod.tfvars` y otro `make tf-apply`.
@@ -104,6 +104,8 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
       ```
 
    5. IP autorizadas: la IP elástica de la instancia (`make tf-output`, TK-098).
+
+   **Límites reales del correo de producción** (TK-097): 300 correos al día en el plan gratuito de Brevo, y como mucho 5.000 por periodo en la propia API (del día 6 al día 6, por coste, TK-099). Si Brevo rechaza un envío, salta la alarma `email-send-failures`.
 
 7. **Primer despliegue** de la aplicación: ver «Despliegue». El mismo `make tf-apply` crea CloudFront y los alias de la web (ver «Web pública»), sin pasos en consola.
 8. **Acceso de GitHub Actions** (manual en GitHub): entorno `production`, clave del usuario de CI y variables; ver «Acceso de GitHub Actions».
@@ -535,6 +537,7 @@ Sin datos sensibles: la API solo registra el asunto de los correos y la clave de
 | `api-errors` | > 10 errores en `/entrevecinos/prod/app/api` en 5 min | Leer las trazas; si empezó con un despliegue, redesplegar el commit anterior (ver «Despliegue continuo») |
 | `web-5xx` | `Proxy5xx` / `ProxyRequests` > 5 % en 5 min, con 10 peticiones o más | `docker ps` (¿web caída?) y `/entrevecinos/prod/app/{proxy,web}`. No ve un proxy caído (CloudFront responde `502` sin llegar a él): mirar `5xxErrorRate` de CloudFront en el panel |
 | `ses-bounces` / `ses-complaints` | `Reputation.BounceRate` > 5 % / `Reputation.ComplaintRate` > 0,1 % | Revisar los rebotes en SES; AWS revisa la cuenta (y puede pausar el envío) a partir del 5 % y del 0,1 % |
+| `email-send-failures` | Un correo de la aplicación no se ha podido enviar («No se pudo enviar el correo» en `/entrevecinos/prod/app/api`): la cuenta se crea, pero el vecino no recibe el enlace | Leer la traza en el registro de la API: credenciales SMTP (rotación pendiente de desplegar), IP no autorizada en Brevo, límite diario de Brevo (300) agotado o caída del proveedor. Corregir y pedir al vecino que use «Reenviar el correo» |
 | `email-quota-80` | Se ha reservado el 80 % del cupo de correos del periodo (4.000 de 5.000) | Revisar si el crecimiento es real o un abuso (registros de la API y del proxy: muchos `POST /registro` desde pocas IP); si es real, valorar subir el límite con el presupuesto |
 | `email-quota-exceeded` | Envío bloqueado por cupo agotado (registro y reenvío responden `503` hasta el día 6) | Si es un abuso, bloquear el origen y esperar al día 6; si es crecimiento real, subir `EMAIL_MONTHLY_LIMIT` en el Compose (y el plan de Brevo y el límite de gasto si hace falta), `make tf-apply` y desplegar |
 
@@ -629,7 +632,7 @@ Terraform separa el volumen (parando la instancia), destruye la instancia, crea 
   | IPv4 pública (TK-085) | 0,005 USD/hora | ≈ 3,7 |
   | EBS (TK-082, TK-085) | 20 GB raíz y 10 GB de datos `gp3`, y 7 *snapshots* incrementales | ≈ 2,8 |
   | Route 53 (TK-084) | zona alojada y consultas (las de alias a CloudFront no se cobran) | ≈ 0,5 |
-  | CloudWatch (TK-086, TK-091, TK-099) | 16 métricas de alarma (10 gratuitas), registros dentro de los 5 GB gratuitos | ≈ 0,6 |
+  | CloudWatch (TK-086, TK-091, TK-097, TK-099) | 17 métricas de alarma (10 gratuitas), registros dentro de los 5 GB gratuitos | ≈ 0,7 |
   | S3 y ECR (TK-080, TK-082) | copias, imágenes de los anuncios y de los contenedores (pocos GB) | < 0,5 |
   | CloudFront, SES, SNS, Parameter Store, KMS gestionada | capas gratuitas o céntimos | ≈ 0 |
   | **Total** | | **≈ 20** |
@@ -646,7 +649,7 @@ Terraform separa el volumen (parando la instancia), destruye la instancia, crea 
 - **Instancia** (TK-085): con créditos de CPU `standard` no hay cargos por exceso.
 
 - **Logs de la aplicación** (TK-086): unos MB al día con el tráfico del MVP, dentro de los 5 GB de ingesta gratuitos al mes; 14 días de retención (30 los despliegues).
-- **Observabilidad** (TK-091, TK-099): 15 alarmas con la de recuperación; `web-5xx` usa dos métricas y cuenta como dos, así que son 16 métricas de alarma (las 10 primeras gratuitas; ≈ 0,60 USD/mes el resto). Panel, filtros de métricas y tema SNS por correo, gratuitos; métricas del agente y de los filtros, dentro de las 10 personalizadas gratuitas o céntimos.
+- **Observabilidad** (TK-091, TK-097, TK-099): 16 alarmas con la de recuperación; `web-5xx` usa dos métricas y cuenta como dos, así que son 17 métricas de alarma (las 10 primeras gratuitas; ≈ 0,70 USD/mes el resto). Panel, filtros de métricas y tema SNS por correo, gratuitos; métricas del agente y de los filtros, dentro de las 10 personalizadas gratuitas o céntimos.
 - **Correo** (TK-096, TK-099): Brevo en el plan gratuito (300 correos al día, 0 USD); su plan de pago más barato cuesta ≈ 9 USD/mes por 5.000 correos. **La aplicación no envía más de 5.000 correos por periodo** (del día 6 al día 6), así que el correo nunca puede costar más que ese plan. SES, conservado como vuelta atrás, no cuesta nada sin envíos.
 - **CloudFront** (TK-087): pago por uso, dentro de su capa gratuita permanente (1 TB y 10 millones de peticiones al mes) con el tráfico del MVP; Shield Standard incluido. Registros de acceso en CloudWatch Logs (`us-east-1`): céntimos al mes, 7 días de retención. Sin WAF: el plan Free de CloudFront no está disponible en el plan del proyecto y no se contrata una web ACL (≈ 10 USD/mes).
 

@@ -2,7 +2,6 @@
 
 ## Purpose
 Vigilancia de producción: retención de los registros, métricas de memoria y disco del agente de CloudWatch, alarmas con aviso por correo, panel y registros sin datos sensibles.
-
 ## Requirements
 ### Requirement: Retención definida de los registros
 Cada grupo de registros de producción SHALL tener una retención definida por Terraform: 14 días para `/entrevecinos/prod/app/{proxy,web,api,db,backup}`, 30 días para `/entrevecinos/prod/app/deploy` y las sesiones de SSM, y 7 días para los *flow logs* y CloudFront.
@@ -46,4 +45,15 @@ Los registros de producción MUST NOT contener contraseñas, *tokens* de validac
 #### Scenario: Enlace de validación
 - **WHEN** alguien abre `/verificar-correo?token=…`
 - **THEN** los registros del proxy y de CloudFront guardan la ruta sin el *token*
+
+### Requirement: Aviso del primer fallo de envío de correo
+Producción SHALL tener la alarma `entrevecinos-prod-email-send-failures`, sobre la métrica `EmailSendFailures` que cuenta el mensaje «No se pudo enviar el correo» del registro de la API, y MUST avisar al tema `entrevecinos-prod-alerts` con el primer fallo en 5 minutos y al volver a `OK`, tratando los datos ausentes como correctos.
+
+#### Scenario: Correo rechazado por el proveedor
+- **WHEN** el servidor SMTP rechaza un correo de la aplicación
+- **THEN** salta la alarma y llega un aviso por correo
+
+#### Scenario: Rebote posterior
+- **WHEN** el proveedor acepta el correo y después rebota (dirección inexistente)
+- **THEN** la alarma no salta: el rebote queda en los registros del proveedor
 

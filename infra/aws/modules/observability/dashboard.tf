@@ -51,6 +51,7 @@ locals {
         [local.logs_namespace, "Proxy5xx"],
         [local.logs_namespace, "RateLimited"],
         [local.logs_namespace, "EmailQuotaExceeded"],
+        [local.logs_namespace, "EmailSendFailures"],
       ]
     }
     ses = {

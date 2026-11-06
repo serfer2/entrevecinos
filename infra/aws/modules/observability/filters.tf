@@ -15,6 +15,9 @@ locals {
     # Python escribe el mensaje y la traza sin nivel).
     api-error     = { group = "api", metric = "ApiErrors", pattern = "\"ERROR:\"" }
     api-traceback = { group = "api", metric = "ApiErrors", pattern = "\"Traceback (most recent call last)\"" }
+    # Correo que el servidor SMTP no acepta (TK-097): el registro sigue, pero el vecino no recibe
+    # el enlace. Mensaje de send_in_background en la API.
+    email-send-failure = { group = "api", metric = "EmailSendFailures", pattern = "\"No se pudo enviar el correo\"" }
     # Cupo de correos por coste (TK-099): aviso al 80 % y cada envío bloqueado.
     email-quota-80       = { group = "api", metric = "EmailQuotaWarning", pattern = "\"Cupo de correo al 80\"" }
     email-quota-exceeded = { group = "api", metric = "EmailQuotaExceeded", pattern = "\"Límite mensual de correos alcanzado\"" }

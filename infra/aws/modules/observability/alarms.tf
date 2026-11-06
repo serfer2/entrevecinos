@@ -62,6 +62,14 @@ locals {
       statistic   = "Sum", period = 300, periods = 1, operator = "GreaterThanThreshold"
       threshold   = 10, missing = "notBreaching"
     }
+    # El primer correo que no sale (TK-097): sin él, un fallo del proveedor pasa desapercibido
+    # porque el registro responde 201 y el envío va después, en segundo plano.
+    email-send-failures = {
+      description = "Un correo de la aplicación no se ha podido enviar (proveedor, credenciales o límite)"
+      namespace   = local.logs_namespace, metric = "EmailSendFailures", dimensions = {}
+      statistic   = "Sum", period = 300, periods = 1, operator = "GreaterThanThreshold"
+      threshold   = 0, missing = "notBreaching"
+    }
     # Cupo de correos por coste (TK-099): aviso al cruzar el 80 % y en cada envío bloqueado.
     email-quota-80 = {
       description = "Se ha usado el 80 % del cupo de correos del periodo (límite por coste)"
