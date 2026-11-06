@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | **Tipo** | Infraestructura |
-| **Componente** | `infra/aws/modules/domain/` (registros DNS), `infra/aws/modules/network/` (salida 587), `infra/docker-compose.prod.yml`, `infra/prod/deploy.sh`, Parameter Store, `infra/aws/README.md` |
+| **Componente** | `infra/aws/modules/domain/` (registros DNS), `infra/aws/modules/network/` (salida 587), `infra/aws/modules/compute/` (IP elástica), `infra/docker-compose.prod.yml`, `infra/prod/deploy.sh`, Parameter Store, cuenta de Brevo (IP autorizadas), `infra/aws/README.md` |
 | **Historia** | HU-40 Recibir el correo de validación en cualquier dirección (Épica 13) |
 | **Prioridad** | Alta |
 | **Depende de** | TK-096 |
@@ -15,7 +15,9 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 
 TK-096 elige Brevo como proveedor de correo de producción. La API ya admite SMTP con STARTTLS (`MAIL_BACKEND=smtp`, el mismo adaptador que usa Mailpit en local), así que no hay cambios de código. Hay que autenticar el dominio en Brevo, llevar las credenciales a los contenedores como el resto de secretos, permitir la salida SMTP de la instancia y cambiar la configuración de producción.
 
-**Objetivo:** que la API envíe por `smtp-relay.brevo.com:587` con STARTTLS como `no-reply@entrevecinos.org`, con DKIM alineado con el dominio y SES intacto como vuelta atrás.
+Brevo solo acepta envíos por SMTP y por la API desde las IP que se le autorizan. El correo sale por la IP pública de la instancia (`16.16.213.236` el 2026-11-06), que AWS asigna automáticamente: cambia al parar y arrancar la instancia y al reemplazarla, y entonces Brevo rechazaría los envíos.
+
+**Objetivo:** que la API envíe por `smtp-relay.brevo.com:587` con STARTTLS como `no-reply@entrevecinos.org`, desde una IP fija autorizada en Brevo, con DKIM alineado con el dominio y SES intacto como vuelta atrás.
 
 ## 2. Alcance
 
@@ -34,6 +36,13 @@ TK-096 elige Brevo como proveedor de correo de producción. La API ya admite SMT
   - `SMTP_USERNAME` y `SMTP_PASSWORD` desde el entorno de `deploy.sh` (`${…:?Lo define deploy.sh}`);
   - `MAIL_FROM` sin cambios;
   - se retiran `SES_REGION` y `SES_CONFIGURATION_SET`.
+- **IP elástica** (`modules/compute`):
+  - `aws_eip` (`domain = "vpc"`) asociada a la instancia, con salida `instance_public_ip` en `envs/prod`;
+  - **sin coste añadido**: desde 2024 AWS cobra igual cualquier IPv4 pública (≈ 3,7 USD/mes, que ya se paga), y una IP elástica asociada cuesta lo mismo que la automática;
+  - `prevent_destroy`, para no perderla por error, y lista en «Destruir el entorno»;
+  - **la IP pública cambia una vez**, al asociarla. El nombre DNS público de la instancia, que es el origen de CloudFront, cambia con ella. La salida `public_dns` de `modules/compute` debe pasar a ser `aws_eip.public_dns`: `aws_instance.public_dns` no se actualiza en el mismo `apply` que asocia la IP, y CloudFront quedaría apuntando al nombre antiguo. Así, el mismo `make tf-apply` actualiza CloudFront. Hay que comprobar después que la web responde (unos minutos de propagación; asumido: corte breve o ninguno);
+  - en «Recuperación» y en el *runbook*, el reemplazo de la instancia conserva la IP: Terraform vuelve a asociarla.
+- **IP autorizadas en Brevo:** la IP elástica, añadida tras el `apply` y antes del despliegue que activa el SMTP. La IP automática anterior se retira cuando el envío funcione. El *runbook* indica que cualquier cambio de la IP de salida exige actualizar esta lista.
 - **Red:** regla de salida TCP 587 en el grupo de seguridad de la instancia (`modules/network`). Destino `0.0.0.0/0`, porque Brevo no publica rangos de entrada para su *relay* (asumido). La red `egress` de Compose ya da salida a la API.
 - **SES como vuelta atrás:** se conservan la identidad, DKIM, `MAIL FROM`, el *configuration set* y el permiso `ses:SendEmail`. Volver es cambiar las variables del Compose, `make tf-apply` y desplegar. Las alarmas de reputación de SES quedan sin datos (sin avisos).
 - **`infra/aws/README.md`:**
@@ -51,7 +60,7 @@ TK-096 elige Brevo como proveedor de correo de producción. La API ya admite SMT
 
 - STARTTLS obligatorio: la configuración de la API lo exige en producción.
 - Credenciales nunca en el repositorio, el estado de Terraform, ficheros de la instancia ni registros (`deploy.sh` sin traza).
-- `make tf-plan`: solo cambian el TXT de la raíz, los CNAME de DKIM, el grupo de seguridad y el documento de SSM; ningún registro de la web ni de SES.
+- `make tf-plan`: solo cambian el TXT de la raíz, los CNAME de DKIM, el grupo de seguridad, el documento de SSM, la IP elástica nueva y el origen de CloudFront (por el nuevo nombre DNS de la instancia); ningún registro de la web ni de SES. La instancia no se reemplaza.
 - `make tf-lint` y `make shellcheck` sin avisos.
 
 ## 4. Criterios de aceptación
@@ -71,7 +80,12 @@ TK-096 elige Brevo como proveedor de correo de producción. La API ya admite SMT
 - **When** reviso `/opt/entrevecinos`, la salida de `deploy.sh` y el grupo de seguridad
 - **Then** las credenciales SMTP no están en ningún fichero ni registro, y la única salida nueva es TCP 587
 
-**AC4 — Vuelta atrás documentada**
+**AC4 — IP fija autorizada**
+- **Given** la instancia con su IP elástica
+- **When** la paro y la vuelvo a arrancar, o consulto `make tf-output`
+- **Then** conserva la misma IP pública (`instance_public_ip`), es la única autorizada en Brevo y la web sigue respondiendo por CloudFront
+
+**AC5 — Vuelta atrás documentada**
 - **Given** `infra/aws/README.md`
 - **When** consulto cómo volver a SES
 - **Then** encuentro los pasos (variables del Compose, `make tf-apply` y despliegue) y SES sigue configurado
@@ -80,7 +94,7 @@ TK-096 elige Brevo como proveedor de correo de producción. La API ya admite SMT
 
 1. Autenticación del dominio en Brevo: valores de la cuenta; registros TXT y CNAME en Terraform.
 2. Parámetros de las credenciales; `deploy.sh` y Compose de producción.
-3. Regla de salida 587.
+3. IP elástica y regla de salida 587; IP autorizada en Brevo.
 4. `make tf-lint`, `make shellcheck`, `make tf-plan`, `make tf-apply` y despliegue.
 5. Pruebas de extremo a extremo y documentación.
 
@@ -91,6 +105,8 @@ dig +short TXT entrevecinos.org                         # SPF y brevo-code en el
 dig +short CNAME brevo1._domainkey.entrevecinos.org
 aws ssm get-parameters --profile entrevecinos --names /entrevecinos/prod/smtp/username /entrevecinos/prod/smtp/password \
   --query 'Parameters[].[Name,Type]'                    # sin --with-decryption
+make -s tf-output | grep instance_public_ip               # la IP que se autoriza en Brevo
+aws ec2 describe-addresses --profile entrevecinos --query 'Addresses[].[PublicIp,InstanceId]'
 aws ec2 describe-security-group-rules --profile entrevecinos \
   --filters Name=group-id,Values=<grupo de la instancia> --query 'SecurityGroupRules[?IsEgress].[IpProtocol,FromPort,CidrIpv4]'
 ```
@@ -107,3 +123,5 @@ aws ec2 describe-security-group-rules --profile entrevecinos \
 - **Salida SMTP abierta:** el puerto 587 a cualquier destino amplía la salida de la instancia; un proceso comprometido podría enviar correo por otros servidores. Mitigación: solo la API tiene la red `egress`; restringir el destino si Brevo publica rangos.
 - **Límite de 300 al día:** al agotarlo, Brevo rechaza los envíos y salta la alarma de fallos de envío (TK-097).
 - **Dependencia externa:** alta y claves fuera de Terraform; la rotación de la clave SMTP es manual (nueva clave en Brevo, `put-parameter --overwrite` y desplegar).
+- **IP autorizadas fuera de Terraform:** la lista de Brevo se mantiene a mano. Si la IP de salida cambiara (p. ej. al destruir y recrear el entorno), los envíos fallarían hasta actualizarla; la alarma de fallos de envío (TK-097) lo detecta.
+- **Cambio de origen de CloudFront:** al asociar la IP elástica cambia el nombre DNS de la instancia; aplicarlo con poco tráfico.
