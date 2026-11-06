@@ -15,8 +15,8 @@ provider "aws" {
   }
 }
 
-# Solo para recursos globales de CloudFront que AWS exige en us-east-1: certificado de ACM
-# (TK-084) y plan de tarifa plana con su WAF (TK-087).
+# Solo para lo que AWS exige en us-east-1: certificado de ACM (TK-084), CloudFront y sus registros
+# (TK-087). La política del proyecto deniega SNS allí (TK-091).
 provider "aws" {
   alias  = "us_east_1"
   region = "us-east-1"

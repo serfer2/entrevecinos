@@ -16,6 +16,7 @@ infra/aws/
 │   ├── budget/         presupuesto mensual con avisos (TK-078)
 │   ├── compute/        instancia EC2 endurecida, su rol, Session Manager y Patch Manager (TK-085);
 │   │                   documento de despliegue, logs de los contenedores y cabecera de origen (TK-086)
+│   ├── observability/  agente de CloudWatch, alarmas con aviso por correo, filtros y panel (TK-091)
 │   ├── network/        VPC, subred pública, grupo de seguridad y flow logs (TK-079)
 │   ├── storage/        repositorios ECR y bucket de imágenes (TK-080)
 │   ├── database/       volumen de PostgreSQL, snapshots, bucket de copias y contraseñas (TK-082)
@@ -34,7 +35,7 @@ infra/prod/             ficheros que se copian a la instancia (TK-082, TK-086)
 ├── proxy/              nginx: exige la cabecera de origen de CloudFront
 ├── initdb/10-roles.sh  roles de PostgreSQL
 ├── backup.sh           copia de PostgreSQL a S3
-└── systemd/            servicio y temporizador de las copias
+└── systemd/            servicio y temporizador de las copias (registro en /var/log/entrevecinos/backup.log)
 ```
 
 Versiones fijadas: Terraform 1.16.7 (`>= 1.11` en el código), proveedor `hashicorp/aws` `~> 6.70.0` y `hashicorp/random` `~> 3.9`, con `.terraform.lock.hcl` versionado para Linux y macOS (amd64 y arm64). Todo se ejecuta en contenedores con `make`:
@@ -60,6 +61,7 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
 5. **Pasos manuales tras el `apply`:**
    - cada destinatario de `ses_test_recipients` recibe un correo de AWS y debe pulsar el enlace de verificación;
    - los avisos de AWS Budgets llegan directamente al correo configurado (no necesitan confirmación);
+   - **correo «AWS Notification - Subscription Confirmation»** (tema `entrevecinos-prod-alerts`): pulsa *Confirm subscription* o no llegará ninguna alarma (TK-091);
    - **delegación del dominio** en Dinahosting (ver «DNS»), y después `wait_for_certificate_validation = true` en `prod.tfvars` y otro `make tf-apply`.
 6. **Salida del *sandbox* de SES**, cuando `https://entrevecinos.org` ya responda (TK-087):
 
@@ -89,7 +91,7 @@ La instancia ejecuta `infra/docker-compose.prod.yml` con cuatro servicios: `prox
 
 - **Proxy de origen:** responde `403` a toda petición sin la cabecera `X-Origin-Verify` con el valor de `/entrevecinos/prod/origin-verify` (la añade CloudFront, TK-087) y la quita antes de reenviar a la web. Identifica al visitante por el último valor de `X-Forwarded-For` (lo añade CloudFront; el visitante no puede falsearlo) y limita por IP con `limit_req`: 4 `POST` por minuto con ráfaga de 10 a `/iniciar-sesion` y `/registro` (≈ 20 en 5 minutos) y 5 peticiones por segundo con ráfaga de 100 en general, con `429`. Su registro de accesos lleva la IP del visitante. nginx lee la plantilla solo al arrancar: `deploy.sh` pone su huella en la etiqueta `org.entrevecinos.proxy-config`, así que cambiarla recrea el proxy en el siguiente despliegue.
 - **Contenedores endurecidos:** `proxy`, `web` y `api` sin *root*, con el sistema de ficheros de solo lectura (`tmpfs` donde hace falta), sin capacidades, con `no-new-privileges`, límites de memoria, CPU y procesos, y sin el socket de Docker. `db` mantiene solo las capacidades que usa la imagen oficial.
-- **Logs** con el *driver* `awslogs` en `/entrevecinos/prod/app/{proxy,web,api,db}`, y la salida de cada despliegue en `/entrevecinos/prod/app/deploy` (30 días).
+- **Logs** con el *driver* `awslogs` en `/entrevecinos/prod/app/{proxy,web,api,db}` (14 días), y la salida de cada despliegue en `/entrevecinos/prod/app/deploy` (30 días). El proxy registra la ruta sin la cadena de consulta (el enlace de validación del correo lleva el *token* en `?token=`).
 
 ### Cómo se despliega
 
@@ -331,10 +333,10 @@ Una sola instancia `entrevecinos-prod-app` (`t4g.small`, arm64, Amazon Linux 202
 
   Necesita el [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) en el equipo. Sin él, se ejecutan comandos con Run Command (`aws ssm send-command --document-name AWS-RunShellScript …`) o se abre la sesión desde la consola de EC2 (*Connect* → *Session Manager*).
 - **Endurecimiento:** IMDSv2 obligatorio (*hop limit* 2, para que los contenedores obtengan las credenciales del rol), volumen raíz `gp3` de 20 GB cifrado, protección contra la terminación y créditos de CPU `standard` (sin cargos por exceso; si la CPU se agota, la instancia se ralentiza).
-- **Primer arranque** (`modules/compute/user-data.sh.tftpl`, registro en `/var/log/cloud-init-output.log`): actualiza el sistema e instala Docker (con `live-restore`, `no-new-privileges` y logs rotados), Compose v5.6.1 (con su SHA-256 comprobado), el agente de CloudWatch (se configura en TK-091) y `dnf-automatic`. Crea 1 GB de *swap*, el usuario `deploy` (sin *shell* ni grupo `docker`) y `/opt/entrevecinos` (750). Solo se ejecuta al crear la instancia: Terraform ignora sus cambios y los de la AMI.
+- **Primer arranque** (`modules/compute/user-data.sh.tftpl`, registro en `/var/log/cloud-init-output.log`): actualiza el sistema e instala Docker (con `live-restore`, `no-new-privileges` y logs rotados), Compose v5.6.1 (con su SHA-256 comprobado), el agente de CloudWatch (lo configura State Manager, ver «Observabilidad y alertas») y `dnf-automatic`. Crea 1 GB de *swap*, el usuario `deploy` (sin *shell* ni grupo `docker`) y `/opt/entrevecinos` (750). Solo se ejecuta al crear la instancia: Terraform ignora sus cambios y los de la AMI.
 - **Volumen de datos** de TK-082 adjunto y montado por UUID en `/srv/entrevecinos/postgres` (XFS, `nofail`). Se formatea solo si no tiene sistema de ficheros, y Docker no arranca si no está montado (`RequiresMountsFor`), así que PostgreSQL nunca escribe en el volumen raíz.
 - **Parches:** `dnf-automatic` aplica a diario los de seguridad, y Patch Manager (`AWS-RunPatchBaseline`, `Install`) todos los domingos a las 04:00 UTC, reiniciando si hace falta (corte de minutos). Estado: `aws ssm describe-instance-patch-states --instance-ids <id> --profile entrevecinos`.
-- **Recuperación:** la alarma `entrevecinos-prod-app-recover` recupera la instancia (mismo ID, IP y volúmenes) si falla el *status check* del sistema.
+- **Recuperación:** la alarma `entrevecinos-prod-app-recover` recupera la instancia (mismo ID, IP y volúmenes) si falla el *status check* del sistema; `entrevecinos-prod-instance-down` avisa por correo (TK-091).
 - **Rol `entrevecinos-prod-app`** (mínimo privilegio, validado con IAM Access Analyzer): `AmazonSSMManagedInstanceCore` y una política propia que permite:
   - `PutObject` y `GetObject` en el bucket de imágenes, y en `postgres/` del de copias (sin borrar);
   - `ses:SendEmail` con la identidad del dominio, el *configuration set* y, mientras haya *sandbox*, los destinatarios de prueba, solo con remitente `no-reply@entrevecinos.org`;
@@ -380,7 +382,57 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - Copia a demanda (p. ej. antes de una migración destructiva): `sudo systemctl start entrevecinos-backup.service` en la instancia.
 - `deploy.sh` instala el script y el temporizador en cada despliegue (`/opt/entrevecinos/prod/backup.sh`). El script localiza el contenedor `db` con `docker` (por sus etiquetas de Compose), así que no necesita los secretos del despliegue.
 
-*Pendiente: TK-091 a TK-093* (registros, alarmas, restauración probada y *runbook*).
+*Pendiente: TK-092 y TK-093* (restauración probada y *runbook*).
+
+### Observabilidad y alertas (TK-091)
+
+Módulo `modules/observability`, todo en `eu-north-1`: la política de control de servicios del proyecto deniega SNS en `us-east-1`, y una alarma solo avisa a un tema de su región, así que las métricas de CloudFront (solo en `us-east-1`) quedan en el panel y los errores de la web se miden en el registro del proxy.
+
+**Registros** (retención corta para recortar costes):
+
+| Grupo | Origen | Retención |
+|---|---|---|
+| `/entrevecinos/prod/app/{proxy,web,api,db}` | contenedores (`awslogs`) | 14 días |
+| `/entrevecinos/prod/app/backup` | `/var/log/entrevecinos/backup.log` (agente de CloudWatch) | 14 días |
+| `/entrevecinos/prod/app/deploy` | salida de cada despliegue | 30 días |
+| `/entrevecinos/prod/ssm-sessions` | sesiones de Session Manager | 30 días |
+| `/entrevecinos/prod/vpc-flow-logs` (TK-079) y `/entrevecinos/prod/cloudfront` (`us-east-1`) | *flow logs* y accesos a la web | 7 días |
+
+Sin datos sensibles: la API solo registra el asunto de los correos y la clave de los objetos; el proxy, la ruta sin cadena de consulta; y CloudFront, los campos elegidos (`record_fields`), sin `cs-uri-query`, `cs(Cookie)` ni `cs(Referer)`.
+
+**Métricas del agente:** la configuración está en `/entrevecinos/prod/cloudwatch-agent` y la aplica la asociación de State Manager `entrevecinos-cloudwatch-agent` (`AmazonCloudWatch-ManageAgent`), que se vuelve a crear, y a aplicar, cuando cambia. Publica en `CWAgent`, con la dimensión `InstanceId`: `mem_used_percent`, `swap_used_percent` (cada minuto) y `disk_used_percent` de `/` y `/srv/entrevecinos/postgres` (`path`, `fstype` `xfs`; cada 5 minutos).
+
+**Filtros de métricas** (`Entrevecinos/Logs`): `DbErrors` (`PANIC`, y `FATAL` salvo los mensajes normales de un reinicio), `ApiErrors` (`ERROR:` de uvicorn y `Traceback` de `logger.exception`), `ProxyRequests` y `Proxy5xx` (todas las peticiones del proxy y las `5xx`) y `RateLimited` (`429` del proxy, solo en el panel).
+
+**Alarmas:** avisan por correo (tema `entrevecinos-prod-alerts`) al entrar en `ALARM` y al volver a `OK`. Umbrales iniciales; ajustarlos tras unas semanas si hay ruido.
+
+| Alarma (`entrevecinos-prod-…`) | Condición | Qué hacer |
+|---|---|---|
+| `instance-down` | `StatusCheckFailed` ≥ 1 durante 2 min (sin datos = alarma) | Si es del sistema, `…-app-recover` la recupera sola. Si no, *Instance screenshot* / `get-console-output` y reiniciar la instancia (`aws ec2 reboot-instances`) |
+| `cpu` | `CPUUtilization` > 80 % durante 15 min | `docker stats` en la instancia; buscar picos de tráfico (`RateLimited`, CloudFront) |
+| `cpu-credits` | `CPUCreditBalance` < 20 | La instancia bajará a su rendimiento base; si se repite, revisar la carga o subir de tamaño |
+| `memory` | `mem_used_percent` > 85 % durante 10 min | `docker stats`; reiniciar el contenedor que crece (`docker restart`) o revisar sus límites |
+| `disk-root` | `disk_used_percent` de `/` > 80 % | `docker system df` y `docker image prune -a` (deploy.sh ya borra las imágenes sin uso); `journalctl --vacuum-size=200M` |
+| `disk-data` | `disk_used_percent` del volumen de datos > 75 % | Ampliar el volumen (`aws ec2 modify-volume --size`) y `xfs_growfs /srv/entrevecinos/postgres` |
+| `backup-missing` | Ninguna `BackupSucceeded` en 7 h (sin datos = alarma) | `systemctl status entrevecinos-backup.service` y `/entrevecinos/prod/app/backup`; copia a demanda con `systemctl start entrevecinos-backup.service` |
+| `db-errors` | `FATAL` o `PANIC` en `/entrevecinos/prod/app/db` en 5 min | Leer el registro de `db`; contraseñas rotadas sin desplegar, disco lleno o corrupción (restaurar, TK-092) |
+| `api-errors` | > 10 errores en `/entrevecinos/prod/app/api` en 5 min | Leer las trazas; si empezó con un despliegue, redesplegar el commit anterior (ver «Despliegue continuo») |
+| `web-5xx` | `Proxy5xx` / `ProxyRequests` > 5 % en 5 min, con 10 peticiones o más | `docker ps` (¿web caída?) y `/entrevecinos/prod/app/{proxy,web}`. No ve un proxy caído (CloudFront responde `502` sin llegar a él): mirar `5xxErrorRate` de CloudFront en el panel |
+| `ses-bounces` / `ses-complaints` | `Reputation.BounceRate` > 5 % / `Reputation.ComplaintRate` > 0,1 % | Revisar los rebotes en SES; AWS revisa la cuenta (y puede pausar el envío) a partir del 5 % y del 0,1 % |
+
+```bash
+# Probar un aviso (llega un correo de ALARM y, en la siguiente evaluación, otro de OK)
+aws cloudwatch set-alarm-state --profile entrevecinos --alarm-name entrevecinos-prod-cpu \
+  --state-value ALARM --state-reason "Prueba de aviso"
+# Alarmas activas
+aws cloudwatch describe-alarms --profile entrevecinos --state-value ALARM --query 'MetricAlarms[].AlarmName'
+# Métricas del agente
+aws cloudwatch list-metrics --profile entrevecinos --namespace CWAgent --query 'Metrics[].[MetricName,Dimensions[?Name==`path`].Value|[0]]' --output text
+```
+
+**Panel** `entrevecinos-prod` (CloudWatch → *Dashboards*): estado de las alarmas, CPU y créditos, memoria y *swap*, discos, copias por hora, peticiones y errores de CloudFront (`us-east-1`), errores de la API, de PostgreSQL y `5xx` del proxy, rechazos `429` y SES.
+
+Sin monitorización externa: si la cuenta de AWS o CloudWatch fallan, no llega ningún aviso (ver «Decisiones»).
 
 ## Costes
 
@@ -389,7 +441,8 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Estimación** de la épica completa (sin alta disponibilidad, mientras el proyecto no escale): unos 20 USD/mes. Hasta TK-085 solo se pagan céntimos (S3, ECR, CloudWatch y el volumen de datos, ≈ 1 USD/mes) y la zona de Route 53 (0,50 USD/mes más las consultas; las de alias a CloudFront no se cobran).
 - **Instancia** (TK-085): `t4g.small` ≈ 12 USD/mes más el volumen raíz de 20 GB (≈ 1,6 USD/mes). Entra en la capa gratuita del plan FREE, así que se paga con los créditos. Con créditos de CPU `standard` no hay cargos por exceso.
 
-- **Logs de la aplicación** (TK-086): unos MB al día con el tráfico del MVP, dentro de los 5 GB de ingesta gratuitos al mes; 30 días de retención.
+- **Logs de la aplicación** (TK-086): unos MB al día con el tráfico del MVP, dentro de los 5 GB de ingesta gratuitos al mes; 14 días de retención (30 los despliegues).
+- **Observabilidad** (TK-091): 13 alarmas con la de recuperación; `web-5xx` usa dos métricas y cuenta como dos, así que son 14 métricas de alarma (las 10 primeras gratuitas; ≈ 0,40 USD/mes el resto). Panel, filtros de métricas y tema SNS por correo, gratuitos; métricas del agente (4 series) y de los filtros, dentro de las 10 personalizadas gratuitas o céntimos.
 - **CloudFront** (TK-087): pago por uso, dentro de su capa gratuita permanente (1 TB y 10 millones de peticiones al mes) con el tráfico del MVP; Shield Standard incluido. Registros de acceso en CloudWatch Logs (`us-east-1`): céntimos al mes, 7 días de retención. Sin WAF: el plan Free de CloudFront no está disponible en el plan del proyecto y no se contrata una web ACL (≈ 10 USD/mes).
 
 *Pendiente: TK-093* (estimación por servicio con la infraestructura completa).
@@ -458,9 +511,18 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Cuándo revisarla:** con más personas con permiso de escritura (activar *Required reviewers* en el entorno) o cuando el corte de cada despliegue moleste.
 - **Evolución:** OIDC (TK-088), despliegue *blue/green* detrás del proxy y `plan`/`apply` de Terraform en CI con un rol propio.
 
+### Alarmas por correo con CloudWatch, sin monitorización externa (TK-091)
+
+- **Qué:** alarmas de CloudWatch sobre las métricas de EC2, del agente, de las copias y de SES, y filtros de métricas sobre los registros (también la tasa de `5xx` del proxy), con aviso por correo desde SNS; el agente se configura con State Manager. Sin *canary* ni comprobación externa. El ticket preveía la alarma sobre `5xxErrorRate` de CloudFront con un tema SNS en `us-east-1`.
+- **Por qué:** sin alta disponibilidad, hay que enterarse de un fallo antes que los vecinos; con coste casi nulo (≈ 0,40 USD/mes) y sin tocar la instancia ni `deploy.sh`. La política de control de servicios deniega SNS en `us-east-1` y una alarma no avisa a temas de otra región, así que la tasa de errores sale del registro del proxy (con un mínimo de 10 peticiones, que además evita saltar por un solo error). El tema SNS no se cifra con KMS: CloudWatch no puede publicar con la clave gestionada `aws/sns`, una propia cuesta 1 USD/mes por región y los avisos solo llevan el nombre y el estado de la alarma.
+- **Impacto:** si falla la cuenta, la región o CloudWatch, no hay aviso; `web-5xx` no ve un proxy caído ni los errores de CloudFront; los umbrales son iniciales; la suscripción de correo se confirma a mano.
+- **Mitigaciones:** `instance-down` y `backup-missing` tratan la falta de datos como alarma; avisos también al volver a `OK`; *runbook* por alarma.
+- **Cuándo revisarla:** con usuarios que dependan de la web a diario, más de una persona de guardia o ruido de alertas.
+- **Evolución:** un *canary* de CloudWatch Synthetics (≈ 1-2 USD/mes) o un servicio externo gratuito de disponibilidad; avisos a un canal de chat; con el plan de pago, la alarma sobre `5xxErrorRate` de CloudFront en `us-east-1` (TK-095).
+
 ### Excepciones de checkov
 
-`.checkov.yaml` omite, con su motivo, las comprobaciones que chocan con decisiones de coste o con el plan del proyecto: claves KMS propias (≈ 1 USD/mes cada una; se usan las gestionadas por AWS), réplica entre regiones (no permitida), registro de accesos y notificaciones de S3, y retenciones de registros de un año. Las excepciones puntuales van en el propio recurso con `#checkov:skip`; entre ellas, DNSSEC y el registro de consultas de la zona de Route 53 (TK-084: DNSSEC necesita una clave KMS y se deja para la evolución), en la instancia la IP pública (sin NAT es su única salida) y la monitorización detallada (TK-085), y en CloudFront la restricción geográfica, el origen de respaldo y la política de cabeceras de respuesta (las pone Next.js), con los registros v2 que checkov no reconoce, y la falta de WAF (TK-087), y el usuario IAM con política propia de GitHub Actions (TK-088).
+`.checkov.yaml` omite, con su motivo, las comprobaciones que chocan con decisiones de coste o con el plan del proyecto: claves KMS propias (≈ 1 USD/mes cada una; se usan las gestionadas por AWS), réplica entre regiones (no permitida), registro de accesos y notificaciones de S3, y retenciones de registros de un año. Las excepciones puntuales van en el propio recurso con `#checkov:skip`; entre ellas, DNSSEC y el registro de consultas de la zona de Route 53 (TK-084: DNSSEC necesita una clave KMS y se deja para la evolución), en la instancia la IP pública (sin NAT es su única salida) y la monitorización detallada (TK-085), y en CloudFront la restricción geográfica, el origen de respaldo y la política de cabeceras de respuesta (las pone Next.js), con los registros v2 que checkov no reconoce, y la falta de WAF (TK-087), el usuario IAM con política propia de GitHub Actions (TK-088), y el tema SNS sin KMS y la configuración del agente como `String` (TK-091).
 
 *Pendiente: TK-095* (resto de decisiones frente a la arquitectura prevista en el `readme.md` §2.4).
 

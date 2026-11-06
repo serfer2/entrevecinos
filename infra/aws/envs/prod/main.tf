@@ -82,3 +82,12 @@ module "ci" {
   instance_id          = module.compute.instance_id
   deploy_document_name = module.compute.deploy_document_name
 }
+
+# Registros, métricas del agente, alarmas con aviso por correo y panel (TK-091).
+module "observability" {
+  source = "../../modules/observability"
+
+  alert_email     = var.alert_email
+  instance_id     = module.compute.instance_id
+  distribution_id = module.edge.distribution_id
+}

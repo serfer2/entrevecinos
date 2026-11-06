@@ -9,4 +9,8 @@ Type=oneshot
 # Configuración no secreta (BACKUP_BUCKET, AWS_REGION); la contraseña se lee de
 # Parameter Store al ejecutarse.
 EnvironmentFile=/opt/entrevecinos/backup.env
-ExecStart=/opt/entrevecinos/prod/backup.sh
+# La salida va al journal y a /var/log/entrevecinos/backup.log, que el agente de CloudWatch envía a
+# /entrevecinos/prod/app/backup (TK-091). Con tee y no con StandardOutput=append: systemd abre ese
+# fichero antes de crear LogsDirectory y la copia no arrancaría.
+LogsDirectory=entrevecinos
+ExecStart=/bin/bash -o pipefail -c '/opt/entrevecinos/prod/backup.sh 2>&1 | tee -a /var/log/entrevecinos/backup.log'

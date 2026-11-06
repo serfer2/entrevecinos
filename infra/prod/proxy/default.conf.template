@@ -32,7 +32,8 @@ limit_req_status 429;
 limit_req_log_level warn;
 
 # Registro con la IP del visitante, no la de CloudFront.
-log_format origin '$client_ip [$time_local] "$request" $status $body_bytes_sent $request_time "$http_user_agent"';
+# Ruta sin la cadena de consulta: el enlace de validación del correo lleva el token en ?token= (TK-091).
+log_format origin '$client_ip [$time_local] "$request_method $uri $server_protocol" $status $body_bytes_sent $request_time "$http_user_agent"';
 
 server {
     listen 8080;

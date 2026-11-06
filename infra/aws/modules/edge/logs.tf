@@ -21,7 +21,17 @@ resource "aws_cloudwatch_log_delivery_destination" "access" {
   }
 }
 
+# Campos elegidos, sin cs-uri-query (el enlace de validación del correo lleva el token en ?token=),
+# cs(Cookie) (sesión) ni cs(Referer) (repetiría la URL anterior con su consulta) (TK-091).
 resource "aws_cloudwatch_log_delivery" "access" {
   delivery_source_name     = aws_cloudwatch_log_delivery_source.access.name
   delivery_destination_arn = aws_cloudwatch_log_delivery_destination.access.arn
+
+  record_fields = [
+    "date", "time", "x-edge-location", "sc-bytes", "c-ip", "cs-method", "cs(Host)", "cs-uri-stem",
+    "sc-status", "cs(User-Agent)", "x-edge-result-type", "x-edge-request-id", "x-host-header",
+    "cs-protocol", "cs-bytes", "time-taken", "ssl-protocol", "x-edge-response-result-type",
+    "cs-protocol-version", "time-to-first-byte", "x-edge-detailed-result-type", "sc-content-type",
+    "c-country", "cache-behavior-path-pattern",
+  ]
 }
