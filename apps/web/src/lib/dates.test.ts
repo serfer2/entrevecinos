@@ -1,3 +1,4 @@
+// Prueba de CI (TK-089): cambio solo en apps/web.
 import { describe, expect, it } from "vitest";
 
 import { formatLongDate } from "./dates";
