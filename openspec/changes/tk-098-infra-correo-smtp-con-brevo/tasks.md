@@ -17,5 +17,5 @@
 
 - [x] 4.1 `make shellcheck`, `make tf-lint` y pruebas de la API
 - [x] 4.2 `make tf-plan` revisado y `make tf-apply`
-- [ ] 4.3 En Brevo: IP elástica autorizada, dominio verificado y seguimiento de clics desactivado
+- [x] 4.3 En Brevo: IP elástica autorizada y dominio verificado (el seguimiento de clics no se puede desactivar: riesgo aceptado)
 - [ ] 4.4 Despliegue y registro de extremo a extremo con dos direcciones no verificadas (cabeceras DKIM y DMARC); retirar la IP antigua de Brevo

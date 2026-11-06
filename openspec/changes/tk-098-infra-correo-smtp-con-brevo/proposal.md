@@ -31,4 +31,4 @@ HU-40: TK-096 eligió Brevo porque SES no sale del *sandbox*. Falta llevar el co
 
 - Infraestructura: `infra/aws/modules/{domain,mail,compute,network}`, `infra/aws/envs/prod`, `infra/docker-compose.prod.yml`, `infra/prod/deploy.sh`; `infra/aws/README.md` («Estructura», «DNS», «Secretos», «Operación», «Destruir el entorno»).
 - API: `infrastructure/mail/smtp_email_sender.py` y su prueba; sin cambios de contrato ni migraciones.
-- Exige `make tf-apply`; tras él, autorizar la IP elástica en Brevo, verificar el dominio y desactivar el seguimiento de clics; después, desplegar.
+- Exige `make tf-apply`; tras él, autorizar la IP elástica en Brevo, verificar el dominio; después, desplegar. El seguimiento de clics de Brevo no se puede desactivar y se acepta como riesgo (TK-096).

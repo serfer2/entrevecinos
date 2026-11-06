@@ -95,7 +95,7 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
 
    1. Cuenta en el plan gratuito con el correo del proyecto y envío transaccional (SMTP) activado.
    2. Dominio `entrevecinos.org` en *Senders, domains & dedicated IPs*, con el prefijo de marca **`send`** (nunca `mail`, que es el `MAIL FROM` de SES). Brevo da 7 registros DNS que crea Terraform (TK-098); no se crean a mano.
-   3. **Seguimiento de clics desactivado** en el correo transaccional (*Transactional* → *Settings*): si no, Brevo reescribe el enlace de validación, con su *token*, a través de su servidor.
+   3. **Seguimiento de clics:** Brevo no permite desactivarlo en el correo transaccional (solo a petición o en el plan Enterprise). **Se acepta como riesgo** (ver la decisión de TK-096). Si el panel ofrece seguimiento **anonimizado** (*Transactional* → *Settings*), se activa.
    4. Clave SMTP propia (no la de la API) y su usuario, guardados solo en Parameter Store, desde una terminal y nunca en ficheros ni en el chat:
 
       ```bash
@@ -297,7 +297,7 @@ El dominio `entrevecinos.org` sigue **registrado en Dinahosting** (renovación a
 | `mail.entrevecinos.org` | `MX` | `10 feedback-smtp.eu-north-1.amazonses.com` | MAIL FROM (rebotes) |
 | `mail.entrevecinos.org` | `TXT` | `v=spf1 include:amazonses.com -all` | SPF del MAIL FROM |
 | `brevo1._domainkey`, `brevo2._domainkey` | `CNAME` | `b1`/`b2.entrevecinos-org.dkim.brevo.com` | DKIM de Brevo (`d=entrevecinos.org`, alineado con DMARC estricto) |
-| `send`, `r.send`, `img.send` | `CNAME` | `send-entrevecinos-org.{brand,r.brand,img.brand}.brevosend.com` | Dominio de marca de Brevo (envío y rebotes; los dos últimos solo sirven con el seguimiento, desactivado). Prefijo `send`: `mail` es el MAIL FROM de SES |
+| `send`, `r.send`, `img.send` | `CNAME` | `send-entrevecinos-org.{brand,r.brand,img.brand}.brevosend.com` | Dominio de marca de Brevo (envío y rebotes; `r.send` lleva la redirección del seguimiento de clics y `img.send`, el de aperturas). Prefijo `send`: `mail` es el MAIL FROM de SES |
 | `entrevecinos.org`, `www.entrevecinos.org` | `A` y `AAAA` alias | Distribución de CloudFront (`modules/edge`) | Web; `www` redirige a la raíz |
 
 Los alias no tienen TTL propio y siguen a la distribución si se recrea. TTL de 300 s durante la puesta en marcha; se subirá a 3600 (`dns_ttl`) cuando esté estable.
@@ -704,8 +704,8 @@ Las entradas siguientes amplían cada decisión (qué, por qué, impacto, mitiga
   | Scaleway TEM | 300 al mes | 0,25 € por 1.000 | En la UE, pero otra cuenta cloud y poco margen gratuito |
 
   Descartados: Mailjet (logo en el plan gratuito), SMTP2GO, Mailgun, Postmark y SendGrid (sin plan gratuito o con menos margen).
-- **Impacto:** una cuenta y unas credenciales fuera de AWS y de Terraform (alta, clave SMTP e IP autorizadas); límite de 300 correos al día; el plan gratuito puede añadir un pie de Brevo (se acepta por ahora); la instancia necesita salida SMTP (puerto 587) y una IP fija autorizada en Brevo.
-- **Mitigaciones:** credenciales solo en Parameter Store y por entorno; dominio autenticado con DKIM alineado (DMARC estricto); seguimiento de clics desactivado; alarma de fallos de envío (TK-097) y límite propio de envíos por coste (TK-099).
+- **Impacto:** una cuenta y unas credenciales fuera de AWS y de Terraform (alta, clave SMTP e IP autorizadas); límite de 300 correos al día; el plan gratuito puede añadir un pie de Brevo (se acepta por ahora); **Brevo reescribe los enlaces del correo para su seguimiento de clics y no permite desactivarlo** (solo a petición o en Enterprise): el enlace de validación, con su *token*, pasa por su redirección (`r.send.entrevecinos.org`) y queda en sus registros. **Riesgo aceptado** el 2026-11-06: el *token* es de un solo uso y caduca en 24 horas, Brevo es encargado del tratamiento (DPA) y la alternativa (cambiar de proveedor) se descartó; la instancia necesita salida SMTP (puerto 587) y una IP fija autorizada en Brevo.
+- **Mitigaciones:** credenciales solo en Parameter Store y por entorno; dominio autenticado con DKIM alineado (DMARC estricto); alarma de fallos de envío (TK-097) y límite propio de envíos por coste (TK-099).
 - **Cuándo revisarla:** si AWS activa el acceso de producción de SES, si el volumen supera el plan gratuito o si la marca del pie molesta.
 - **Evolución:** volver a SES cuando tenga acceso de producción (solo configuración: variables del Compose, `make tf-apply` y despliegue) o pasar al plan de pago de Brevo.
 

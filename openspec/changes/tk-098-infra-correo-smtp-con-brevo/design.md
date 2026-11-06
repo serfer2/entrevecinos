@@ -20,4 +20,5 @@ TK-096 dejó la cuenta de Brevo, las credenciales en Parameter Store y los 7 reg
 
 - **Salida 587 a cualquier destino** (Brevo no publica rangos): solo la API tiene la red `egress`.
 - **La IP pública cambia una vez** al asociar la IP elástica, y CloudFront cambia de origen en el mismo `apply`.
+- **Seguimiento de clics de Brevo:** reescribe el enlace de validación (con su *token*) y no se puede desactivar en el plan gratuito; riesgo aceptado (TK-096): *token* de un solo uso con caducidad de 24 horas y Brevo como encargado con DPA.
 - **IP autorizadas fuera de Terraform:** si la IP cambiara, el correo fallaría hasta actualizar Brevo.

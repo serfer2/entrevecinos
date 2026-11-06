@@ -31,12 +31,12 @@ Brevo solo acepta envíos por SMTP y por la API desde las IP que se le autorizan
   | DKIM 2 | CNAME | `brevo2._domainkey` | `b2.entrevecinos-org.dkim.brevo.com` | Nuevo |
   | DMARC | TXT | `_dmarc` | Brevo propone `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com` | **Se combina con el actual** sin perder `adkim` ni `aspf`: `v=DMARC1; p=none; adkim=s; aspf=r; rua=mailto:rua@dmarc.brevo.com`. Los informes agregados no llevan datos personales |
   | Marca | CNAME | `send` | `send-entrevecinos-org.brand.brevosend.com` | Nuevo. Dominio de envío y rebotes con la marca del proyecto |
-  | Redirección | CNAME | `r.send` | `send-entrevecinos-org.r.brand.brevosend.com` | Nuevo; solo sirve con el seguimiento de clics, que se desactiva (ver abajo) |
-  | Imágenes | CNAME | `img.send` | `send-entrevecinos-org.img.brand.brevosend.com` | Nuevo; solo sirve con el seguimiento de aperturas |
+  | Redirección | CNAME | `r.send` | `send-entrevecinos-org.r.brand.brevosend.com` | Nuevo; redirección del seguimiento de clics (ver abajo) |
+  | Imágenes | CNAME | `img.send` | `send-entrevecinos-org.img.brand.brevosend.com` | Nuevo; seguimiento de aperturas |
 
   - **Prefijo `send`, nunca `mail`:** `mail.entrevecinos.org` es el `MAIL FROM` de SES, con sus registros MX y SPF, y un CNAME no puede convivir con otros registros en el mismo nombre. Brevo los generó primero con `mail` y se cambiaron a `send` (confirmado el 2026-11-06).
   - **SPF:** la raíz mantiene `v=spf1 -all`. Brevo no pide SPF: DMARC pasa por DKIM alineado y los rebotes van al dominio con marca.
-  - **Seguimiento de clics desactivado** en el correo transaccional de Brevo: si no, reescribiría el enlace de validación, con su *token*, a través de su servidor de redirección (el mismo motivo por el que TK-091 lo quitó de los registros).
+  - **Seguimiento de clics:** Brevo no permite desactivarlo en el correo transaccional (solo a petición o en Enterprise). Se acepta como riesgo (decisión del 2026-11-06, ver TK-096): el enlace de validación pasa por `r.send.entrevecinos.org`. Si el panel ofrece seguimiento anonimizado, se activa.
 - **Secretos:**
   - `/entrevecinos/prod/smtp/username` y `/entrevecinos/prod/smtp/password` (`SecureString`), creados a mano con `aws ssm put-parameter` (Terraform no conoce los valores; así no quedan en el estado);
   - `deploy.sh` los lee en la misma llamada que el resto y los exporta solo por entorno;
@@ -102,7 +102,7 @@ Brevo solo acepta envíos por SMTP y por la API desde las IP que se le autorizan
 
 ## 5. Plan de tareas
 
-1. Registros DNS de Brevo en Terraform; seguimiento de clics desactivado en Brevo.
+1. Registros DNS de Brevo en Terraform; seguimiento anonimizado en Brevo si está disponible.
 2. Parámetros de las credenciales; `deploy.sh` y Compose de producción.
 3. IP elástica y regla de salida 587; IP autorizada en Brevo.
 4. `make tf-lint`, `make shellcheck`, `make tf-plan`, `make tf-apply` y despliegue.
