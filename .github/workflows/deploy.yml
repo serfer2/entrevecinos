@@ -1,0 +1,229 @@
+# Despliegue continuo en producción (TK-090): cada push a main pasa las comprobaciones de CI,
+# publica las imágenes del commit en ECR, las despliega con el documento de SSM entrevecinos-deploy
+# y comprueba la URL pública. workflow_dispatch vuelve a desplegar main o un commit anterior de main.
+#
+# Credenciales: la clave del usuario de CI (secretos del entorno production, limitado a main) solo
+# asume el rol entrevecinos-github-deploy (TK-088); el plan de AWS del proyecto no admite OIDC.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit de main que desplegar (vacío = el último). Sus imágenes se reutilizan si ya existen.
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# Nunca dos despliegues a la vez: una ejecución nueva espera a que termine la anterior (no la
+# cancela). Si llegan varias mientras tanto, solo queda pendiente la más reciente.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+env:
+  PUBLIC_URL: https://entrevecinos.org
+
+jobs:
+  checks:
+    # Un commit anterior ya pasó CI al fusionarse; solo se comprueba lo nuevo.
+    if: inputs.sha == ''
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: checks
+    if: ${{ !cancelled() && (needs.checks.result == 'success' || needs.checks.result == 'skipped') }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    environment: production
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+      api-digest: ${{ steps.digests.outputs.api }}
+      web-digest: ${{ steps.digests.outputs.web }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Commit de main
+        id: commit
+        env:
+          REQUESTED: ${{ inputs.sha }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          # workflow_dispatch: solo commits ya fusionados en main, nunca de otras ramas.
+          if [[ -n $REQUESTED ]] && ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$REQUESTED no está en main."
+            exit 1
+          fi
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+          echo "tag=${sha:0:12}" >>"$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-external-id: ${{ vars.AWS_DEPLOY_ROLE_EXTERNAL_ID }}
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+
+      - name: Acceso a ECR
+        id: ecr
+        env:
+          ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          account="$(cut -d: -f5 <<<"$ROLE_ARN")"
+          registry="$account.dkr.ecr.$AWS_REGION.amazonaws.com"
+          aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
+          echo "registry=$registry" >>"$GITHUB_OUTPUT"
+
+      # Las etiquetas de ECR son inmutables: si el commit ya se publicó, se reutiliza su imagen.
+      - name: Imágenes ya publicadas
+        id: existing
+        env:
+          TAG: ${{ steps.commit.outputs.tag }}
+        run: |
+          for service in api web; do
+            digest="$(aws ecr batch-get-image --repository-name "entrevecinos/$service" \
+              --image-ids imageTag="$TAG" --query 'images[0].imageId.imageDigest' --output text)"
+            [[ $digest == sha256:* ]] || digest=""
+            echo "$service=$digest" >>"$GITHUB_OUTPUT"
+          done
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: steps.existing.outputs.api == '' || steps.existing.outputs.web == ''
+
+      - name: Imagen api
+        id: api
+        if: steps.existing.outputs.api == ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: apps/api
+          target: prod
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: ${{ steps.ecr.outputs.registry }}/entrevecinos/api:${{ steps.commit.outputs.tag }}
+          build-contexts: |
+            python:3.12-slim=docker-image://public.ecr.aws/docker/library/python:3.12-slim
+          cache-from: type=gha,scope=api
+
+      - name: Imagen web
+        id: web
+        if: steps.existing.outputs.web == ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: apps/web
+          target: prod
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: ${{ steps.ecr.outputs.registry }}/entrevecinos/web:${{ steps.commit.outputs.tag }}
+          build-args: NEXT_PUBLIC_API_BASE_URL=http://api:8000/v1
+          build-contexts: |
+            node:22-alpine=docker-image://public.ecr.aws/docker/library/node:22-alpine
+          cache-from: type=gha,scope=web
+
+      - name: Digests
+        id: digests
+        env:
+          API: ${{ steps.existing.outputs.api || steps.api.outputs.digest }}
+          WEB: ${{ steps.existing.outputs.web || steps.web.outputs.digest }}
+          TAG: ${{ steps.commit.outputs.tag }}
+        run: |
+          pattern='^sha256:[a-f0-9]{64}$'
+          [[ $API =~ $pattern && $WEB =~ $pattern ]] || { echo "::error::Digests no válidos"; exit 1; }
+          echo "api=$API" >>"$GITHUB_OUTPUT"
+          echo "web=$WEB" >>"$GITHUB_OUTPUT"
+          {
+            echo "### Imágenes ($TAG)"
+            echo "| Servicio | Digest |"
+            echo "|---|---|"
+            echo "| api | \`$API\` |"
+            echo "| web | \`$WEB\` |"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Cerrar sesión en ECR
+        if: always()
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: docker logout "$REGISTRY" || true
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: production
+    steps:
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-external-id: ${{ vars.AWS_DEPLOY_ROLE_EXTERNAL_ID }}
+          role-duration-seconds: 3600
+          role-skip-session-tagging: true
+
+      # deploy.sh migra, arranca, comprueba la salud y, si falla, vuelve a los digests anteriores y
+      # termina con error: el comando de SSM queda Failed y este paso también.
+      - name: entrevecinos-deploy en la instancia
+        env:
+          INSTANCE_ID: ${{ vars.DEPLOY_INSTANCE_ID }}
+          API_DIGEST: ${{ needs.publish.outputs.api-digest }}
+          WEB_DIGEST: ${{ needs.publish.outputs.web-digest }}
+          SHA: ${{ needs.publish.outputs.sha }}
+        run: |
+          command_id="$(aws ssm send-command --document-name entrevecinos-deploy \
+            --instance-ids "$INSTANCE_ID" \
+            --parameters "ApiDigest=$API_DIGEST,WebDigest=$WEB_DIGEST" \
+            --comment "GitHub Actions ${SHA:0:12} (run $GITHUB_RUN_ID)" \
+            --cloud-watch-output-config CloudWatchOutputEnabled=true,CloudWatchLogGroupName=/entrevecinos/prod/app/deploy \
+            --query Command.CommandId --output text)"
+          echo "Comando $command_id"
+          status=Pending
+          for _ in $(seq 1 120); do
+            status="$(aws ssm get-command-invocation --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)"
+            case $status in Success | Failed | Cancelled | TimedOut) break ;; esac
+            sleep 10
+          done
+          echo "::group::Salida de deploy.sh"
+          aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+            --query '[StandardOutputContent, StandardErrorContent]' --output text
+          echo "::endgroup::"
+          echo "### Despliegue: $status (comando \`$command_id\`)" >>"$GITHUB_STEP_SUMMARY"
+          [[ $status == Success ]] || { echo "::error::El despliegue ha terminado en $status; producción sigue con los digests anteriores."; exit 1; }
+
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: La web responde por HTTPS con las cabeceras de producción
+        run: |
+          check() {
+            local root login hsts
+            root="$(curl -s -o /dev/null -w '%{http_code}' "$PUBLIC_URL/")"
+            login="$(curl -s -o /dev/null -w '%{http_code}' "$PUBLIC_URL/iniciar-sesion")"
+            hsts="$(curl -sI "$PUBLIC_URL/iniciar-sesion" | grep -ci '^strict-transport-security:' || true)"
+            echo "/: $root, /iniciar-sesion: $login, HSTS: $hsts"
+            [[ $root =~ ^(200|307|308)$ && $login == 200 && $hsts -ge 1 ]]
+          }
+          for _ in $(seq 1 12); do
+            if check; then
+              echo "### Smoke test: correcto ($PUBLIC_URL)" >>"$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "### Smoke test: fallido ($PUBLIC_URL)" >>"$GITHUB_STEP_SUMMARY"
+          exit 1

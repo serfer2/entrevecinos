@@ -1,5 +1,5 @@
-# Comprobaciones de cada pull request y de main (TK-089). Las mismas órdenes que en local
-# (AGENTS.md, Makefile). El despliegue (TK-090) lo reutiliza con workflow_call.
+# Comprobaciones de cada pull request (TK-089). Las mismas órdenes que en local (AGENTS.md,
+# Makefile). En main las ejecuta el despliegue (deploy.yml, TK-090) con workflow_call.
 #
 # Seguridad: solo lectura, acciones fijadas por SHA y ningún secreto ni acceso a AWS.
 name: CI
@@ -8,16 +8,16 @@ on:
   pull_request:
     # labeled/unlabeled: la etiqueta sin-cambios-en-doc-infra vuelve a evaluar docs-infra.
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  push:
-    branches: [main]
   workflow_call:
 
 permissions:
   contents: read
 
+# En pull requests, una ejecución nueva cancela la anterior. Llamado desde el despliegue, nunca:
+# cancelaría las comprobaciones de un despliegue en curso.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   api:

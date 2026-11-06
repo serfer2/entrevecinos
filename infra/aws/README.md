@@ -26,7 +26,8 @@ infra/aws/
 ├── .tflint.hcl         reglas de tflint
 └── .checkov.yaml       comprobaciones de checkov omitidas, con su motivo
 infra/docker-compose.prod.yml   Compose de producción: proxy, web, api y db (TK-086)
-.github/workflows/ci.yml        comprobaciones de cada pull request y de main (TK-089)
+.github/workflows/ci.yml        comprobaciones de cada pull request (TK-089)
+.github/workflows/deploy.yml    despliegue continuo en cada fusión a main (TK-090)
 .github/dependabot.yml          actualizaciones semanales de dependencias (TK-089)
 infra/prod/             ficheros que se copian a la instancia (TK-082, TK-086)
 ├── deploy.sh           despliegue: secretos, migraciones, salud y vuelta atrás
@@ -106,7 +107,7 @@ Las migraciones deben ser compatibles con la versión anterior de la API (*expan
 
 ### Despliegue manual
 
-Hasta TK-090 (GitHub Actions) se construye y despliega desde el equipo. La instancia es `arm64`; en un equipo `amd64` hace falta la emulación de QEMU (en Ubuntu, `sudo apt-get install qemu-user-static`; comprobar con `docker buildx inspect --bootstrap`, que debe listar `linux/arm64`).
+Lo habitual es el despliegue continuo (ver «Despliegue continuo»). Para desplegar desde el equipo (p. ej., si GitHub Actions no está disponible): La instancia es `arm64`; en un equipo `amd64` hace falta la emulación de QEMU (en Ubuntu, `sudo apt-get install qemu-user-static`; comprobar con `docker buildx inspect --bootstrap`, que debe listar `linux/arm64`).
 
 ```bash
 registry=995006761619.dkr.ecr.eu-north-1.amazonaws.com
@@ -180,13 +181,30 @@ Uso en un *workflow* (TK-090), en un *job* con `environment: production`:
     role-skip-session-tagging: true   # el usuario no tiene sts:TagSession
 ```
 
+`deploy.yml` lo usa en los trabajos `publish` y `deploy`.
+
 **Rotación cada 90 días** (como mucho dos claves a la vez): crear una nueva y actualizar los secretos con la orden anterior, comprobar que un despliegue funciona y borrar la antigua (`aws iam list-access-keys` y `aws iam delete-access-key --access-key-id <antigua>`). **Si se filtra:** `aws iam update-access-key --user-name entrevecinos-github-actions --access-key-id <id> --status Inactive` y crear otra.
 
-*Pendiente: TK-090* (despliegue continuo desde GitHub Actions).
+### Despliegue continuo (TK-090)
+
+Cada fusión en `main` llega sola a producción con `.github/workflows/deploy.yml` (*workflow* `Deploy`):
+
+| Trabajo | Qué hace |
+|---|---|
+| `checks` | Reutiliza `ci.yml` (las comprobaciones de los *pull requests*); si falla, no se publica nada |
+| `publish` | Entorno `production`. Asume `entrevecinos-github-deploy`, construye `api` y `web` (`prod`, `linux/arm64`, *runner* arm64) y las sube a ECR con la etiqueta de los 12 primeros caracteres del commit. Si la etiqueta ya existe (ECR es inmutable), reutiliza la imagen. Resumen con los *digests* |
+| `deploy` | Entorno `production`. Lanza `entrevecinos-deploy` con los *digests*, espera el resultado (hasta 20 min), muestra la salida de `deploy.sh` y falla si no es `Success`; si `deploy.sh` volvió atrás, producción sigue con la versión anterior |
+| `smoke` | `https://entrevecinos.org/` (`200`/`307`/`308`) y `/iniciar-sesion` (`200` con `Strict-Transport-Security`), con reintentos durante 2 minutos |
+
+- **Un despliegue cada vez:** `concurrency: production` sin cancelación. Una fusión que llega durante un despliegue espera; si llegan varias, GitHub deja pendiente solo la más reciente (que incluye las anteriores).
+- **Volver a desplegar:** *Actions → Deploy → Run workflow* sobre `main`. Con el campo `sha`, despliega un commit anterior **de `main`** (los demás se rechazan) sin repetir las comprobaciones; si sus imágenes ya están en ECR, se reutilizan. Así se vuelve a una versión anterior a mano.
+- **Seguimiento:** el resumen de cada ejecución muestra las imágenes y el resultado; la salida completa de `deploy.sh` está en el registro de `deploy` y en `/entrevecinos/prod/app/deploy`.
+- **Fallo de `smoke`:** no vuelve atrás (la instancia ya comprobó salud y origen); revisar CloudFront y DNS.
+- **Cambios de Terraform** (incluido el Compose o `infra/prod/`, que viajan en el documento de SSM): `make tf-apply` a mano **antes** de fusionar; el *workflow* nunca aplica infraestructura.
 
 ## Integración continua
 
-`.github/workflows/ci.yml` (*workflow* `CI`) se ejecuta en cada *pull request*, en cada `push` a `main` y como `workflow_call` (el despliegue de TK-090 lo reutiliza). Cinco trabajos en paralelo, con las mismas órdenes que en local:
+`.github/workflows/ci.yml` (*workflow* `CI`) se ejecuta en cada *pull request* y como `workflow_call`: en `main` lo ejecuta el despliegue (`deploy.yml`, TK-090), una sola vez. Cinco trabajos en paralelo, con las mismas órdenes que en local:
 
 | Trabajo | Qué hace | Local |
 |---|---|---|
@@ -196,7 +214,7 @@ Uso en un *workflow* (TK-090), en un *job* con `environment: production`:
 | `images` | etapas `prod` de `api` y `web` para `linux/arm64` en *runners* arm64 nativos, con caché de GitHub Actions; no publica | — |
 | `docs-infra` | solo en *pull requests*: falla si cambian `infra/aws/**`, `infra/prod/**`, `infra/docker-compose.prod.yml` o `.github/workflows/**` sin `infra/aws/README.md`, salvo con la etiqueta `sin-cambios-en-doc-infra` | — |
 
-- **Seguridad:** `permissions: contents: read`, acciones fijadas por SHA (versión en comentario; Dependabot las actualiza), `persist-credentials: false`, sin secretos ni acceso a AWS. Solo el *token* automático de solo lectura, para que tflint descargue su *plugin*. Una ejecución nueva de la misma rama cancela la anterior.
+- **Seguridad:** `permissions: contents: read`, acciones fijadas por SHA (versión en comentario; Dependabot las actualiza), `persist-credentials: false`, sin secretos ni acceso a AWS. Solo el *token* automático de solo lectura, para que tflint descargue su *plugin*. En un *pull request*, una ejecución nueva cancela la anterior; dentro del despliegue, nunca.
 - **Dependabot** (`.github/dependabot.yml`): `github-actions`, `uv`, `npm`, `docker`, `docker-compose` y `terraform`, cada semana.
 - **Coste:** 0; el repositorio es público (minutos ilimitados, también en `ubuntu-24.04-arm`).
 
@@ -430,6 +448,15 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Impacto:** sin `terraform plan` en los *pull requests* (los cambios de infraestructura se revisan con el `plan` local); `ci-web` no monta el código, así que construye la imagen `dev` en cada ejecución.
 - **Cuándo revisarla:** si el repositorio pasa a privado (minutos de pago, sobre todo arm64) o si hace falta `plan` automático.
 - **Evolución:** `plan` en *pull requests* con OIDC y un rol de lectura cuando el plan de AWS lo permita (TK-088).
+
+### Despliegue continuo por SSM desde GitHub Actions (TK-090)
+
+- **Qué:** cada fusión en `main` pasa CI, publica las imágenes por commit y despliega con el documento de SSM de TK-086; sin aprobación manual.
+- **Por qué:** sin SSH ni puertos abiertos, con el mismo `deploy.sh` (migraciones, salud y vuelta atrás) que el despliegue manual, y con credenciales de 1 hora de un rol que solo puede publicar imágenes y lanzar ese documento.
+- **Impacto:** cada fusión corta el servicio unos segundos; las imágenes se construyen dos veces (comprobación y publicación, con caché); los cambios de Terraform siguen siendo manuales y deben aplicarse antes de fusionar.
+- **Mitigaciones:** `main` protegida (TK-089), un despliegue cada vez, vuelta atrás automática y redespliegue de cualquier commit anterior de `main`.
+- **Cuándo revisarla:** con más personas con permiso de escritura (activar *Required reviewers* en el entorno) o cuando el corte de cada despliegue moleste.
+- **Evolución:** OIDC (TK-088), despliegue *blue/green* detrás del proxy y `plan`/`apply` de Terraform en CI con un rol propio.
 
 ### Excepciones de checkov
 
