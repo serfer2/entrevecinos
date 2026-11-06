@@ -9,6 +9,8 @@
 | **Depende de** | TK-084, TK-086 |
 | **Referencias** | `readme.md` §2.4 («DNS + CDN + WAF, HTTPS»), §2.5 (cifrado del tráfico, CORS); `apps/web/next.config.ts` (HSTS en producción); `apps/web/src/features/auth/session.ts` (cookie `Secure`) |
 
+> **Implementado sin WAF.** La política de control de servicios del plan FREE de AWS deniega el plan gratuito de CloudFront (`pricingplanmanager:*`), así que no hay WAF: los límites de peticiones por IP los aplica el proxy nginx (`429`). El resto del ticket se implementó como se describe. Decisión y alternativas: `infra/aws/README.md`, «CloudFront sin WAF y con origen HTTP (TK-087)».
+
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.
 
 ## 1. Contexto y objetivo

@@ -5,9 +5,11 @@
 #   deploy.sh <digest de api> <digest de web>      # sha256:<64 hex>
 #
 # 1. Credenciales de ECR con el rol de la instancia (credential helper: ningún token en disco).
-# 2. Secretos de Parameter Store solo al entorno de este proceso: ni .env ni ficheros temporales.
+# 2. Secretos de Parameter Store (también las credenciales SMTP de Brevo) solo al entorno de este
+#    proceso: ni .env ni ficheros temporales.
 # 3. PostgreSQL en marcha y roles al día (aplica también las contraseñas rotadas).
-# 4. Migraciones como entrevecinos_owner.
+# 4. Si hay migraciones pendientes, copia previa con backup.sh (TK-092); después, las migraciones
+#    como entrevecinos_owner.
 # 5. Servicios nuevos, healthy y respondiendo por el proxy; si no, vuelta a los digests anteriores
 #    (sin deshacer migraciones) y error.
 # 6. Digests guardados, temporizador de copias instalado e imágenes antiguas eliminadas.
@@ -23,7 +25,7 @@ readonly registry=995006761619.dkr.ecr.eu-north-1.amazonaws.com
 readonly digest_pattern='^sha256:[a-f0-9]{64}$'
 readonly wait_timeout="${WAIT_TIMEOUT:-240}"
 readonly secret_vars=(JWT_SECRET POSTGRES_PASSWORD ENTREVECINOS_OWNER_PASSWORD
-  ENTREVECINOS_APP_PASSWORD ORIGIN_VERIFY DATABASE_URL)
+  ENTREVECINOS_APP_PASSWORD ORIGIN_VERIFY SMTP_USERNAME SMTP_PASSWORD DATABASE_URL)
 
 export AWS_REGION=eu-north-1
 # El agente de SSM no siempre define HOME: la configuración de Docker, siempre la de root.
@@ -51,7 +53,7 @@ load_secrets() {
   local name value
   # Se exportan a docker compose, que los interpola en el Compose (${VAR:?}).
   export JWT_SECRET ORIGIN_VERIFY POSTGRES_PASSWORD ENTREVECINOS_OWNER_PASSWORD \
-    ENTREVECINOS_APP_PASSWORD
+    ENTREVECINOS_APP_PASSWORD SMTP_USERNAME SMTP_PASSWORD
   # Una sola llamada; los valores llegan por una tubería y solo quedan en variables.
   while IFS=$'\t' read -r name value; do
     case "$name" in
@@ -60,16 +62,20 @@ load_secrets() {
       /entrevecinos/prod/db/postgres-password) POSTGRES_PASSWORD="$value" ;;
       /entrevecinos/prod/db/owner-password) ENTREVECINOS_OWNER_PASSWORD="$value" ;;
       /entrevecinos/prod/db/app-password) ENTREVECINOS_APP_PASSWORD="$value" ;;
+      # Credenciales SMTP de Brevo (TK-098), creadas a mano: no las conoce Terraform.
+      /entrevecinos/prod/smtp/username) SMTP_USERNAME="$value" ;;
+      /entrevecinos/prod/smtp/password) SMTP_PASSWORD="$value" ;;
     esac
   done < <(aws ssm get-parameters --with-decryption --output text \
     --query 'Parameters[].[Name,Value]' --names \
     /entrevecinos/prod/jwt-secret /entrevecinos/prod/origin-verify \
     /entrevecinos/prod/db/postgres-password /entrevecinos/prod/db/owner-password \
-    /entrevecinos/prod/db/app-password)
+    /entrevecinos/prod/db/app-password /entrevecinos/prod/smtp/username \
+    /entrevecinos/prod/smtp/password)
 
   local var
   for var in JWT_SECRET ORIGIN_VERIFY POSTGRES_PASSWORD ENTREVECINOS_OWNER_PASSWORD \
-    ENTREVECINOS_APP_PASSWORD; do
+    ENTREVECINOS_APP_PASSWORD SMTP_USERNAME SMTP_PASSWORD; do
     [[ -n ${!var:-} ]] || fail "falta el parámetro de $var en Parameter Store"
   done
 }
@@ -120,6 +126,19 @@ rollback() {
   fail "el despliegue ha fallado; se han restaurado los digests anteriores"
 }
 
+# Copia antes de migrar (TK-092): solo si la base ya tiene esquema y hay migraciones pendientes
+# (`alembic current` de la imagen nueva no marca «(head)»). Si la copia falla, no se migra.
+backup_before_migrations() {
+  local current
+  current="$(compose run --rm --no-deps -T -e DATABASE_URL api alembic current 2>/dev/null)"
+  if [[ -z $current || $current == *"(head)"* ]]; then
+    echo "Sin migraciones pendientes sobre una base existente: no hace falta copia previa"
+    return
+  fi
+  BACKUP_BUCKET=entrevecinos-backups-995006761619 "$app_dir/prod/backup.sh" ||
+    fail "la copia previa a las migraciones ha fallado; no se ha migrado ni desplegado"
+}
+
 install_backups() {
   # Configuración no secreta de backup.sh; la contraseña la lee el propio script.
   printf 'BACKUP_BUCKET=entrevecinos-backups-995006761619\nAWS_REGION=%s\n' "$AWS_REGION" \
@@ -145,6 +164,7 @@ compose exec -T db bash /docker-entrypoint-initdb.d/10-roles.sh
 log "Migraciones"
 DATABASE_URL="postgresql+psycopg://entrevecinos_owner:${ENTREVECINOS_OWNER_PASSWORD}@db:5432/entrevecinos"
 export DATABASE_URL
+backup_before_migrations
 compose run --rm --no-deps -T -e DATABASE_URL api alembic upgrade head
 unset DATABASE_URL
 

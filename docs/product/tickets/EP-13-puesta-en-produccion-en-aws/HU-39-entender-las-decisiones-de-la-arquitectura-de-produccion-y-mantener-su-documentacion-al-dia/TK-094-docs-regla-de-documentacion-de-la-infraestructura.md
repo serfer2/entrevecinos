@@ -91,8 +91,8 @@ En GitHub (interfaz web): un *pull request* de prueba que toca `infra/aws/` sin 
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] Cambios revisados y fusionados mediante *pull request*.
+- [x] Los criterios de aceptación se cumplen (AC3 y AC4, con la comprobación de CI de TK-089).
+- [x] Cambios revisados y fusionados mediante *pull request* (#6).
 
 ## 8. Riesgos y decisiones abiertas
 

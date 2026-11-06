@@ -13,13 +13,15 @@ resource "aws_route53_zone" "this" {
   }
 }
 
-# La raíz no envía correo: el de la aplicación sale con el MAIL FROM mail.<dominio> (modules/mail).
+# Route 53 admite un solo conjunto TXT por nombre: el SPF de la raíz y los códigos de verificación
+# de otros servicios (Brevo, TK-098) van en el mismo registro. La raíz no envía correo con su propio
+# sobre: SES usa el MAIL FROM mail.<dominio> (modules/mail) y Brevo, send.<dominio>.
 resource "aws_route53_record" "spf" {
   zone_id = aws_route53_zone.this.zone_id
   name    = var.domain
   type    = "TXT"
   ttl     = var.dns_ttl
-  records = ["v=spf1 -all"]
+  records = concat(["v=spf1 -all"], var.root_txt_records)
 }
 
 # DMARC en observación (p=none); endurecer a quarantine y reject tras unas semanas sin fallos.
@@ -28,7 +30,7 @@ resource "aws_route53_record" "dmarc" {
   name    = "_dmarc.${var.domain}"
   type    = "TXT"
   ttl     = var.dns_ttl
-  records = ["v=DMARC1; p=none; adkim=s; aspf=r"]
+  records = [join("; ", concat(["v=DMARC1", "p=none", "adkim=s", "aspf=r"], [for a in var.dmarc_rua : "rua=mailto:${a}"]))]
 }
 
 # Solo Amazon emite certificados del dominio, y ninguno comodín.

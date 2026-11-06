@@ -16,13 +16,14 @@ infra/aws/
 │   ├── budget/         presupuesto mensual con avisos (TK-078)
 │   ├── compute/        instancia EC2 endurecida, su rol, Session Manager y Patch Manager (TK-085);
 │   │                   documento de despliegue, logs de los contenedores y cabecera de origen (TK-086)
+│   ├── observability/  agente de CloudWatch, alarmas con aviso por correo, filtros y panel (TK-091)
 │   ├── network/        VPC, subred pública, grupo de seguridad y flow logs (TK-079)
 │   ├── storage/        repositorios ECR y bucket de imágenes (TK-080)
 │   ├── database/       volumen de PostgreSQL, snapshots, bucket de copias y contraseñas (TK-082)
 │   ├── domain/         zona de Route 53, políticas de correo y certificado HTTPS (TK-084)
 │   ├── edge/           CloudFront, redirección de www, registros de acceso y alias (TK-087)
 │   ├── ci/             usuario y rol de despliegue de GitHub Actions (TK-088)
-│   └── mail/           SES (configuration set, dominio con DKIM y MAIL FROM) y secreto de los JWT (TK-083, TK-084)
+│   └── mail/           SES (configuration set, dominio con DKIM y MAIL FROM), registros de Brevo y secreto de los JWT (TK-083, TK-084, TK-098)
 ├── .tflint.hcl         reglas de tflint
 └── .checkov.yaml       comprobaciones de checkov omitidas, con su motivo
 infra/docker-compose.prod.yml   Compose de producción: proxy, web, api y db (TK-086)
@@ -34,7 +35,8 @@ infra/prod/             ficheros que se copian a la instancia (TK-082, TK-086)
 ├── proxy/              nginx: exige la cabecera de origen de CloudFront
 ├── initdb/10-roles.sh  roles de PostgreSQL
 ├── backup.sh           copia de PostgreSQL a S3
-└── systemd/            servicio y temporizador de las copias
+├── restore.sh          restauración de una copia, de ensayo o de producción (TK-092)
+└── systemd/            servicio y temporizador de las copias (registro en /var/log/entrevecinos/backup.log)
 ```
 
 Versiones fijadas: Terraform 1.16.7 (`>= 1.11` en el código), proveedor `hashicorp/aws` `~> 6.70.0` y `hashicorp/random` `~> 3.9`, con `.terraform.lock.hcl` versionado para Linux y macOS (amd64 y arm64). Todo se ejecuta en contenedores con `make`:
@@ -45,6 +47,7 @@ Versiones fijadas: Terraform 1.16.7 (`>= 1.11` en el código), proveedor `hashic
 | `make tf-init` | Inicializa `envs/prod` con el estado en S3 |
 | `make tf-plan` / `make tf-apply` | Muestra o aplica los cambios con `prod.tfvars` (`apply` pide confirmación) |
 | `make tf-output` | Muestra las salidas |
+| `make tf ARGS="…"` | Cualquier otra orden de Terraform sobre `envs/prod` (`state list`, `import`…; ver «Recuperación») |
 | `make tf-lint` | `terraform fmt` y `validate`, tflint y checkov; no necesita credenciales |
 
 Las credenciales temporales de `aws login` se pasan al contenedor por entorno (`aws configure export-credentials`), sin escribirlas en disco. Recursos de CloudFront que AWS gestiona desde `us-east-1` (certificado, distribución y registros de acceso) usan el proveedor `aws.us_east_1`; el resto, `eu-north-1`. Todos llevan las etiquetas `Project = entrevecinos`, `Environment = prod` y `ManagedBy = terraform`.
@@ -55,11 +58,24 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
 
 1. **Límite de gasto (manual, antes que nada).** El propietario del proyecto fija **40 € al mes** en AWS Settings > Billing > *Spend limit*. Si el panel solo admite USD, se usa el equivalente redondeado hacia abajo y se anota en «Costes». Al alcanzarlo, AWS pausa el proyecto (las operaciones fallan con `AccessDenied` y la web puede caer).
 2. **Estado de Terraform:** `make tf-bootstrap` crea `entrevecinos-tfstate-995006761619` (privado, cifrado, versionado). Su estado queda en `infra/aws/bootstrap/terraform.tfstate`, fuera del repositorio: consérvalo.
-3. **Variables:** `cp infra/aws/envs/prod/prod.tfvars.example infra/aws/envs/prod/prod.tfvars` y ajusta el correo de avisos, el importe del presupuesto y los destinatarios de prueba de SES.
+3. **Variables:** `cp infra/aws/envs/prod/prod.tfvars.example infra/aws/envs/prod/prod.tfvars` (no se versiona) y ajusta:
+
+   | Variable | Para qué | Por defecto |
+   |---|---|---|
+   | `alert_email` | Avisos del presupuesto y de las alarmas | — (obligatoria) |
+   | `monthly_budget_usd` | Presupuesto mensual, equivalente al límite de gasto | `44` |
+   | `availability_zone` | Zona de la subred, la instancia y el volumen de datos | `eu-north-1a` |
+   | `admin_role_arns` | Roles que pueden borrar copias de la base | — (obligatoria) |
+   | `ses_test_recipients` | Destinatarios verificados mientras SES esté en *sandbox* | `[]` |
+   | `db_password_version`, `jwt_secret_version`, `origin_verify_version` | Subirlas rota el secreto (ver «Secretos») | `1` |
+   | `wait_for_certificate_validation` | `true` cuando el dominio ya esté delegado en Route 53 | `false` |
+
+   Salidas útiles (`make tf-output`): `instance_id` (`DEPLOY_INSTANCE_ID` de GitHub), `name_servers` (delegación), `distribution_id`, `ecr_repository_urls`, `backups_bucket`, `media_bucket`, `github_user`, `github_deploy_role_arn`, `github_deploy_external_id` y `alerts_topic_arn`.
 4. **Infraestructura:** `make tf-init`, `make tf-plan` y `make tf-apply`. Un segundo `make tf-plan` no debe mostrar cambios.
 5. **Pasos manuales tras el `apply`:**
    - cada destinatario de `ses_test_recipients` recibe un correo de AWS y debe pulsar el enlace de verificación;
    - los avisos de AWS Budgets llegan directamente al correo configurado (no necesitan confirmación);
+   - **correo «AWS Notification - Subscription Confirmation»** (tema `entrevecinos-prod-alerts`): pulsa *Confirm subscription* o no llegará ninguna alarma (TK-091);
    - **delegación del dominio** en Dinahosting (ver «DNS»), y después `wait_for_certificate_validation = true` en `prod.tfvars` y otro `make tf-apply`.
 6. **Salida del *sandbox* de SES**, cuando `https://entrevecinos.org` ya responda (TK-087):
 
@@ -71,7 +87,23 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
    aws sesv2 get-account --profile entrevecinos --query '{prod:ProductionAccessEnabled,review:Details.ReviewDetails}'
    ```
 
-   `--contact-language` solo admite `EN` o `JA`, y la descripción va en inglés. Mientras AWS no la apruebe, SES solo envía a direcciones verificadas y como máximo 200 correos al día. Solicitada el 2026-11-06 (TK-087): revisión `GRANTED`.
+   `--contact-language` solo admite `EN` o `JA`, y la descripción va en inglés. Mientras AWS no la apruebe, SES solo envía a direcciones verificadas y como máximo 200 correos al día.
+
+   **Estado real (2026-11-06):** solicitada en TK-087. `get-account` muestra la revisión `GRANTED`, pero `ProductionAccessEnabled` sigue en `false` y la cuota en 200 al día. **SES sigue en *sandbox***: solo entrega a direcciones verificadas, así que los vecinos no pueden validar su cuenta. Por eso el correo de producción pasa a **Brevo** por SMTP (TK-096; ver «Decisiones de arquitectura»). SES se conserva configurado como vuelta atrás.
+
+   **Alta en Brevo** (manual, TK-096; la integración es TK-098):
+
+   1. Cuenta en el plan gratuito con el correo del proyecto y envío transaccional (SMTP) activado.
+   2. Dominio `entrevecinos.org` en *Senders, domains & dedicated IPs*, con el prefijo de marca **`send`** (nunca `mail`, que es el `MAIL FROM` de SES). Brevo da 7 registros DNS que crea Terraform (TK-098); no se crean a mano.
+   3. **Seguimiento de clics:** Brevo no permite desactivarlo en el correo transaccional (solo a petición o en el plan Enterprise). **Se acepta como riesgo** (ver la decisión de TK-096). Si el panel ofrece seguimiento **anonimizado** (*Transactional* → *Settings*), se activa.
+   4. Clave SMTP propia (no la de la API) y su usuario, guardados solo en Parameter Store, desde una terminal y nunca en ficheros ni en el chat:
+
+      ```bash
+      aws ssm put-parameter --profile entrevecinos --type SecureString --name /entrevecinos/prod/smtp/username --value '<usuario SMTP>'
+      aws ssm put-parameter --profile entrevecinos --type SecureString --name /entrevecinos/prod/smtp/password --value '<clave SMTP>'
+      ```
+
+   5. IP autorizadas: la IP elástica de la instancia (`make tf-output`, TK-098).
 
 7. **Primer despliegue** de la aplicación: ver «Despliegue». El mismo `make tf-apply` crea CloudFront y los alias de la web (ver «Web pública»), sin pasos en consola.
 8. **Acceso de GitHub Actions** (manual en GitHub): entorno `production`, clave del usuario de CI y variables; ver «Acceso de GitHub Actions».
@@ -89,7 +121,7 @@ La instancia ejecuta `infra/docker-compose.prod.yml` con cuatro servicios: `prox
 
 - **Proxy de origen:** responde `403` a toda petición sin la cabecera `X-Origin-Verify` con el valor de `/entrevecinos/prod/origin-verify` (la añade CloudFront, TK-087) y la quita antes de reenviar a la web. Identifica al visitante por el último valor de `X-Forwarded-For` (lo añade CloudFront; el visitante no puede falsearlo) y limita por IP con `limit_req`: 4 `POST` por minuto con ráfaga de 10 a `/iniciar-sesion` y `/registro` (≈ 20 en 5 minutos) y 5 peticiones por segundo con ráfaga de 100 en general, con `429`. Su registro de accesos lleva la IP del visitante. nginx lee la plantilla solo al arrancar: `deploy.sh` pone su huella en la etiqueta `org.entrevecinos.proxy-config`, así que cambiarla recrea el proxy en el siguiente despliegue.
 - **Contenedores endurecidos:** `proxy`, `web` y `api` sin *root*, con el sistema de ficheros de solo lectura (`tmpfs` donde hace falta), sin capacidades, con `no-new-privileges`, límites de memoria, CPU y procesos, y sin el socket de Docker. `db` mantiene solo las capacidades que usa la imagen oficial.
-- **Logs** con el *driver* `awslogs` en `/entrevecinos/prod/app/{proxy,web,api,db}`, y la salida de cada despliegue en `/entrevecinos/prod/app/deploy` (30 días).
+- **Logs** con el *driver* `awslogs` en `/entrevecinos/prod/app/{proxy,web,api,db}` (14 días), y la salida de cada despliegue en `/entrevecinos/prod/app/deploy` (30 días). El proxy registra la ruta sin la cadena de consulta (el enlace de validación del correo lleva el *token* en `?token=`).
 
 ### Cómo se despliega
 
@@ -257,19 +289,22 @@ El dominio `entrevecinos.org` sigue **registrado en Dinahosting** (renovación a
 
 | Nombre | Tipo | Valor | Para qué |
 |---|---|---|---|
-| `entrevecinos.org` | `TXT` | `v=spf1 -all` | La raíz no envía correo |
-| `_dmarc.entrevecinos.org` | `TXT` | `v=DMARC1; p=none; adkim=s; aspf=r` | DMARC en observación |
+| `entrevecinos.org` | `TXT` | `v=spf1 -all` y `brevo-code:63e65be7…` (un solo conjunto: Route 53 no admite dos por nombre) | La raíz no envía correo con su propio sobre; verificación del dominio en Brevo (TK-098) |
+| `_dmarc.entrevecinos.org` | `TXT` | `v=DMARC1; p=none; adkim=s; aspf=r; rua=mailto:rua@dmarc.brevo.com` | DMARC en observación; informes agregados a Brevo |
 | `entrevecinos.org` | `CAA` | `amazon.com`, `amazontrust.com`, `awstrust.com`, `amazonaws.com` e `issuewild ";"` | Solo Amazon emite certificados; ningún comodín |
 | `_<hash>.entrevecinos.org`, `_<hash>.www.entrevecinos.org` | `CNAME` | Validación de ACM | Emisión y renovación del certificado |
 | `<token>._domainkey.entrevecinos.org` (×3) | `CNAME` | `<token>.dkim.amazonses.com` | DKIM de SES |
 | `mail.entrevecinos.org` | `MX` | `10 feedback-smtp.eu-north-1.amazonses.com` | MAIL FROM (rebotes) |
 | `mail.entrevecinos.org` | `TXT` | `v=spf1 include:amazonses.com -all` | SPF del MAIL FROM |
+| `brevo1._domainkey`, `brevo2._domainkey` | `CNAME` | `b1`/`b2.entrevecinos-org.dkim.brevo.com` | DKIM de Brevo (`d=entrevecinos.org`, alineado con DMARC estricto) |
+| `send`, `r.send`, `img.send` | `CNAME` | `send-entrevecinos-org.{brand,r.brand,img.brand}.brevosend.com` | Dominio de marca de Brevo (envío y rebotes; `r.send` lleva la redirección del seguimiento de clics y `img.send`, el de aperturas). Prefijo `send`: `mail` es el MAIL FROM de SES |
 | `entrevecinos.org`, `www.entrevecinos.org` | `A` y `AAAA` alias | Distribución de CloudFront (`modules/edge`) | Web; `www` redirige a la raíz |
 
 Los alias no tienen TTL propio y siguen a la distribución si se recrea. TTL de 300 s durante la puesta en marcha; se subirá a 3600 (`dns_ttl`) cuando esté estable.
 
 - **Certificado:** ACM en `us-east-1` (lo exige CloudFront) para `entrevecinos.org` y `www.entrevecinos.org`, validado por DNS. Se renueva solo mientras existan sus registros.
-- **Correo:** identidad de dominio de SES con Easy DKIM RSA 2048 y el *configuration set* `entrevecinos-prod`; MAIL FROM `mail.entrevecinos.org`. Remitente de producción: `MAIL_FROM="EntreVecinos <no-reply@entrevecinos.org>"` (lo fija el Compose de producción, TK-086). Nadie lee las respuestas: no hay `MX` en la raíz.
+- **Correo de producción:** Brevo por SMTP (TK-096, TK-098), con los registros de la tabla en `modules/mail/brevo.tf` y `modules/domain` (valores en `envs/prod/main.tf`, dados por Brevo).
+- **SES (vuelta atrás):** identidad de dominio de SES con Easy DKIM RSA 2048 y el *configuration set* `entrevecinos-prod`; MAIL FROM `mail.entrevecinos.org`. Remitente de producción: `MAIL_FROM="EntreVecinos <no-reply@entrevecinos.org>"` (lo fija el Compose de producción, TK-086). Nadie lee las respuestas: no hay `MX` en la raíz.
 
 **Delegación desde Dinahosting** (una sola vez):
 
@@ -304,6 +339,7 @@ Todos los secretos viven en SSM Parameter Store como `SecureString` (nivel está
 | `/entrevecinos/prod/db/app-password` | `entrevecinos_app` (la API) | TK-082 |
 | `/entrevecinos/prod/db/{host,port,name}` | Conexión (`String`, no secretos): `db`, `5432`, `entrevecinos` | TK-082 |
 | `/entrevecinos/prod/origin-verify` | Cabecera `X-Origin-Verify` entre CloudFront y el proxy (48 caracteres) | TK-086 |
+| `/entrevecinos/prod/smtp/username`, `/entrevecinos/prod/smtp/password` | Usuario y clave SMTP de Brevo. **Creados a mano** (`aws ssm put-parameter`, ver «Puesta en marcha», paso 6): Terraform no los conoce ni los guarda | TK-096, TK-098 |
 
 - Los valores (salvo `origin-verify`) se generan con `ephemeral "random_password"` y se escriben con argumentos de solo escritura (`value_wo`): **no quedan en el estado de Terraform**.
 - No tienen rotación automática. Para rotar: sube `jwt_secret_version` o `db_password_version` en `prod.tfvars`, `make tf-apply` y vuelve a desplegar (TK-086 aplica las contraseñas nuevas a PostgreSQL y recrea los contenedores). Rotar el secreto de los JWT invalida todas las sesiones.
@@ -323,6 +359,9 @@ Todos los secretos viven en SSM Parameter Store como `SecureString` (nivel está
 
 Una sola instancia `entrevecinos-prod-app` (`t4g.small`, arm64, Amazon Linux 2023) en `eu-north-1a`, con IP pública y el grupo de seguridad que solo admite HTTP desde CloudFront. Ejecuta Docker Compose (TK-086).
 
+- **IP pública fija** (TK-098): IP elástica `entrevecinos-prod-app` (`make tf-output` → `instance_public_ip`), con `prevent_destroy`. Es la única IP autorizada en Brevo y el origen de CloudFront usa su nombre DNS. Cuesta lo mismo que la IP automática anterior. **Si cambia** (p. ej. al recrear el entorno), hay que actualizar las IP autorizadas de Brevo o el correo dejará de salir.
+- **Salida:** HTTPS (443) hacia los servicios de AWS y SMTP con STARTTLS (587) hacia Brevo; nada más.
+
 - **Acceso solo con Session Manager:** sin par de claves, sin puerto 22 y con `sshd` desactivado. Cada sesión queda registrada en `/entrevecinos/prod/ssm-sessions` (30 días); se cierra tras 20 minutos inactiva y dura como máximo 60.
 
   ```bash
@@ -331,17 +370,17 @@ Una sola instancia `entrevecinos-prod-app` (`t4g.small`, arm64, Amazon Linux 202
 
   Necesita el [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) en el equipo. Sin él, se ejecutan comandos con Run Command (`aws ssm send-command --document-name AWS-RunShellScript …`) o se abre la sesión desde la consola de EC2 (*Connect* → *Session Manager*).
 - **Endurecimiento:** IMDSv2 obligatorio (*hop limit* 2, para que los contenedores obtengan las credenciales del rol), volumen raíz `gp3` de 20 GB cifrado, protección contra la terminación y créditos de CPU `standard` (sin cargos por exceso; si la CPU se agota, la instancia se ralentiza).
-- **Primer arranque** (`modules/compute/user-data.sh.tftpl`, registro en `/var/log/cloud-init-output.log`): actualiza el sistema e instala Docker (con `live-restore`, `no-new-privileges` y logs rotados), Compose v5.6.1 (con su SHA-256 comprobado), el agente de CloudWatch (se configura en TK-091) y `dnf-automatic`. Crea 1 GB de *swap*, el usuario `deploy` (sin *shell* ni grupo `docker`) y `/opt/entrevecinos` (750). Solo se ejecuta al crear la instancia: Terraform ignora sus cambios y los de la AMI.
+- **Primer arranque** (`modules/compute/user-data.sh.tftpl`, registro en `/var/log/cloud-init-output.log`): actualiza el sistema e instala Docker (con `live-restore`, `no-new-privileges` y logs rotados), Compose v5.6.1 (con su SHA-256 comprobado), el agente de CloudWatch (lo configura State Manager, ver «Observabilidad y alertas») y `dnf-automatic`. Crea 1 GB de *swap*, el usuario `deploy` (sin *shell* ni grupo `docker`) y `/opt/entrevecinos` (750). Solo se ejecuta al crear la instancia: Terraform ignora sus cambios y los de la AMI.
 - **Volumen de datos** de TK-082 adjunto y montado por UUID en `/srv/entrevecinos/postgres` (XFS, `nofail`). Se formatea solo si no tiene sistema de ficheros, y Docker no arranca si no está montado (`RequiresMountsFor`), así que PostgreSQL nunca escribe en el volumen raíz.
 - **Parches:** `dnf-automatic` aplica a diario los de seguridad, y Patch Manager (`AWS-RunPatchBaseline`, `Install`) todos los domingos a las 04:00 UTC, reiniciando si hace falta (corte de minutos). Estado: `aws ssm describe-instance-patch-states --instance-ids <id> --profile entrevecinos`.
-- **Recuperación:** la alarma `entrevecinos-prod-app-recover` recupera la instancia (mismo ID, IP y volúmenes) si falla el *status check* del sistema.
+- **Recuperación:** la alarma `entrevecinos-prod-app-recover` recupera la instancia (mismo ID, IP y volúmenes) si falla el *status check* del sistema; `entrevecinos-prod-instance-down` avisa por correo (TK-091).
 - **Rol `entrevecinos-prod-app`** (mínimo privilegio, validado con IAM Access Analyzer): `AmazonSSMManagedInstanceCore` y una política propia que permite:
   - `PutObject` y `GetObject` en el bucket de imágenes, y en `postgres/` del de copias (sin borrar);
   - `ses:SendEmail` con la identidad del dominio, el *configuration set* y, mientras haya *sandbox*, los destinatarios de prueba, solo con remitente `no-reply@entrevecinos.org`;
   - leer los parámetros de `/entrevecinos/prod/`. `AmazonSSMManagedInstanceCore` concede `ssm:GetParameter(s)` sobre `*`, así que la política deniega expresamente cualquier otro parámetro de la cuenta (solo quedan además los públicos de AWS, `/aws/*`);
   - descargar imágenes de los dos repositorios de ECR;
   - escribir en los grupos de logs `/entrevecinos/prod/app/*` y de sesiones, y publicar métricas en `Entrevecinos/Backup` y `CWAgent`.
-- **Reemplazar la instancia** (nueva AMI, cambio de *user data*): procedimiento en TK-093.
+- **Reemplazar la instancia** tras perderla o cambiar de zona: ver «Recuperación», procedimiento 3. Nueva AMI o cambio de *user data* sin pérdida: ver «Runbook».
 
 ### Aplicación (TK-086)
 
@@ -377,24 +416,298 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Copias con `pg_dump`** cada 6 horas (`entrevecinos-backup.timer` a las 00, 06, 12 y 18 UTC): `backup.sh` sube la copia en *streaming* a `s3://entrevecinos-backups-995006761619/postgres/AAAA/MM/DD/`, comprueba su tamaño y que `pg_restore --list` la lee, y publica la métrica `Entrevecinos/Backup BackupSucceeded`. Se conservan 30 días.
 - **Snapshots** diarios del volumen a las 03:00 UTC con Data Lifecycle Manager; se conservan 7.
 - **Copias protegidas:** la política del bucket deniega el borrado a todos salvo a los roles de `admin_role_arns`; la instancia solo escribe y lee.
-- Copia a demanda (p. ej. antes de una migración destructiva): `sudo systemctl start entrevecinos-backup.service` en la instancia.
-- `deploy.sh` instala el script y el temporizador en cada despliegue (`/opt/entrevecinos/prod/backup.sh`). El script localiza el contenedor `db` con `docker` (por sus etiquetas de Compose), así que no necesita los secretos del despliegue.
+- **Copia antes de migrar:** `deploy.sh` ejecuta `backup.sh` antes de las migraciones si hay alguna pendiente (TK-092); si la copia falla, no migra ni despliega. A demanda: `sudo systemctl start entrevecinos-backup.service` en la instancia.
+- `deploy.sh` instala los scripts y el temporizador en cada despliegue (`/opt/entrevecinos/prod/backup.sh` y `restore.sh`). El script localiza el contenedor `db` con `docker` (por sus etiquetas de Compose), así que no necesita los secretos del despliegue.
 
-*Pendiente: TK-091 a TK-093* (registros, alarmas, restauración probada y *runbook*).
+### Recuperación (TK-092)
+
+**Objetivos del MVP:** **RPO 6 horas** (la última copia de `pg_dump`; los *snapshots* diarios no lo mejoran) y **RTO 4 horas**. Se ensaya cada 3 meses (ver «Registro de ensayos»).
+
+| Qué hay | Frecuencia | Se conserva | Dónde |
+|---|---|---|---|
+| `pg_dump` (`backup.sh`) | cada 6 h y antes de migrar | 30 días | `s3://entrevecinos-backups-995006761619/postgres/AAAA/MM/DD/` |
+| *Snapshot* del volumen de datos | diario, 03:00 UTC | 7 | EC2 → *Snapshots*, etiqueta `Name = entrevecinos-prod-postgres` |
+| Versiones anteriores de las imágenes | cada cambio o borrado | 30 días | bucket `entrevecinos-media-995006761619` |
+
+**`restore.sh`** (en la instancia, como *root*: `sudo -i` en Session Manager):
+
+```bash
+aws s3 ls s3://entrevecinos-backups-995006761619/postgres/ --recursive --profile entrevecinos | tail -3   # copias recientes
+/opt/entrevecinos/prod/restore.sh postgres/<AAAA/MM/DD>/<copia>.dump                     # ensayo en entrevecinos_restore
+/opt/entrevecinos/prod/restore.sh --production --yes postgres/<AAAA/MM/DD>/<copia>.dump  # sustituye producción
+/opt/entrevecinos/prod/restore.sh --drop entrevecinos_restore                            # borra una base de ensayo o la anterior
+```
+
+Siempre restaura en una base nueva como `entrevecinos_owner`, aplica los permisos de `entrevecinos_app` y muestra los recuentos de `users`, `community`, `listing` y `media_asset` de la restaurada y de la actual; producción no cambia salvo con `--production --yes`. Con `--production`, además: copia previa de la base actual, API parada, `entrevecinos` → `entrevecinos_anterior_<fecha>`, la restaurada → `entrevecinos` y API arrancada (corte de segundos). La base anterior se conserva para volver atrás (el mismo cambio de nombre al revés) y se borra a mano. Solo admite bases `entrevecinos_*`.
+
+Consultas en una base restaurada:
+
+```bash
+docker exec -it "$(docker ps -q --filter label=com.docker.compose.service=db)" \
+  psql -U postgres -d entrevecinos_restore -c 'SELECT count(*) FROM listing'
+```
+
+**1. Error de datos** (borrado o corrupción lógica, p. ej. un anuncio borrado por error):
+
+1. Elegir la última copia **anterior** al error (`aws s3 ls …`, la hora va en el nombre, UTC).
+2. Restaurarla en `entrevecinos_restore` y comprobar en ella los datos afectados.
+3. Si el error afecta a pocas filas, copiarlas a producción con `psql` (`\copy` de una base a otra) y borrar `entrevecinos_restore`. Si afecta a mucho, `restore.sh --production --yes <copia>`: se pierden los cambios posteriores a la copia (como mucho 6 horas).
+
+**2. Fallo del volumen de datos** (`db` no arranca, errores de E/S, `db-errors`):
+
+```bash
+P=--profile=entrevecinos
+SNAP=$(aws ec2 describe-snapshots $P --owner-ids self --filters Name=tag:Name,Values=entrevecinos-prod-postgres \
+  --query 'reverse(sort_by(Snapshots,&StartTime))[0].SnapshotId' --output text)
+NEW=$(aws ec2 create-volume $P --snapshot-id "$SNAP" --availability-zone eu-north-1a --volume-type gp3 --encrypted \
+  --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=entrevecinos-prod-postgres},{Key=Snapshot,Value=entrevecinos-postgres}]' \
+  --query VolumeId --output text)
+aws ec2 wait volume-available $P --volume-ids "$NEW"
+# Terraform pasa a gestionar el volumen nuevo; el dañado queda fuera (bórralo a mano cuando ya no haga falta).
+make tf ARGS="state rm module.database.aws_ebs_volume.postgres"
+make tf ARGS="import -var-file=prod.tfvars module.database.aws_ebs_volume.postgres $NEW"
+echo yes | make tf-apply     # reemplaza el adjunto: para la instancia, cambia el volumen y la arranca
+```
+
+Después, un despliegue (*Run workflow*) y, si hay una copia de `pg_dump` posterior al *snapshot*, `restore.sh --production --yes <copia>`. El montaje es por UUID: el volumen creado desde el *snapshot* lo conserva.
+
+**3. Pérdida de la instancia o cambio de zona:**
+
+- **Instancia perdida, misma zona:** `make tf-plan` muestra la instancia y el adjunto como nuevos; `make tf-apply` la crea, el *user data* monta el volumen existente (no lo formatea porque ya tiene sistema de ficheros) y un despliegue arranca la aplicación. El ID cambia: actualizar `DEPLOY_INSTANCE_ID` en el entorno `production` de GitHub.
+- **Otra zona** (fallo de la zona): crear el volumen desde el último *snapshot* en la zona nueva (procedimiento 2, con su `--availability-zone`), cambiar `availability_zone` en `prod.tfvars`, `state rm` + `import` del volumen nuevo y `make tf-apply` (crea la subred y la instancia en la zona nueva); después despliegue, `DEPLOY_INSTANCE_ID` y, si hace falta, `restore.sh --production --yes` con la última copia.
+
+**4. Imagen borrada** (versiones anteriores durante 30 días):
+
+```bash
+P=--profile=entrevecinos; B=entrevecinos-media-995006761619
+aws s3api list-object-versions $P --bucket $B --prefix <clave> \
+  --query '{versiones:Versions[].[VersionId,IsLatest,LastModified],borrados:DeleteMarkers[].[VersionId,IsLatest]}'
+# Si la última es un marcador de borrado, quitarlo devuelve la versión anterior:
+aws s3api delete-object $P --bucket $B --key <clave> --version-id <id del marcador>
+# Si se sobrescribió, copiar la versión buena encima:
+aws s3api copy-object $P --bucket $B --key <clave> --copy-source "$B/<clave>?versionId=<id>"
+```
+
+La clave está en `media_asset.object_key` (o en la ruta de la URL prefirmada de la imagen, sin la consulta).
+
+#### Registro de ensayos
+
+| Fecha | Ensayo | Copia o *snapshot* | Resultado | Tiempo | Incidencias |
+|---|---|---|---|---|---|
+| 2026-11-06 | 1. `restore.sh` en `entrevecinos_restore` (AC1) | `postgres/2026/11/06/20261106T130240Z.dump` | Correcto: `users` 1, `community` 1, `listing` 1, `media_asset` 2, igual que producción; base de ensayo borrada | 1 s de restauración, 10 s en total | Ninguna |
+| 2026-11-06 | 2. PostgreSQL sobre un volumen desde *snapshot* (AC2) | `snap-014026de9c3d67f8c` (03:23 UTC) | Correcto: recuperación del WAL y mismos recuentos; último usuario de las 00:03 UTC, anterior al *snapshot*; volumen borrado | 47 s hasta los datos | Primer intento con un error de la consulta de recuentos del guion de ensayo, no del procedimiento |
+| 2026-11-06 | 4. Imagen borrada (AC3) | `media/288d9b22-…/0cca8a82-….jpg` | Correcto: marcador de borrado quitado, mismo ETag | Segundos | Ninguna |
+
+Próximo ensayo: 2027-02 (cada 3 meses). Los guiones de ensayo lanzan los mismos pasos con Run Command desde el equipo; el procedimiento 3 (pérdida de la instancia) no se ensaya: recrea la instancia de producción.
+
+### Observabilidad y alertas (TK-091)
+
+Módulo `modules/observability`, todo en `eu-north-1`: la política de control de servicios del proyecto deniega SNS en `us-east-1`, y una alarma solo avisa a un tema de su región, así que las métricas de CloudFront (solo en `us-east-1`) quedan en el panel y los errores de la web se miden en el registro del proxy.
+
+**Registros** (retención corta para recortar costes):
+
+| Grupo | Origen | Retención |
+|---|---|---|
+| `/entrevecinos/prod/app/{proxy,web,api,db}` | contenedores (`awslogs`) | 14 días |
+| `/entrevecinos/prod/app/backup` | `/var/log/entrevecinos/backup.log` (agente de CloudWatch) | 14 días |
+| `/entrevecinos/prod/app/deploy` | salida de cada despliegue | 30 días |
+| `/entrevecinos/prod/ssm-sessions` | sesiones de Session Manager | 30 días |
+| `/entrevecinos/prod/vpc-flow-logs` (TK-079) y `/entrevecinos/prod/cloudfront` (`us-east-1`) | *flow logs* y accesos a la web | 7 días |
+
+Sin datos sensibles: la API solo registra el asunto de los correos y la clave de los objetos; el proxy, la ruta sin cadena de consulta; y CloudFront, los campos elegidos (`record_fields`), sin `cs-uri-query`, `cs(Cookie)` ni `cs(Referer)`.
+
+**Métricas del agente:** la configuración está en `/entrevecinos/prod/cloudwatch-agent` y la aplica la asociación de State Manager `entrevecinos-cloudwatch-agent` (`AmazonCloudWatch-ManageAgent`), que se vuelve a crear, y a aplicar, cuando cambia. Publica en `CWAgent`, con la dimensión `InstanceId`: `mem_used_percent`, `swap_used_percent` (cada minuto) y `disk_used_percent` de `/` y `/srv/entrevecinos/postgres` (`path`, `fstype` `xfs`; cada 5 minutos).
+
+**Filtros de métricas** (`Entrevecinos/Logs`): `DbErrors` (`PANIC`, y `FATAL` salvo los mensajes normales de un reinicio), `ApiErrors` (`ERROR:` de uvicorn y `Traceback` de `logger.exception`), `ProxyRequests` y `Proxy5xx` (todas las peticiones del proxy y las `5xx`) y `RateLimited` (`429` del proxy, solo en el panel).
+
+**Alarmas:** avisan por correo (tema `entrevecinos-prod-alerts`) al entrar en `ALARM` y al volver a `OK`. Umbrales iniciales; ajustarlos tras unas semanas si hay ruido.
+
+| Alarma (`entrevecinos-prod-…`) | Condición | Qué hacer |
+|---|---|---|
+| `instance-down` | `StatusCheckFailed` ≥ 1 durante 2 min (sin datos = alarma) | Si es del sistema, `…-app-recover` la recupera sola. Si no, *Instance screenshot* / `get-console-output` y reiniciar la instancia (`aws ec2 reboot-instances`) |
+| `cpu` | `CPUUtilization` > 80 % durante 15 min | `docker stats` en la instancia; buscar picos de tráfico (`RateLimited`, CloudFront) |
+| `cpu-credits` | `CPUCreditBalance` < 20 | La instancia bajará a su rendimiento base; si se repite, revisar la carga o subir de tamaño |
+| `memory` | `mem_used_percent` > 85 % durante 10 min | `docker stats`; reiniciar el contenedor que crece (`docker restart`) o revisar sus límites |
+| `disk-root` | `disk_used_percent` de `/` > 80 % | `docker system df` y `docker image prune -a` (deploy.sh ya borra las imágenes sin uso); `journalctl --vacuum-size=200M` |
+| `disk-data` | `disk_used_percent` del volumen de datos > 75 % | Ampliar el volumen (`aws ec2 modify-volume --size`) y `xfs_growfs /srv/entrevecinos/postgres` |
+| `backup-missing` | Ninguna `BackupSucceeded` en 7 h (sin datos = alarma) | `systemctl status entrevecinos-backup.service` y `/entrevecinos/prod/app/backup`; copia a demanda con `systemctl start entrevecinos-backup.service` |
+| `db-errors` | `FATAL` o `PANIC` en `/entrevecinos/prod/app/db` en 5 min | Leer el registro de `db`; contraseñas rotadas sin desplegar, disco lleno o corrupción (restaurar, TK-092) |
+| `api-errors` | > 10 errores en `/entrevecinos/prod/app/api` en 5 min | Leer las trazas; si empezó con un despliegue, redesplegar el commit anterior (ver «Despliegue continuo») |
+| `web-5xx` | `Proxy5xx` / `ProxyRequests` > 5 % en 5 min, con 10 peticiones o más | `docker ps` (¿web caída?) y `/entrevecinos/prod/app/{proxy,web}`. No ve un proxy caído (CloudFront responde `502` sin llegar a él): mirar `5xxErrorRate` de CloudFront en el panel |
+| `ses-bounces` / `ses-complaints` | `Reputation.BounceRate` > 5 % / `Reputation.ComplaintRate` > 0,1 % | Revisar los rebotes en SES; AWS revisa la cuenta (y puede pausar el envío) a partir del 5 % y del 0,1 % |
+
+```bash
+# Probar un aviso (llega un correo de ALARM y, en la siguiente evaluación, otro de OK)
+aws cloudwatch set-alarm-state --profile entrevecinos --alarm-name entrevecinos-prod-cpu \
+  --state-value ALARM --state-reason "Prueba de aviso"
+# Alarmas activas
+aws cloudwatch describe-alarms --profile entrevecinos --state-value ALARM --query 'MetricAlarms[].AlarmName'
+# Métricas del agente
+aws cloudwatch list-metrics --profile entrevecinos --namespace CWAgent --query 'Metrics[].[MetricName,Dimensions[?Name==`path`].Value|[0]]' --output text
+```
+
+**Panel** `entrevecinos-prod` (CloudWatch → *Dashboards*): estado de las alarmas, CPU y créditos, memoria y *swap*, discos, copias por hora, peticiones y errores de CloudFront (`us-east-1`), errores de la API, de PostgreSQL y `5xx` del proxy, rechazos `429` y SES.
+
+Sin monitorización externa: si la cuenta de AWS o CloudWatch fallan, no llega ningún aviso (ver «Decisiones»).
+
+### Runbook (TK-093)
+
+Órdenes para las tareas habituales. En la instancia, siempre en una sesión de Session Manager como *root* (`sudo -i`). Las operaciones que tocan producción se confirman antes con quien sea responsable.
+
+**Sesión de AWS.** `aws login --profile entrevecinos` abre el navegador y deja credenciales temporales que caducan (al cabo de unas horas, `Your session has expired`): basta con repetirlo. Si operaciones que antes funcionaban fallan de repente con `AccessDenied`, revisa en AWS Settings > *Billing* si se ha alcanzado el límite de gasto (pausa el proyecto) antes de tocar permisos.
+
+**Nombrar un `platform_admin`** (la cuenta ya registrada y validada):
+
+```bash
+docker exec "$(docker ps -q --filter label=com.docker.compose.service=db)" psql -U postgres -d entrevecinos \
+  -c "UPDATE users SET platform_role = 'platform_admin' WHERE email = '<correo>' RETURNING email, platform_role"
+```
+
+Para retirarlo, el mismo `UPDATE` con `'user'`. El cambio se aplica en la siguiente petición del usuario (la API comprueba el rol en cada una).
+
+**Desplegar un commit concreto o volver a una versión anterior:** *Actions → Deploy → Run workflow* con el SHA de un commit de `main` (ver «Despliegue continuo»). Si la versión anterior necesita un esquema anterior, no basta: las migraciones no se deshacen solas (*expand/contract*, ver «Cómo se despliega»).
+
+**Rotar secretos** (ver «Secretos»): subir la versión en `prod.tfvars`, `make tf-apply` y desplegar enseguida.
+
+| Secreto | Variable | Efecto |
+|---|---|---|
+| Clave de los JWT | `jwt_secret_version` | Cierra todas las sesiones |
+| Contraseñas de PostgreSQL | `db_password_version` | `deploy.sh` las aplica con `10-roles.sh` (`ALTER ROLE … PASSWORD`) y recrea `api` y `db` (segundos sin servicio) |
+| Cabecera de origen | `origin_verify_version` | El mismo `apply` cambia el parámetro y la cabecera de CloudFront: hasta que el despliegue recrea el proxy, la web responde `403` (minutos). Mejor con poco tráfico |
+
+**Actualizar PostgreSQL:**
+
+- **Versión menor** (`16.x`, sin cambio de formato): copia a demanda (`systemctl start entrevecinos-backup.service`), cambiar `image: postgres:16.<x>` en `infra/docker-compose.prod.yml`, `make tf-apply` y desplegar; `deploy.sh` recrea `db` (segundos sin servicio).
+- **Versión mayor** (p. ej. 17, formato de datos distinto): se hace con copia y restauración, no con `pg_upgrade`.
+  1. Copia a demanda y anotar su clave (`aws s3 ls … | tail -1`).
+  2. En el Compose, `image: postgres:17.<x>` y `PGDATA: /var/lib/postgresql/data/pgdata17` (directorio nuevo en el mismo volumen; el de la 16 queda intacto para volver atrás).
+  3. `make tf-apply` y desplegar: la imagen nueva inicializa un clúster vacío y crea los roles (`10-roles.sh`), y las migraciones crean el esquema vacío.
+  4. `restore.sh --production --yes <clave>` con la copia del paso 1 y comprobar la web.
+  5. Unos días después, borrar `pgdata` (el clúster de la 16) del volumen.
+
+  Para volver atrás: devolver la imagen y `PGDATA` del Compose, `make tf-apply` y desplegar.
+
+**Migrar a Amazon RDS** (cuando el proyecto escale; ver «Decisiones»):
+
+1. Crear RDS PostgreSQL en Terraform (subred privada, grupo de seguridad que solo admita la instancia, copias automáticas y PITR) y los roles con `10-roles.sh` contra el *endpoint*.
+2. Ventana de corte: parar la API, copia con `backup.sh`, `pg_restore` de esa copia en RDS como `entrevecinos_owner` (`aws s3 cp <copia> - | pg_restore -h <endpoint> …`).
+3. Cambiar `DATABASE_URL` en el Compose (o el parámetro `/entrevecinos/prod/db/host`) al *endpoint*, retirar el servicio `db`, `make tf-apply` y desplegar (minutos sin servicio).
+4. Adaptar `backup.sh` (o sustituirlo por las copias de RDS), la alarma `backup-missing` y esta guía.
+
+**Reemplazar la instancia sin perder datos** (nueva AMI de Amazon Linux o cambio del *user data*, que solo se aplica al crearla). El volumen de datos es aparte y se vuelve a adjuntar:
+
+```bash
+P=--profile=entrevecinos
+ID=$(make -s tf-output | sed -n 's/^instance_id = "\(.*\)"/\1/p')
+aws ec2 modify-instance-attribute $P --instance-id "$ID" --no-disable-api-termination   # protección contra la terminación
+make tf ARGS="apply -var-file=prod.tfvars -replace=module.compute.aws_instance.app"
+```
+
+Terraform separa el volumen (parando la instancia), destruye la instancia, crea otra con la última AMI y el *user data* actual, adjunta el volumen y actualiza CloudFront (nuevo origen), las alarmas y las asociaciones de State Manager. Después: `DEPLOY_INSTANCE_ID` en el entorno `production` de GitHub con el nuevo ID (`make -s tf-output`) y un despliegue (*Run workflow*). Unos 15 minutos sin servicio; la protección contra la terminación vuelve a activarse con la instancia nueva.
+
+**Correo (Brevo, TK-098):**
+
+- **Comprobar el envío:** un registro de prueba en la web y, en Brevo, *Transactional* → *Logs* (entregado, rebotado o bloqueado). En la API, `/entrevecinos/prod/app/api` muestra «No se pudo enviar el correo» si el servidor lo rechaza.
+- **Rotar la clave SMTP:** nueva clave en Brevo (*SMTP & API* → *SMTP*), `aws ssm put-parameter --overwrite --type SecureString --name /entrevecinos/prod/smtp/password --value '<clave>'` desde una terminal, desplegar y borrar la antigua en Brevo.
+- **La IP de salida cambia:** añadir la nueva en Brevo (IP autorizadas) antes de desplegar; con la IP elástica solo pasa al recrear el entorno.
+- **Volver a SES** (si tiene acceso de producción): en `infra/docker-compose.prod.yml`, `MAIL_BACKEND: ses`, `SES_REGION: eu-north-1` y `SES_CONFIGURATION_SET: entrevecinos-prod` en lugar de las variables `SMTP_*`; `make tf-apply` y desplegar. La identidad, DKIM y el MAIL FROM de SES siguen configurados.
+
+**Alarmas:** qué hacer con cada una, en «Observabilidad y alertas». **Restaurar copias, *snapshots* o imágenes:** «Recuperación».
 
 ## Costes
 
 - **Límite de gasto:** 40 €/mes en AWS Settings (manual, paso 1 de la puesta en marcha). Equivalente en USD anotado: **44 USD** (fijado el 2026-11-05).
 - **Presupuesto** `entrevecinos-mensual` en AWS Budgets, igual al límite (`monthly_budget_usd`, 44 USD): avisos por correo al 50 %, 75 % y 90 % del gasto real y al 100 % del previsto.
-- **Estimación** de la épica completa (sin alta disponibilidad, mientras el proyecto no escale): unos 20 USD/mes. Hasta TK-085 solo se pagan céntimos (S3, ECR, CloudWatch y el volumen de datos, ≈ 1 USD/mes) y la zona de Route 53 (0,50 USD/mes más las consultas; las de alias a CloudFront no se cobran).
-- **Instancia** (TK-085): `t4g.small` ≈ 12 USD/mes más el volumen raíz de 20 GB (≈ 1,6 USD/mes). Entra en la capa gratuita del plan FREE, así que se paga con los créditos. Con créditos de CPU `standard` no hay cargos por exceso.
+- **Plan FREE de AWS:** el gasto se descuenta de los créditos del plan (quedaban 119,36 USD el 2026-11-06) y la `t4g.small` entra en su capa gratuita; mientras duren, la factura es 0. Gasto bruto real del 1 al 6 de noviembre de 2026, sin créditos: 0,63 USD (0,50 de la zona de Route 53, 0,08 de la IPv4 pública y 0,05 de EBS).
+- **Estimación mensual a precio de lista** (sin alta disponibilidad, mientras el proyecto no escale; `eu-north-1`, tráfico del MVP):
 
-- **Logs de la aplicación** (TK-086): unos MB al día con el tráfico del MVP, dentro de los 5 GB de ingesta gratuitos al mes; 30 días de retención.
+  | Servicio | Qué se paga | USD/mes |
+  |---|---|---|
+  | EC2 (TK-085) | `t4g.small` (capa gratuita del plan FREE mientras dure) | ≈ 12 |
+  | IPv4 pública (TK-085) | 0,005 USD/hora | ≈ 3,7 |
+  | EBS (TK-082, TK-085) | 20 GB raíz y 10 GB de datos `gp3`, y 7 *snapshots* incrementales | ≈ 2,8 |
+  | Route 53 (TK-084) | zona alojada y consultas (las de alias a CloudFront no se cobran) | ≈ 0,5 |
+  | CloudWatch (TK-086, TK-091) | 14 métricas de alarma (10 gratuitas), registros dentro de los 5 GB gratuitos | ≈ 0,4 |
+  | S3 y ECR (TK-080, TK-082) | copias, imágenes de los anuncios y de los contenedores (pocos GB) | < 0,5 |
+  | CloudFront, SES, SNS, Parameter Store, KMS gestionada | capas gratuitas o céntimos | ≈ 0 |
+  | **Total** | | **≈ 20** |
+
+  Precios de lista consultados en noviembre de 2026; se revisan con el gasto real. Consulta del mes en curso por servicio, sin los créditos:
+
+  ```bash
+  aws ce get-cost-and-usage --profile entrevecinos --granularity MONTHLY --metrics UnblendedCost \
+    --time-period Start=$(date +%Y-%m-01),End=$(date -d tomorrow +%F) --group-by Type=DIMENSION,Key=SERVICE \
+    --filter '{"Not":{"Dimensions":{"Key":"RECORD_TYPE","Values":["Credit"]}}}' \
+    --query 'ResultsByTime[0].Groups[].[Keys[0],Metrics.UnblendedCost.Amount]' --output text
+  aws freetier get-account-plan-state --profile entrevecinos   # plan y créditos restantes
+  ```
+- **Instancia** (TK-085): con créditos de CPU `standard` no hay cargos por exceso.
+
+- **Logs de la aplicación** (TK-086): unos MB al día con el tráfico del MVP, dentro de los 5 GB de ingesta gratuitos al mes; 14 días de retención (30 los despliegues).
+- **Observabilidad** (TK-091): 13 alarmas con la de recuperación; `web-5xx` usa dos métricas y cuenta como dos, así que son 14 métricas de alarma (las 10 primeras gratuitas; ≈ 0,40 USD/mes el resto). Panel, filtros de métricas y tema SNS por correo, gratuitos; métricas del agente (4 series) y de los filtros, dentro de las 10 personalizadas gratuitas o céntimos.
+- **Correo** (TK-096): Brevo en el plan gratuito (300 correos al día, 0 USD); su plan de pago más barato cuesta ≈ 9 USD/mes por 5.000 correos. SES, conservado como vuelta atrás, no cuesta nada sin envíos.
 - **CloudFront** (TK-087): pago por uso, dentro de su capa gratuita permanente (1 TB y 10 millones de peticiones al mes) con el tráfico del MVP; Shield Standard incluido. Registros de acceso en CloudWatch Logs (`us-east-1`): céntimos al mes, 7 días de retención. Sin WAF: el plan Free de CloudFront no está disponible en el plan del proyecto y no se contrata una web ACL (≈ 10 USD/mes).
 
-*Pendiente: TK-093* (estimación por servicio con la infraestructura completa).
-
 ## Decisiones de arquitectura
+
+El `readme.md` §2.4 preveía contenedores gestionados detrás de un balanceador o API Gateway, PostgreSQL gestionado con alta disponibilidad, CDN con WAF y un gestor de secretos. Producción es distinta por **ahorro de costes mientras el proyecto no escale**, dentro del límite de 40 €/mes (TK-078). Resumen frente a lo previsto (costes aproximados a precio de lista, `eu-north-1`, noviembre de 2026; se revisan al dar cada paso de «Evolución»):
+
+| Área | Previsto en el `readme.md` | Elegido | Coste evitado | Riesgo aceptado | Entrada |
+|---|---|---|---|---|---|
+| Cómputo | Contenedores gestionados detrás de un balanceador o API Gateway | Una EC2 `t4g.small` con Docker Compose, sin balanceador | ≈ 30-40 USD/mes (ALB y Fargate) | Sin alta disponibilidad; web, API y base en el mismo host; parches del sistema a cargo del proyecto; cortes de segundos al desplegar | [TK-085](#instancia-única-endurecida-tk-085), [TK-086](#despliegue-por-ssm-con-secretos-solo-por-entorno-tk-086) |
+| Base de datos | PostgreSQL gestionado con alta disponibilidad, copias y PITR | PostgreSQL 16 en la instancia, volumen EBS propio, copias cada 6 h y *snapshots* | ≈ 15 USD/mes (RDS) | RPO de 6 h, sin conmutación por error, mantenimiento propio, base accesible si se compromete la instancia | [TK-082](#base-de-datos-en-la-instancia-tk-082), [TK-092](#restauración-en-una-base-nueva-con-cambio-de-nombre-tk-092) |
+| Protección web | CDN + WAF | CloudFront **sin WAF**; límites de peticiones por IP en nginx (el plan del proyecto no admite el plan gratuito de CloudFront) | ≈ 10 USD/mes (Web ACL) | Sin reglas gestionadas contra patrones maliciosos ni bots; los límites consumen CPU de la instancia | [TK-087](#cloudfront-sin-waf-y-con-origen-http-tk-087) |
+| DNS | DNS, sin detallar | Route 53 gestionado por Terraform, dominio en Dinahosting, sin DNSSEC | ≈ 1 USD/mes (clave KMS) | Zona sin firmar | [TK-084](#route-53-sin-dnssec-tk-084) |
+| Origen | — | CloudFront → instancia por HTTP, con cabecera secreta y la lista de prefijos de CloudFront | ≈ 0 (sin certificado de origen ni ALB) | Tramo CloudFront-origen sin cifrar | [TK-087](#cloudfront-sin-waf-y-con-origen-http-tk-087) |
+| Red | Red privada para la base de datos | Una subred pública sin NAT; la base solo en la red interna de Compose | ≈ 35 USD/mes (NAT) | IP pública en la instancia (solo admite tráfico de CloudFront) | [TK-079](#subred-pública-sin-nat-tk-079) |
+| Correo | Proveedor transaccional, sin detallar (SMTP en el `readme.md`) | Brevo por SMTP en el plan gratuito (300 al día); SES configurado como vuelta atrás | ≈ 0 (SES necesitaba salir del *sandbox* o pasar al plan de pago) | Dependencia de una cuenta externa, con su límite diario y la marca de Brevo en el plan gratuito | [TK-096](#correo-transaccional-con-brevo-en-lugar-de-ses-tk-096) |
+| Secretos | Gestor de secretos | Parameter Store `SecureString`, solo por entorno | ≈ 1,5 USD/mes (Secrets Manager) | Sin rotación gestionada; secretos visibles para *root* con `docker inspect` | [TK-083](#parameter-store-en-lugar-de-secrets-manager-tk-083), [TK-086](#despliegue-por-ssm-con-secretos-solo-por-entorno-tk-086) |
+
+Las entradas siguientes amplían cada decisión (qué, por qué, impacto, mitigaciones, cuándo revisarla y evolución) e incluyen otras que no estaban en el `readme.md` (CI/CD, alertas, restauración). Cada cambio de una decisión actualiza su entrada (regla de TK-094).
+
+### Subred pública sin NAT (TK-079)
+
+- **Qué:** una VPC con una sola subred pública para la instancia, con IP pública e Internet Gateway; sin subredes privadas ni NAT. PostgreSQL no está en una subred: solo existe en la red interna de Compose, sin puerto publicado. Endpoint *gateway* de S3 (gratuito) y *flow logs* del tráfico rechazado.
+- **Por qué:** **ahorro de costes mientras el proyecto no escale**: un NAT Gateway cuesta ≈ 35 USD/mes, casi el doble de todo lo demás, y con una sola instancia no hay nada que separar en subredes.
+- **Impacto:** la instancia tiene IP pública; si el grupo de seguridad se abriera por error, quedaría expuesta.
+- **Mitigaciones:** el grupo de seguridad solo admite HTTP desde la lista de prefijos de CloudFront y solo sale por HTTPS; el proxy exige la cabecera de origen; sin SSH; el grupo por defecto, sin reglas; *flow logs* de los rechazos.
+- **Cuándo revisarla:** al pasar a varias instancias o a ECS (paso 3 de «Evolución»).
+- **Evolución:** subredes privadas con orígenes VPC de CloudFront (paso 7).
+
+### Parameter Store en lugar de Secrets Manager (TK-083)
+
+- **Qué:** los secretos (contraseñas de PostgreSQL, clave de los JWT, cabecera de origen) en Parameter Store como `SecureString` de nivel estándar, cifrados con la clave gestionada `aws/ssm`.
+- **Por qué:** **ahorro de costes mientras el proyecto no escale**: el nivel estándar es gratuito; Secrets Manager cobra 0,40 USD/mes por secreto (≈ 1,5 USD/mes) y su ventaja, la rotación gestionada, solo sirve de verdad con RDS.
+- **Impacto:** la rotación es manual (subir la versión, `make tf-apply` y desplegar); sin historial de rotación ni rotación programada.
+- **Mitigaciones:** valores generados sin quedar en el estado de Terraform (salvo la cabecera de origen), solo por entorno (TK-086), lectura limitada al rol de la instancia y procedimiento de rotación en el *runbook*.
+- **Cuándo revisarla:** al migrar a RDS (contraseña gestionada por RDS en Secrets Manager) o si una norma exige rotación periódica.
+- **Evolución:** contraseña maestra de RDS gestionada en Secrets Manager; el resto puede seguir en Parameter Store.
+
+### Route 53 sin DNSSEC (TK-084)
+
+- **Qué:** el DNS de `entrevecinos.org` en una zona de Route 53 gestionada entera por Terraform; el dominio sigue registrado en Dinahosting. Sin DNSSEC ni registro de consultas.
+- **Por qué:** los registros de CloudFront (alias) y de SES viven junto al resto de la infraestructura y sin deriva; DNSSEC necesita una clave KMS en `us-east-1` (≈ 1 USD/mes) y el registro `DS` en Dinahosting, y se deja para cuando la infraestructura esté estable (**ahorro de costes mientras el proyecto no escale**).
+- **Impacto:** la zona no está firmada: un ataque de envenenamiento de la caché DNS no se detectaría.
+- **Mitigaciones:** HTTPS con HSTS en toda la web (un certificado falso no se aceptaría), CAA que solo permite a Amazon emitir certificados, y SPF, DKIM y DMARC en el correo.
+- **Cuándo revisarla:** en cuanto la infraestructura esté estable; no depende del tráfico.
+- **Evolución:** DNSSEC en Route 53 (paso 5).
+
+### Correo transaccional con Brevo en lugar de SES (TK-096)
+
+- **Qué:** el correo de la aplicación (validación de la cuenta y reenvío) sale por SMTP con Brevo, en su plan gratuito, en lugar de por SES. SES sigue configurado (identidad, DKIM, `MAIL FROM` y *configuration set*) como vuelta atrás.
+- **Por qué:** SES sigue en *sandbox* en `eu-north-1`. La revisión del acceso de producción figura como `GRANTED`, pero `ProductionAccessEnabled` es `false`, sin número de caso ni explicación en la documentación, y la cuenta está en el plan FREE. Salir del *sandbox* depende de un caso de soporte de plazo incierto o del plan de pago, y mientras tanto nadie puede validar su cuenta. Se compararon los proveedores con el coste como primer criterio y la integración como segundo:
+
+  | Proveedor | Gratis | Si se supera | Por qué |
+  |---|---|---|---|
+  | **Brevo** (elegido) | 300 al día | ≈ 9 USD/mes (5.000) | Mayor margen gratuito; empresa y datos en la UE; SMTP con STARTTLS |
+  | Resend | 100 al día | 20 USD/mes | Más sencillo, pero los datos de la cuenta se guardan en EE. UU. |
+  | Scaleway TEM | 300 al mes | 0,25 € por 1.000 | En la UE, pero otra cuenta cloud y poco margen gratuito |
+
+  Descartados: Mailjet (logo en el plan gratuito), SMTP2GO, Mailgun, Postmark y SendGrid (sin plan gratuito o con menos margen).
+- **Impacto:** una cuenta y unas credenciales fuera de AWS y de Terraform (alta, clave SMTP e IP autorizadas); límite de 300 correos al día; el plan gratuito puede añadir un pie de Brevo (se acepta por ahora); **Brevo reescribe los enlaces del correo para su seguimiento de clics y no permite desactivarlo** (solo a petición o en Enterprise): el enlace de validación, con su *token*, pasa por su redirección (`r.send.entrevecinos.org`) y queda en sus registros. **Riesgo aceptado** el 2026-11-06: el *token* es de un solo uso y caduca en 24 horas, Brevo es encargado del tratamiento (DPA) y la alternativa (cambiar de proveedor) se descartó; la instancia necesita salida SMTP (puerto 587) y una IP fija autorizada en Brevo.
+- **Mitigaciones:** credenciales solo en Parameter Store y por entorno; dominio autenticado con DKIM alineado (DMARC estricto); alarma de fallos de envío (TK-097) y límite propio de envíos por coste (TK-099).
+- **Cuándo revisarla:** si AWS activa el acceso de producción de SES, si el volumen supera el plan gratuito o si la marca del pie molesta.
+- **Evolución:** volver a SES cuando tenga acceso de producción (solo configuración: variables del Compose, `make tf-apply` y despliegue) o pasar al plan de pago de Brevo.
 
 ### Base de datos en la instancia (TK-082)
 
@@ -412,7 +725,7 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Impacto:** la seguridad del sistema operativo queda a cargo del proyecto (parches, acceso y permisos), y la web y la API comparten host y rol: un fallo en la web daría acceso a las credenciales de la API. Sin alta disponibilidad: un fallo de la instancia corta el servicio hasta que se recupera.
 - **Mitigaciones:** sin SSH (Session Manager con registro), IMDSv2, rol de mínimo privilegio, parches automáticos, recuperación automática y contenedores sin privilegios ni socket de Docker (TK-086).
 - **Cuándo revisarla:** CPU o memoria saturadas de forma sostenida, necesidad de más de una instancia o de separar web y API.
-- **Evolución:** ECS Fargate con ALB y una tarea por servicio (TK-095).
+- **Evolución:** ECS Fargate con ALB y una tarea por servicio (paso 3 de «Evolución»).
 
 ### Despliegue por SSM con secretos solo por entorno (TK-086)
 
@@ -458,16 +771,93 @@ PostgreSQL 16 corre como contenedor `db` en la instancia, con los datos en un vo
 - **Cuándo revisarla:** con más personas con permiso de escritura (activar *Required reviewers* en el entorno) o cuando el corte de cada despliegue moleste.
 - **Evolución:** OIDC (TK-088), despliegue *blue/green* detrás del proxy y `plan`/`apply` de Terraform en CI con un rol propio.
 
+### Alarmas por correo con CloudWatch, sin monitorización externa (TK-091)
+
+- **Qué:** alarmas de CloudWatch sobre las métricas de EC2, del agente, de las copias y de SES, y filtros de métricas sobre los registros (también la tasa de `5xx` del proxy), con aviso por correo desde SNS; el agente se configura con State Manager. Sin *canary* ni comprobación externa. El ticket preveía la alarma sobre `5xxErrorRate` de CloudFront con un tema SNS en `us-east-1`.
+- **Por qué:** sin alta disponibilidad, hay que enterarse de un fallo antes que los vecinos; con coste casi nulo (≈ 0,40 USD/mes) y sin tocar la instancia ni `deploy.sh`. La política de control de servicios deniega SNS en `us-east-1` y una alarma no avisa a temas de otra región, así que la tasa de errores sale del registro del proxy (con un mínimo de 10 peticiones, que además evita saltar por un solo error). El tema SNS no se cifra con KMS: CloudWatch no puede publicar con la clave gestionada `aws/sns`, una propia cuesta 1 USD/mes por región y los avisos solo llevan el nombre y el estado de la alarma.
+- **Impacto:** si falla la cuenta, la región o CloudWatch, no hay aviso; `web-5xx` no ve un proxy caído ni los errores de CloudFront; los umbrales son iniciales; la suscripción de correo se confirma a mano.
+- **Mitigaciones:** `instance-down` y `backup-missing` tratan la falta de datos como alarma; avisos también al volver a `OK`; *runbook* por alarma.
+- **Cuándo revisarla:** con usuarios que dependan de la web a diario, más de una persona de guardia o ruido de alertas.
+- **Evolución:** un *canary* de CloudWatch Synthetics (≈ 1-2 USD/mes) o un servicio externo gratuito de disponibilidad; avisos a un canal de chat; con el plan de pago, la alarma sobre `5xxErrorRate` de CloudFront en `us-east-1` (ver «Evolución», otras mejoras).
+
+### Restauración en una base nueva con cambio de nombre (TK-092)
+
+- **Qué:** `restore.sh` restaura siempre en una base nueva y, para producción, cambia los nombres (la actual pasa a `entrevecinos_anterior_<fecha>`), en lugar de `pg_restore --clean` sobre la base de producción; copia previa en cada restauración y antes de cada migración pendiente.
+- **Por qué:** la base anterior queda intacta para volver atrás al instante, el corte es de segundos y se evitan los fallos de `--clean` con el esquema `public` y la extensión `unaccent`.
+- **Impacto:** la base anterior ocupa el volumen de datos hasta que se borra a mano; RPO de 6 horas (TK-082) y copias en la misma cuenta y región.
+- **Mitigaciones:** alarma `disk-data` (TK-091), copias que la instancia no puede borrar (TK-082), *snapshots* diarios y ensayos cada 3 meses.
+- **Cuándo revisarla:** al migrar a RDS (recuperación a un punto en el tiempo) o si los datos no pueden perder 6 horas.
+- **Evolución:** S3 Object Lock en modo *governance* en el bucket de copias (también contra el borrado por error de un administrador) y, con el plan de pago, copias en otra cuenta (ver «Evolución», otras mejoras).
+
 ### Excepciones de checkov
 
-`.checkov.yaml` omite, con su motivo, las comprobaciones que chocan con decisiones de coste o con el plan del proyecto: claves KMS propias (≈ 1 USD/mes cada una; se usan las gestionadas por AWS), réplica entre regiones (no permitida), registro de accesos y notificaciones de S3, y retenciones de registros de un año. Las excepciones puntuales van en el propio recurso con `#checkov:skip`; entre ellas, DNSSEC y el registro de consultas de la zona de Route 53 (TK-084: DNSSEC necesita una clave KMS y se deja para la evolución), en la instancia la IP pública (sin NAT es su única salida) y la monitorización detallada (TK-085), y en CloudFront la restricción geográfica, el origen de respaldo y la política de cabeceras de respuesta (las pone Next.js), con los registros v2 que checkov no reconoce, y la falta de WAF (TK-087), y el usuario IAM con política propia de GitHub Actions (TK-088).
-
-*Pendiente: TK-095* (resto de decisiones frente a la arquitectura prevista en el `readme.md` §2.4).
+`.checkov.yaml` omite, con su motivo, las comprobaciones que chocan con decisiones de coste o con el plan del proyecto: claves KMS propias (≈ 1 USD/mes cada una; se usan las gestionadas por AWS), réplica entre regiones (no permitida), registro de accesos y notificaciones de S3, y retenciones de registros de un año. Las excepciones puntuales van en el propio recurso con `#checkov:skip`; entre ellas, DNSSEC y el registro de consultas de la zona de Route 53 (TK-084: DNSSEC necesita una clave KMS y se deja para la evolución), en la instancia la IP pública (sin NAT es su única salida) y la monitorización detallada (TK-085), y en CloudFront la restricción geográfica, el origen de respaldo y la política de cabeceras de respuesta (las pone Next.js), con los registros v2 que checkov no reconoce, y la falta de WAF (TK-087), el usuario IAM con política propia de GitHub Actions (TK-088), y el tema SNS sin KMS y la configuración del agente como `String` (TK-091).
 
 ## Evolución
 
-*Pendiente: TK-095.* Pasos recomendados cuando el proyecto sea maduro y tenga mucho tráfico, con su señal de disparo y su coste.
+Pasos recomendados **cuando el proyecto sea maduro y tenga mucho tráfico**, en orden. Ninguno está implementado. Las señales son orientativas: se fijan con las métricas reales de «Observabilidad y alertas» tras unas semanas en producción. Costes aproximados a precio de lista (`eu-north-1`, noviembre de 2026); cada paso suma su coste al límite de gasto de TK-078, que habrá que subir.
+
+| Orden | Paso | Señal para darlo | Coste añadido | Dependencias y referencia |
+|---|---|---|---|---|
+| 1 | **RDS PostgreSQL** (copias automáticas y PITR) | Datos que no pueden perder 6 horas, memoria de la instancia saturada por PostgreSQL (`memory`) o necesidad de recuperación a un punto en el tiempo | ≈ +15 USD/mes | *Runbook*, «Migrar a Amazon RDS» |
+| 2 | **RDS Multi-AZ** (`multi_az = true`) | Requisito de disponibilidad de la base (p. ej. ≥ 99,9 %) o caídas de zona que afecten a usuarios | ≈ +15 USD/mes | Paso 1 |
+| 3 | **ECS Fargate + ALB** (tareas de web y API, despliegues sin corte, autoescalado) | CPU o memoria sostenidas > 70 % incluso en `t4g.medium` (`cpu`, `memory`, `cpu-credits`), más de una réplica o despliegues sin corte | ≈ +30-40 USD/mes | Paso 1 (la base no puede seguir en la instancia); sustituye `deploy.sh` por despliegues de ECS |
+| 4 | **WAF** (plan Free o Pro de CloudFront si el plan de AWS lo admite, o Web ACL propia con reglas gestionadas) | Ataques o bots que los límites del proxy no frenan (`RateLimited`, `web-5xx`), o carga de la instancia por tráfico abusivo | ≈ 0-10 USD/mes | Plan de pago de AWS para el plan de CloudFront; los límites de nginx pueden quedarse como segunda capa |
+| 5 | **DNSSEC en Route 53** (clave KMS en `us-east-1` y `DS` en Dinahosting) | En cuanto la infraestructura esté estable; no depende del tráfico | ≈ +1 USD/mes | Ninguna |
+| 6 | **Origen cifrado** (`origin.entrevecinos.org` con Let's Encrypt por DNS-01 en Route 53 y origen `https-only`, o certificado de ACM en el ALB del paso 3) | Antes de manejar datos más sensibles o al salir del MVP | ≈ 0 (o incluido en el ALB) | Ninguna (o el paso 3) |
+| 7 | **Orígenes VPC de CloudFront** (aplicación en subredes privadas, sin IP pública ni cabecera secreta) | Junto con el paso 3, cuando la aplicación pase a subredes privadas | ≈ +35 USD/mes de NAT, o endpoints de interfaz | Paso 3 |
+
+El orden es una recomendación: los pasos 5 y 6 son baratos y se pueden adelantar; el 7 solo tiene sentido con el 3. Cada paso actualiza su entrada de «Decisiones de arquitectura» (regla de TK-094) y esta guía.
+
+**Otras mejoras sin dependencia del tráfico**, recogidas en sus decisiones:
+
+- **OIDC para GitHub Actions** en lugar de la clave del usuario de CI, cuando el plan de AWS lo admita (TK-088).
+- **S3 Object Lock** en modo *governance* en el bucket de copias, contra el borrado por error de un administrador; con el plan de pago, copias en otra cuenta (TK-092).
+- **Monitorización externa** (*canary* de CloudWatch Synthetics, ≈ 1-2 USD/mes, o un servicio gratuito de disponibilidad) y, con el plan de pago, la alarma de `5xxErrorRate` de CloudFront (TK-091).
+- **Despliegue *blue/green*** detrás del proxy, sin corte, mientras siga la instancia única (TK-086, TK-090).
 
 ## Destruir el entorno
 
-*Pendiente: TK-093.* Orden para eliminar la infraestructura sin gastar créditos y qué se conserva.
+Para dejar de gastar créditos cuando producción ya no haga falta. **Borra la web y sus datos**: confirma antes con quien sea responsable. No se ha ensayado (destruiría producción); el orden evita los bloqueos conocidos.
+
+**Se conserva:** el bucket del estado (`bootstrap/`, fuera de `envs/prod`) y, si se quiere, el de copias con la copia final (fuera de Terraform; con la política que impide borrar salvo a `admin_role_arns`). El límite de gasto de AWS Settings no cambia.
+
+1. **Copia final**, en la instancia: `systemctl start entrevecinos-backup.service`; anotar su clave (`aws s3 ls s3://entrevecinos-backups-995006761619/postgres/ --recursive | tail -1`).
+2. **GitHub:** *Actions → Deploy → Disable workflow* (una fusión intentaría desplegar) y borrar los secretos del entorno `production`.
+3. **DNS:** en Dinahosting, volver a sus servidores de nombres (ver «DNS»), o el dominio quedará apuntando a una zona borrada.
+4. **Quitar los bloqueos** (sin subir estos cambios):
+
+   ```bash
+   P=--profile=entrevecinos
+   aws ec2 modify-instance-attribute $P --no-disable-api-termination \
+     --instance-id "$(make -s tf-output | sed -n 's/^instance_id = "\(.*\)"/\1/p')"
+   # Clave de acceso del usuario de CI (creada a mano: Terraform no puede borrar un usuario con claves)
+   aws iam list-access-keys $P --user-name entrevecinos-github-actions --query 'AccessKeyMetadata[].AccessKeyId'
+   aws iam delete-access-key $P --user-name entrevecinos-github-actions --access-key-id <id>
+   # Conservar el bucket de copias: Terraform deja de gestionarlo
+   make tf ARGS="state rm module.database.module.backups_bucket"
+   ```
+
+   Y `prevent_destroy = false` en `modules/database/main.tf` (volumen), `modules/domain/main.tf` (zona), `modules/private-bucket/main.tf` (bucket de imágenes) y `modules/compute/main.tf` (IP elástica). En Brevo, retirar la IP autorizada y, si no se va a volver, eliminar la cuenta o sus claves SMTP.
+5. **Vaciar lo que Terraform no borra con contenido:** el bucket de imágenes (con todas sus versiones) y los repositorios de ECR:
+
+   ```bash
+   B=entrevecinos-media-995006761619
+   for q in Versions DeleteMarkers; do
+     aws s3api delete-objects $P --bucket $B --delete "$(aws s3api list-object-versions $P --bucket $B \
+       --query "{Objects: $q[].{Key: Key, VersionId: VersionId}}" --output json)" || true   # hasta 1000 por vuelta
+   done
+   for r in api web; do
+     aws ecr batch-delete-image $P --repository-name entrevecinos/$r \
+       --image-ids "$(aws ecr list-images $P --repository-name entrevecinos/$r --query imageIds --output json)"
+   done
+   ```
+6. **Destruir:** `make tf ARGS="destroy -var-file=prod.tfvars"` (CloudFront tarda unos 15 minutos en desactivarse y borrarse).
+7. **Después:** borrar los *snapshots* de Data Lifecycle Manager, que no gestiona Terraform:
+
+   ```bash
+   aws ec2 describe-snapshots $P --owner-ids self --filters Name=tag:Name,Values=entrevecinos-prod-postgres \
+     --query 'Snapshots[].SnapshotId' --output text | xargs -n1 aws ec2 delete-snapshot $P --snapshot-id
+   ```
+
+   Y deshacer los `prevent_destroy = false` del paso 4 (`git checkout -- infra/aws/modules`). Para volver a crear el entorno, «Puesta en marcha» desde el paso 3; los datos, con `restore.sh --production --yes` y la copia final.

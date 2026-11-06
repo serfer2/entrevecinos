@@ -97,3 +97,13 @@ output "github_deploy_external_id" {
   description = "ExternalId del rol de despliegue (variable AWS_DEPLOY_ROLE_EXTERNAL_ID)."
   value       = module.ci.external_id
 }
+
+output "alerts_topic_arn" {
+  description = "Tema SNS de los avisos; confirma la suscripción por correo (TK-091)."
+  value       = module.observability.alerts_topic_arn
+}
+
+output "instance_public_ip" {
+  description = "IP pública fija de la instancia: autorízala en Brevo (TK-098)."
+  value       = module.compute.public_ip
+}

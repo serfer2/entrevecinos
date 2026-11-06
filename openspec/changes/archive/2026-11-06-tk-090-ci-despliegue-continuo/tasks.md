@@ -11,6 +11,6 @@
 
 ## 3. Verificación
 
-- [ ] 3.1 Fusión de PR #6 en `main`: primer despliegue automático correcto (AC1, AC2)
-- [ ] 3.2 Vuelta atrás con un commit cuya API no arranca (AC3) y su reversión
-- [ ] 3.3 Dos fusiones seguidas: la segunda espera (AC4)
+- [x] 3.1 Fusión de PR #6 en `main`: primer despliegue automático correcto (AC1, AC2)
+- [x] 3.2 Vuelta atrás con un commit cuya API no arranca (AC3) y su reversión
+- [x] 3.3 Dos fusiones seguidas: la segunda espera (AC4)

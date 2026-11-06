@@ -3,9 +3,16 @@ output "instance_id" {
   value       = aws_instance.app.id
 }
 
+# Del recurso de la IP elástica: aws_instance.public_dns no se actualiza en el mismo apply que la
+# asocia y CloudFront quedaría apuntando al nombre anterior.
 output "public_dns" {
-  description = "DNS público de la instancia: origen de CloudFront (TK-087)."
-  value       = aws_instance.app.public_dns
+  description = "DNS público de la IP elástica de la instancia: origen de CloudFront (TK-087)."
+  value       = aws_eip.app.public_dns
+}
+
+output "public_ip" {
+  description = "IP pública fija de la instancia: la que se autoriza en Brevo (TK-098)."
+  value       = aws_eip.app.public_ip
 }
 
 output "role_arn" {

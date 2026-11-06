@@ -86,6 +86,16 @@ resource "aws_vpc_security_group_ingress_rule" "http_from_cloudfront" {
 
 # ECR, SSM y Parameter Store, SES, CloudWatch y S3. La hora (169.254.169.123) y el DNS de la VPC
 # no pasan por el grupo de seguridad.
+# SMTP con STARTTLS hacia Brevo (TK-098). Brevo no publica los rangos de su relay: cualquier destino.
+resource "aws_vpc_security_group_egress_rule" "smtp" {
+  security_group_id = aws_security_group.app.id
+  description       = "SMTP con STARTTLS hacia el proveedor de correo"
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "tcp"
+  from_port         = 587
+  to_port           = 587
+}
+
 resource "aws_vpc_security_group_egress_rule" "https" {
   security_group_id = aws_security_group.app.id
   description       = "HTTPS hacia los servicios de AWS"

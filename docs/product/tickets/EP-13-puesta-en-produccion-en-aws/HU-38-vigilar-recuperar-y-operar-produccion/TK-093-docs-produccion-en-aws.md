@@ -21,11 +21,12 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 
 **Incluye**
 - `readme.md` §2.4:
-  - diagrama Mermaid de producción real: `entrevecinos.org` (registrado en Dinahosting, DNS en Route 53) → CloudFront (plan gratuito con WAF) → instancia EC2 (proxy, web, API, PostgreSQL en volumen EBS) → S3 (imágenes y copias), SES, Parameter Store, CloudWatch; GitHub Actions → ECR y SSM;
-  - texto de la sección de producción y de las diferencias, coherente con lo implementado (por qué una sola EC2 y no contenedores gestionados, PostgreSQL en la instancia y no RDS, plan gratuito de CloudFront en vez de WAF de pago, Parameter Store en vez de Secrets Manager, dominio `entrevecinos.org` registrado en Dinahosting con el DNS en Route 53 gestionado por Terraform);
+  - diagrama Mermaid de producción real: `entrevecinos.org` (registrado en Dinahosting, DNS en Route 53) → CloudFront (sin WAF; límite de peticiones en el proxy, TK-087) → instancia EC2 (proxy, web, API, PostgreSQL en volumen EBS) → S3 (imágenes y copias), SES, Parameter Store, CloudWatch; GitHub Actions → ECR y SSM;
+  - texto de la sección de producción y de las diferencias, coherente con lo implementado (por qué una sola EC2 y no contenedores gestionados, PostgreSQL en la instancia y no RDS, CloudFront sin WAF porque el plan de AWS del proyecto no admite el plan gratuito de CloudFront ni WAF, con límite de peticiones por IP en nginx, Parameter Store en vez de Secrets Manager, dominio `entrevecinos.org` registrado en Dinahosting con el DNS en Route 53 gestionado por Terraform);
   - **base de datos y disponibilidad**: el nodo del diagrama `PostgreSQL gestionado<br/>alta disponibilidad + backups` pasa a `PostgreSQL 16 en la instancia<br/>volumen EBS + copias cada 6 h en S3`, y la frase «una instancia gestionada, preferiblemente con alta disponibilidad, copias de seguridad y recuperación a un punto en el tiempo» se sustituye por la decisión real: **PostgreSQL en la instancia y sin alta disponibilidad para ahorrar costes mientras el proyecto no escale**, sus mitigaciones (copias cada 6 h, alarma de copias, volumen separado, usuario sin privilegios), RPO de 6 h (TK-092), enlazando a la decisión de `infra/aws/README.md` (TK-082); el resumen de todas las decisiones y la evolución recomendada los añade TK-095;
+  - **integración y despliegue continuos:** subsección breve que resuma qué se comprueba en cada *pull request* (`ci.yml`: `api`, `web`, `infra`, `images`, `docs-infra`; obligatorias para fusionar en `main`) y qué ocurre al fusionar (`deploy.yml`: `checks` → `publish` → `deploy` → `smoke`, vuelta atrás visible si la API no arranca, un despliegue cada vez, redespliegue manual de un commit de `main`), enlazando a «Integración continua» y «Despliegue continuo» de `infra/aws/README.md` en vez de repetir el detalle; sustituye la frase genérica «una canalización CI/CD puede construir y publicar imágenes…» de las diferencias técnicas;
   - se elimina la nota «Pendiente».
-- `readme.md` §2.5: medidas de seguridad que ya son reales en producción (HTTPS en CloudFront, WAF del plan gratuito, cabecera de origen, IMDSv2, sin SSH, roles con mínimo privilegio, OIDC, PostgreSQL solo en la red interna de Compose con usuario sin privilegios, copias que la instancia no puede borrar, secretos en Parameter Store que solo llegan a los contenedores por entorno, sin ficheros `.env` en la instancia, bucket privado).
+- `readme.md` §2.5: medidas de seguridad que ya son reales en producción (HTTPS en CloudFront, límite de peticiones por IP en el proxy, cabecera de origen, IMDSv2, sin SSH, roles con mínimo privilegio, credenciales temporales en el despliegue (un usuario de CI que solo asume el rol de despliegue, desde el entorno `production` limitado a `main`, TK-088), comprobaciones obligatorias antes de fusionar en `main` (TK-089), PostgreSQL solo en la red interna de Compose con usuario sin privilegios, copias que la instancia no puede borrar, secretos en Parameter Store que solo llegan a los contenedores por entorno, sin ficheros `.env` en la instancia, bucket privado).
 - `infra/aws/README.md` (guía completa):
   - requisitos (`aws login --profile entrevecinos`, Docker), estructura y *bootstrap*;
   - orden de aplicación y primer despliegue manual (de TK-078 a TK-087), pasos manuales (verificación de SES, suscripciones de SNS, salida del *sandbox*, protección de `main`);
@@ -74,9 +75,14 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 - **When** un agente busca cómo validar o aplicar la infraestructura
 - **Then** encuentra los comandos y la obligación de pedir confirmación antes de `terraform apply` o `destroy`
 
+**AC4 — Integración y despliegue continuos (HU-37)**
+- **Given** `readme.md` §2.4
+- **When** busco qué se comprueba en un *pull request* y qué pasa al fusionarlo en `main`
+- **Then** encuentro las comprobaciones de CI y los pasos del despliegue, coherentes con `.github/workflows/ci.yml` y `deploy.yml`, y el enlace a la guía de `infra/aws/README.md` con el detalle y el *runbook*
+
 ## 5. Plan de tareas
 
-1. Diagrama y texto de `readme.md` §2.4 y §2.5.
+1. Diagrama y texto de `readme.md` §2.4 (incluida la integración y el despliegue continuos) y §2.5.
 2. `infra/aws/README.md`: guía, runbook, costes y destrucción.
 3. `infra/README.md`, `AGENTS.md` y `.env.example`.
 4. Revisión cruzada con los recursos reales y prueba de la guía por otra persona (o en una cuenta limpia).
@@ -86,6 +92,8 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 ```bash
 # Diagrama: vista previa del readme en GitHub, sin errores de Mermaid
 grep -n "Pendiente" readme.md          # sin resultados en §2.4
+grep -n "canalización CI/CD puede" readme.md   # sin resultados: sustituida por la descripción real
+grep -n "ci.yml\|deploy.yml" readme.md        # integración y despliegue continuos en §2.4
 grep -n -i "alta disponibilidad" readme.md   # ninguna referencia a la base de datos de producción
 grep -n -i "mientras el proyecto no escale" readme.md infra/aws/README.md   # decisión documentada en ambos
 grep -n -i "RDS\|Secrets Manager" readme.md   # solo como evolución futura

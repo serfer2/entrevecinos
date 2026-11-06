@@ -1,12 +1,13 @@
 # Despliegue de la aplicación (TK-086): documento de SSM, grupos de logs y cabecera de origen.
 
-# Logs de los contenedores (driver awslogs) y de cada despliegue (salida de Run Command). El rol de
-# la instancia escribe en /entrevecinos/prod/app/*, pero no puede crear grupos.
+# Logs de los contenedores (driver awslogs), de las copias (agente de CloudWatch, TK-091) y de cada
+# despliegue (salida de Run Command). El rol de la instancia escribe en /entrevecinos/prod/app/*, pero
+# no puede crear grupos. Retención corta para recortar costes; los despliegues, 30 días (auditoría).
 resource "aws_cloudwatch_log_group" "app" {
-  for_each = toset(["proxy", "web", "api", "db", "deploy"])
+  for_each = { proxy = 14, web = 14, api = 14, db = 14, backup = 14, deploy = 30 }
 
   name              = "/entrevecinos/prod/app/${each.key}"
-  retention_in_days = 30
+  retention_in_days = each.value
 }
 
 # Cabecera secreta que CloudFront (TK-087) añade y el proxy exige. A diferencia de las contraseñas,
@@ -36,6 +37,7 @@ locals {
     "docker-compose.prod.yml"          = { mode = "644", source = "docker-compose.prod.yml" }
     "prod/deploy.sh"                   = { mode = "755", source = "prod/deploy.sh" }
     "prod/backup.sh"                   = { mode = "755", source = "prod/backup.sh" }
+    "prod/restore.sh"                  = { mode = "755", source = "prod/restore.sh" }
     "prod/initdb/10-roles.sh"          = { mode = "755", source = "prod/initdb/10-roles.sh" }
     "prod/proxy/default.conf.template" = { mode = "644", source = "prod/proxy/default.conf.template" }
     "prod/systemd/entrevecinos-backup.service" = {

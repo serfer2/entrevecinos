@@ -34,6 +34,10 @@ module "domain" {
   }
 
   wait_for_certificate_validation = var.wait_for_certificate_validation
+
+  # Brevo (TK-098): verificación del dominio e informes agregados de DMARC.
+  root_txt_records = ["brevo-code:63e65be73c205d7e281cfa96975e98a5"]
+  dmarc_rua        = ["rua@dmarc.brevo.com"]
 }
 
 module "mail" {
@@ -44,6 +48,15 @@ module "mail" {
 
   test_recipients    = var.ses_test_recipients
   jwt_secret_version = var.jwt_secret_version
+
+  # Valores dados por Brevo al autenticar entrevecinos.org (TK-096, TK-098).
+  brevo_cnames = {
+    "brevo1._domainkey" = "b1.entrevecinos-org.dkim.brevo.com"
+    "brevo2._domainkey" = "b2.entrevecinos-org.dkim.brevo.com"
+    "send"              = "send-entrevecinos-org.brand.brevosend.com"
+    "r.send"            = "send-entrevecinos-org.r.brand.brevosend.com"
+    "img.send"          = "send-entrevecinos-org.img.brand.brevosend.com"
+  }
 }
 
 module "compute" {
@@ -81,4 +94,13 @@ module "ci" {
   ecr_repository_arns  = values(module.storage.ecr_repository_arns)
   instance_id          = module.compute.instance_id
   deploy_document_name = module.compute.deploy_document_name
+}
+
+# Registros, métricas del agente, alarmas con aviso por correo y panel (TK-091).
+module "observability" {
+  source = "../../modules/observability"
+
+  alert_email     = var.alert_email
+  instance_id     = module.compute.instance_id
+  distribution_id = module.edge.distribution_id
 }

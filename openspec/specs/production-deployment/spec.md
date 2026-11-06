@@ -58,11 +58,15 @@ El proxy SHALL responder `403` a cualquier petición sin la cabecera `X-Origin-V
 - **THEN** falla sin arrancar ningún contenedor
 
 ### Requirement: Logs en CloudWatch
-Los contenedores SHALL enviar sus logs con el *driver* `awslogs` a `/entrevecinos/prod/app/<servicio>`, y la salida de cada despliegue MUST quedar en `/entrevecinos/prod/app/deploy`.
+Los contenedores SHALL enviar sus logs con el *driver* `awslogs` a `/entrevecinos/prod/app/<servicio>`, con retención de 14 días; la salida de cada despliegue MUST quedar en `/entrevecinos/prod/app/deploy` (30 días) y la de las copias en `/entrevecinos/prod/app/backup` (14 días). El proxy MUST registrar el método, la ruta sin la cadena de consulta y el protocolo, nunca la petición completa.
 
 #### Scenario: Logs de la API
 - **WHEN** la API atiende peticiones
 - **THEN** sus logs aparecen en `/entrevecinos/prod/app/api`
+
+#### Scenario: Proxy sin cadena de consulta
+- **WHEN** alguien abre `/verificar-correo?token=…`
+- **THEN** el registro del proxy muestra `GET /verificar-correo HTTP/1.1`
 
 ### Requirement: Límite de peticiones en el proxy
 El proxy SHALL identificar al visitante por el último valor de `X-Forwarded-For` (el que añade CloudFront) y MUST responder `429` cuando una IP supera 20 peticiones `POST` en 5 minutos (con ráfaga de 10) a `/iniciar-sesion` y `/registro`, o 5 peticiones por segundo (con ráfaga de 100) en total. Los rechazos y el registro de accesos SHALL aparecer en `/entrevecinos/prod/app/proxy` con la IP del visitante.
@@ -74,4 +78,15 @@ El proxy SHALL identificar al visitante por el último valor de `X-Forwarded-For
 #### Scenario: X-Forwarded-For falseado
 - **WHEN** el visitante envía su propio `X-Forwarded-For` con otra IP
 - **THEN** el límite se aplica a la IP que añade CloudFront
+
+### Requirement: Copia antes de migrar
+`deploy.sh` SHALL ejecutar `backup.sh` antes de aplicar las migraciones cuando la base ya tiene esquema y hay migraciones pendientes, y si la copia falla MUST terminar con error sin migrar ni cambiar los contenedores.
+
+#### Scenario: Migración pendiente
+- **WHEN** despliego una versión con una migración nueva
+- **THEN** hay una copia nueva en el bucket antes de que se aplique
+
+#### Scenario: Sin migraciones
+- **WHEN** despliego una versión sin migraciones nuevas
+- **THEN** no se hace copia previa
 

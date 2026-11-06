@@ -25,3 +25,9 @@ variable "dns_ttl" {
   type        = number
   default     = 300
 }
+
+variable "brevo_cnames" {
+  description = "CNAME de Brevo (DKIM y marca), nombre relativo al dominio → destino (TK-098)."
+  type        = map(string)
+  default     = {}
+}

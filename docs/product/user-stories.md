@@ -31,7 +31,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
 | 11. Experiencia de usuario | HU-28, HU-29, HU-30, HU-31, HU-32 |
 | 12. Documentación técnica | HU-33, HU-34, HU-35 |
-| 13. Puesta en producción en AWS | HU-36, HU-37, HU-38, HU-39 |
+| 13. Puesta en producción en AWS | HU-36, HU-37, HU-38, HU-39, HU-40 |
 
 ---
 
@@ -991,11 +991,11 @@ La aplicación se despliega en AWS (región `eu-north-1`) con toda la infraestru
 - **When** termina el *workflow* de despliegue
 - **Then** producción ejecuta las imágenes de ese *commit*, con las migraciones aplicadas, y una prueba de humo contra la URL pública ha pasado
 
-**AC3 — Sin credenciales guardadas**
+**AC3 — Credenciales de mínimo privilegio**
 
 - **Given** la configuración del repositorio en GitHub
 - **When** reviso sus secretos
-- **Then** no hay claves de acceso de AWS: el *workflow* obtiene credenciales temporales por OIDC con un rol que solo puede publicar imágenes y desplegar en la instancia de producción, y solo desde `main`
+- **Then** la única clave de AWS es la de un usuario de CI que solo puede asumir, con un identificador externo, un rol que solo puede publicar imágenes y desplegar en la instancia de producción; el *workflow* trabaja con las credenciales temporales de ese rol y solo desde `main` (el entorno `production`). El plan de AWS del proyecto no admite OIDC (TK-088)
 
 **AC4 — Vuelta atrás automática**
 
@@ -1058,3 +1058,40 @@ La aplicación se despliega en AWS (región `eu-north-1`) con toda la infraestru
 - **Given** la sección de evolución de `infra/aws/README.md`
 - **When** el proyecto madura y tiene mucho tráfico
 - **Then** encuentro, en orden y con la señal que indica cuándo dar cada paso y su coste aproximado: RDS (y después Multi-AZ), ECS Fargate con ALB, WAF propio, DNSSEC en Route 53, origen cifrado y orígenes VPC de CloudFront
+
+### HU-40 Recibir el correo de validación en cualquier dirección
+
+**Como** vecino que se registra, **quiero** recibir el correo de validación en mi dirección habitual, sea cual sea su proveedor, **para** poder activar mi cuenta y usar EntreVecinos en producción.
+
+Hoy SES sigue en *sandbox* en `eu-north-1`: solo entrega a direcciones verificadas en la cuenta (como mucho 200 correos al día), así que cualquier otra persona se registra pero nunca recibe el enlace. La revisión de la solicitud figura como `GRANTED`, pero el acceso de producción sigue desactivado.
+
+**AC1 — Correo en cualquier dirección**
+
+- **Given** producción en `https://entrevecinos.org`
+- **When** me registro con una dirección que no está verificada en AWS (p. ej. de Gmail o de Outlook)
+- **Then** recibo el correo de validación en unos minutos, en la bandeja de entrada, desde `no-reply@entrevecinos.org` y autenticado con SPF, DKIM y DMARC
+
+**AC2 — Aviso si el correo no sale**
+
+- **Given** que el envío de un correo de la aplicación falla (rechazo del proveedor, límite de envío o error de credenciales)
+- **When** pasan unos minutos
+- **Then** recibo un aviso por correo como el resto de las alarmas de producción
+
+**AC3 — Sin restos del *sandbox***
+
+- **Given** la infraestructura de producción
+- **When** reviso las identidades de SES y los permisos de la instancia
+- **Then** no quedan destinatarios de prueba verificados ni permisos de envío a ellos
+
+**AC4 — Estado documentado**
+
+- **Given** `infra/aws/README.md`
+- **When** consulto el correo de producción
+- **Then** encuentro el estado real del acceso de producción, los límites de envío, cómo se comprobó y qué hacer si vuelve a fallar
+
+**AC5 — Límite mensual de envíos**
+
+- **Given** que la aplicación ya ha enviado 5.000 correos en el periodo actual, del día 6 de un mes al día 6 del siguiente
+- **When** alguien se registra o pide de nuevo el correo de validación
+- **Then** no se envía nada, veo un mensaje que me pide intentarlo más tarde y el equipo recibe un aviso; el día 6 siguiente el envío vuelve a funcionar. El límite es una restricción de costes y está documentado como tal
+

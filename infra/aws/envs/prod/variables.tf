@@ -1,5 +1,5 @@
 variable "alert_email" {
-  description = "Correo que recibe los avisos de gasto (y, más adelante, las alarmas de TK-091)."
+  description = "Correo que recibe los avisos de gasto (TK-078) y de las alarmas (TK-091)."
   type        = string
 }
 

@@ -29,11 +29,11 @@ La plataforma funciona como un escaparate y tablón de anuncios digital, donde c
 
 ### **0.4. URL del proyecto:**
 
-**Pendiente**. Se proporcionará al completar el presente proyecto.
+https://entrevecinos.org (producción en AWS; ver §2.4).
 
 ### 0.5. URL o archivo comprimido del repositorio
 
-https://github.com/serfer2/AI4Devs-finalproject
+https://github.com/serfer2/entrevecinos
 
 
 ---
@@ -205,9 +205,58 @@ La Épica 11 (HU-28 a HU-32, TK-066 a TK-072) fija la identidad visual y mejora 
 ### **1.4. Instrucciones de instalación:**
 > Documenta de manera precisa las instrucciones para instalar y poner en marcha el proyecto en local (librerías, backend, frontend, servidor, base de datos, migraciones y semillas de datos, etc.)
 
-**Pendiente**. Se proporcionará una vez completado el desarrollo de backend y frontend.
+Todo se ejecuta en contenedores: no hace falta instalar Python, Node.js ni PostgreSQL en el equipo.
 
-Mientras tanto, el entorno local se levanta con `cp .env.example .env` y `make dev` (detalle en `infra/README.md`). Además de la web (`http://localhost:3000`) y la API (`http://localhost:8000/docs`), `make dev` levanta **Mailpit**, el buzón de desarrollo donde llegan los correos de validación del registro: `http://localhost:8025`. Un `.env` creado antes de la validación del correo necesita las variables nuevas de la sección «Correo (SMTP)» de `.env.example` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `MAIL_FROM`, `WEB_PUBLIC_URL`, `EMAIL_VERIFICATION_TTL_HOURS` y `MAIL_UI_HOST_PORT`); sin ellas, la API no arranca.
+**Requisitos:** Git, Docker con el plugin Compose v2 (`docker compose version`) y `make`. Puertos libres: 3000 (web), 8000 (API) y 8025 (buzón de correo); se cambian en `.env`.
+
+**1. Código y variables de entorno**
+
+```bash
+git clone https://github.com/serfer2/entrevecinos.git && cd entrevecinos
+cp .env.example .env    # cambia al menos POSTGRES_PASSWORD; el resto vale para desarrollo
+```
+
+`.env` no se sube al repositorio. Los valores de `.env.example` son ficticios y solo sirven en local.
+
+**2. Arrancar**
+
+```bash
+make dev
+```
+
+Construye las imágenes de la web y la API, levanta PostgreSQL, MinIO (imágenes), Mailpit (correo), la API y la web, aplica las migraciones y muestra las direcciones:
+
+| Servicio | Dirección |
+|---|---|
+| Web | http://localhost:3000 |
+| API (documentación interactiva) | http://localhost:8000/docs |
+| Buzón de correo de desarrollo (Mailpit) | http://localhost:8025 |
+
+**3. Datos iniciales.** Las migraciones crean el esquema y las 10 categorías de anuncios; no hay más datos de ejemplo. Para probar:
+
+1. Regístrate en http://localhost:3000/registro y abre el enlace de validación que llega a Mailpit.
+2. Para tener un administrador de plataforma, que aprueba comunidades y entra en todas, promueve tu cuenta:
+
+   ```bash
+   docker compose --env-file .env -f infra/docker-compose.yml exec db \
+     psql -U entrevecinos -d entrevecinos -c "UPDATE users SET platform_role = 'platform_admin' WHERE email = '<tu correo>'"
+   ```
+
+3. Crea una comunidad (la de un `platform_admin` queda activa al momento), publica anuncios con fotografías y, con otra cuenta, solicita acceso a la comunidad.
+
+**4. Comandos habituales**
+
+| Comando | Qué hace |
+|---|---|
+| `make migrate` | Aplica las migraciones pendientes |
+| `make ci-api` / `make ci-web` | Lint, tipos y pruebas de la API y de la web, igual que la CI (ver §2.6) |
+| `make build-backend` / `make build-frontend` | Reconstruye una imagen tras cambiar dependencias |
+| `make clean` | Elimina contenedores e imágenes; **conserva** los datos |
+| `make help` | Lista todos los comandos |
+
+Para borrar también los datos: `docker compose --env-file .env -f infra/docker-compose.yml down -v`. Más detalle en [`infra/README.md`](infra/README.md), [`apps/api/README.md`](apps/api/README.md) y [`apps/web/README.md`](apps/web/README.md).
+
+**Producción.** La instalación en AWS (Terraform, despliegue, operación y costes) está en [`infra/aws/README.md`](infra/aws/README.md).
 
 ---
 
@@ -293,7 +342,7 @@ La seguridad de la API se aplica dentro de FastAPI, en este orden: CORS restring
 
 - **Almacenamiento de imágenes:** un servicio compatible con S3, como **MinIO**, almacena las fotografías de los anuncios y perfiles. Sus ficheros se conservan en un volumen persistente. PostgreSQL guarda las referencias y metadatos de cada imagen, mientras que el backend gestiona las cargas y lecturas.
 
-- **Envío de correo:** la API envía por **SMTP** los correos de la aplicación, como el enlace de validación del registro. En desarrollo los recoge **Mailpit**, que los muestra en `http://localhost:8025` sin enviarlos a nadie; en producción se usa un proveedor SMTP con STARTTLS.
+- **Envío de correo:** la API envía por **SMTP** los correos de la aplicación, como el enlace de validación del registro. En desarrollo los recoge **Mailpit**, que los muestra en `http://localhost:8025` sin enviarlos a nadie; en producción se envían con **Amazon SES** (por su API, con las credenciales del rol de la instancia).
 
 - **Contenedores y red de despliegue:** **Docker** ejecuta frontend, backend, PostgreSQL y almacenamiento de imágenes en servicios separados. La base de datos y el almacenamiento deberían permanecer en una red interna, accesibles desde el backend, y no exponerse directamente a los usuarios.
 
@@ -302,19 +351,23 @@ La seguridad de la API se aplica dentro de FastAPI, en este orden: CORS restring
 ```
 entrevecinos/
 ├── apps/
-│   ├── web/                         # Aplicación web
+│   ├── web/                         # Aplicación web (Next.js)
 │   │   ├── src/
-│   │   │   ├── app/                 # Rutas y layouts de Next.js
-│   │   │   ├── features/            # Funcionalidades organizadas por dominio
-│   │   │   │   ├── auth/
+│   │   │   ├── app/                 # Rutas y layouts; zona privada en app/(privado)/
+│   │   │   ├── features/            # Código por funcionalidad
+│   │   │   │   ├── auth/            #   registro, inicio de sesión, sesión y validación del correo
 │   │   │   │   ├── communities/
 │   │   │   │   ├── listings/
-│   │   │   │   └── messaging/
-│   │   │   ├── components/          # Componentes compartidos de interfaz
-│   │   │   ├── lib/                 # Clientes API y utilidades
-│   │   │   └── styles/              # Estilos globales y configuración visual
+│   │   │   │   ├── media/
+│   │   │   │   ├── messaging/       #   versión futura
+│   │   │   │   ├── platform-admin/
+│   │   │   │   └── profile/
+│   │   │   ├── components/          # Componentes compartidos de interfaz (ui/)
+│   │   │   ├── lib/                 # Cliente de la API y utilidades
+│   │   │   ├── styles/              # Tema visual y estilos globales
+│   │   │   └── proxy.ts             # Content-Security-Policy con nonce por petición
 │   │   ├── public/                  # Recursos estáticos
-│   │   ├── Dockerfile
+│   │   ├── Dockerfile               # Etapas dev y prod
 │   │   └── package.json
 │   │
 │   └── api/                         # API de Python y FastAPI
@@ -322,33 +375,46 @@ entrevecinos/
 │       │   └── entrevecinos/
 │       │       ├── domain/          # Entidades y reglas de negocio
 │       │       ├── application/     # Casos de uso y puertos
-│       │       ├── infrastructure/ # PostgreSQL, imágenes y servicios externos
+│       │       ├── infrastructure/  # PostgreSQL, S3, correo, seguridad y configuración
 │       │       └── presentation/    # Endpoints, esquemas y dependencias FastAPI
+│       ├── migrations/              # Migraciones de Alembic
 │       ├── tests/
-│       ├── Dockerfile
-│       └── pyproject.toml
-│
-├── packages/                        # Código compartido, si es necesario
-│   └── api-contracts/               # Contratos o esquemas compartidos
+│       ├── Dockerfile               # Etapas dev y prod
+│       └── pyproject.toml           # Dependencias con uv (uv.lock)
 │
 ├── infra/
-│   ├── docker-compose.yml           # Servicios y redes locales
-│   ├── postgres/                    # Inicialización y configuración de PostgreSQL
-│   └── storage/                     # Configuración del almacenamiento de imágenes
+│   ├── docker-compose.yml           # Entorno local: db, storage, mail, api y web
+│   ├── postgres/                    # Inicialización de PostgreSQL en local
+│   ├── storage/                     # Inicialización de MinIO en local
+│   ├── docker-compose.prod.yml      # Compose de producción: proxy, web, api y db
+│   ├── prod/                        # Scripts de la instancia: despliegue, copias, restauración y proxy
+│   └── aws/                         # Terraform de producción y guía de operación (README.md)
 │
-├── docs/                            # Arquitectura y documentación del proyecto
+├── .github/
+│   ├── workflows/                   # CI en cada pull request (ci.yml) y despliegue continuo (deploy.yml)
+│   ├── dependabot.yml
+│   └── pull_request_template.md
+│
+├── docs/
+│   ├── api/                         # Contrato OpenAPI multi-fichero (openapi.yaml)
+│   └── product/                     # Historias de usuario y tickets
+│
+├── openspec/                        # Especificaciones vigentes y cambios por ticket
+├── Makefile                         # Atajos: make dev, ci-api, ci-web, tf-*…
+├── AGENTS.md                        # Instrucciones para agentes de código
 ├── .env.example                     # Variables de entorno de ejemplo
-├── .gitignore
-└── README.md
+├── prompts.md                       # Prompts utilizados con asistentes de código
+└── readme.md
 ```
 
 #### Propósito de las carpetas
 
 - **`apps/web`** contiene la aplicación React con Next.js. `app/` define las rutas; `features/` agrupa pantallas, componentes y lógica de cada funcionalidad; y `components/` reúne elementos reutilizables.
 - **`apps/api`** contiene el backend FastAPI. Separa las reglas de negocio de los detalles del framework, la base de datos y otros servicios.
-- **`packages/`** aloja contratos compartidos cuando frontend y backend necesitan una definición común. Conviene evitar duplicar lógica de negocio entre aplicaciones.
-- **`infra/`** guarda la configuración para ejecutar servicios como la API, PostgreSQL y el almacenamiento de imágenes.
-- **`docs/`** contiene diagramas, decisiones de arquitectura e información técnica complementaria.
+- **`infra/`** guarda la configuración para ejecutar los servicios en local (Docker Compose) y en producción (Compose de producción, scripts de la instancia y Terraform de AWS).
+- **`.github/`** contiene la integración y el despliegue continuos y la plantilla de *pull request*.
+- **`docs/`** contiene el contrato de la API, que es la fuente de verdad (`docs/api/openapi.yaml`), y la planificación del producto: épicas, historias de usuario y tickets.
+- **`openspec/`** guarda las especificaciones vigentes y un cambio archivado por cada ticket implementado.
 
 #### Arquitectura y buenas prácticas
 
@@ -387,30 +453,52 @@ flowchart LR
         API_LOCAL -->|"SMTP"| MAIL_LOCAL
         BROWSER_LOCAL -.->|"Ver correos"| MAIL_LOCAL
     end
+```
 
-    subgraph CLOUD["Producción · Cloud"]
+```mermaid
+flowchart LR
+    subgraph AWS["Producción · AWS eu-north-1"]
         USER["Usuarios"]
-        CDN["DNS + CDN + WAF<br/>HTTPS"]
+        DNS["Route 53<br/>entrevecinos.org<br/>dominio registrado en Dinahosting"]
+        CDN["CloudFront<br/>HTTPS con ACM · caché de estáticos"]
 
-        WEB_CLOUD["Frontend<br/>Next.js en runtime Node"]
-        LB["Balanceador o API Gateway"]
-        API_CLOUD["Backend<br/>FastAPI en contenedores"]
-        DB_CLOUD[("PostgreSQL gestionado<br/>alta disponibilidad + backups")]
-        IMG_CLOUD[("Almacenamiento de objetos<br/>S3 compatible")]
-        SECRETS["Gestor de secretos"]
-        OBS["Logs, métricas y alertas"]
+        subgraph EC2["Instancia EC2 t4g.small · Docker Compose"]
+            PROXY["Proxy nginx<br/>cabecera de origen + límite de peticiones"]
+            WEB_PROD["Frontend<br/>Next.js"]
+            API_PROD["Backend<br/>FastAPI"]
+            DB_PROD[("PostgreSQL 16 en la instancia<br/>volumen EBS + copias cada 6 h en S3")]
+            PROXY --> WEB_PROD
+            WEB_PROD -->|"API REST · JWT<br/>red interna"| API_PROD
+            API_PROD --> DB_PROD
+        end
 
-        USER --> CDN
-        CDN --> WEB_CLOUD
-        CDN --> LB
-        LB -->|"API REST · JWT"| API_CLOUD
-        API_CLOUD --> DB_CLOUD
-        API_CLOUD --> IMG_CLOUD
-        SECRETS -.-> WEB_CLOUD
-        SECRETS -.-> API_CLOUD
-        API_CLOUD -.-> OBS
-        WEB_CLOUD -.-> OBS
+        S3_MEDIA[("S3<br/>imágenes · URL prefirmadas")]
+        S3_BACKUP[("S3<br/>copias de la base")]
+        SES["SES<br/>correo de validación"]
+        SSM_PS["Parameter Store<br/>secretos"]
+        CW["CloudWatch<br/>registros, métricas y alarmas"]
+        SNS["SNS<br/>avisos por correo"]
+
+        USER --> DNS
+        USER -->|"HTTPS"| CDN
+        CDN -->|"HTTP + X-Origin-Verify"| PROXY
+        USER -.->|"Imágenes"| S3_MEDIA
+        API_PROD --> S3_MEDIA
+        API_PROD --> SES
+        DB_PROD -.->|"backup.sh"| S3_BACKUP
+        SSM_PS -.->|"deploy.sh"| EC2
+        EC2 -.-> CW
+        CW -.-> SNS
     end
+
+    subgraph GH["GitHub"]
+        GHA["GitHub Actions<br/>CI en cada pull request<br/>despliegue al fusionar en main"]
+        ECR[("ECR<br/>imágenes de api y web")]
+    end
+
+    GHA -->|"publica"| ECR
+    GHA -->|"SSM Run Command"| EC2
+    ECR -.->|"descarga por digest"| EC2
 ```
 
 #### Desarrollo local
@@ -419,52 +507,110 @@ Docker Compose levanta los componentes necesarios en el equipo del desarrollador
 
 Esta configuración facilita arrancar el proyecto con un entorno reproducible y probar la integración entre componentes. Las credenciales locales deben ser de desarrollo y no reutilizarse en producción.
 
-#### Producción en cloud
+#### Producción en AWS
 
-En producción, el frontend y la API se despliegan en servicios con runtime compatible con Node.js y contenedores, respectivamente. Un proveedor cloud puede ofrecerlos como servicios gestionados de contenedores. El tráfico público entra por DNS y HTTPS; CDN y WAF pueden proteger y distribuir el contenido web, mientras que un balanceador o API Gateway dirige las solicitudes a la API.
+Producción está en `https://entrevecinos.org`, en la región `eu-north-1` de AWS, y toda la infraestructura se define con Terraform en `infra/aws/` (guía, *runbook*, costes y decisiones en [`infra/aws/README.md`](infra/aws/README.md)). El dominio sigue registrado en Dinahosting, con el DNS en Route 53.
 
-PostgreSQL se sustituye por una instancia gestionada, preferiblemente con alta disponibilidad, copias de seguridad y recuperación a un punto en el tiempo. Las imágenes pasan de MinIO local a almacenamiento de objetos cloud compatible con S3. Las credenciales se obtienen de un gestor de secretos, y logs y métricas se centralizan para facilitar la operación.
+- **Entrada:** CloudFront termina HTTPS (certificado de ACM), redirige `www` y HTTP, guarda en caché solo los estáticos de Next.js y reenvía el resto a la instancia por HTTP con una cabecera secreta. No hay WAF: el plan del proyecto no admite el plan gratuito de CloudFront y una web ACL costaría unos 10 USD/mes, así que los límites de peticiones por IP los pone el proxy.
+- **Aplicación:** una sola instancia EC2 `t4g.small` (Graviton, Amazon Linux 2023) ejecuta con Docker Compose el proxy nginx, la web, la API y PostgreSQL, con contenedores sin privilegios. Solo el proxy publica un puerto, y solo CloudFront puede llegar a él; **la API no es pública**: la web la llama por una red interna de Docker. No hay balanceador ni API Gateway.
+- **Datos:** **PostgreSQL 16 en la propia instancia**, sobre un volumen EBS cifrado que sobrevive a la instancia, con copias de `pg_dump` cada 6 horas en S3 (30 días) y *snapshots* diarios (7). Las imágenes de los anuncios, en un bucket S3 privado con versionado, se leen con URL prefirmadas.
+- **Secretos:** en Parameter Store; llegan a los contenedores solo por entorno durante el despliegue, sin ficheros `.env` en la instancia.
+- **Correo:** SES, con el dominio verificado (DKIM, SPF y DMARC).
+- **Operación:** registros, métricas y alarmas en CloudWatch con aviso por correo, y procedimientos de recuperación ensayados (RPO 6 horas, RTO 4 horas). Sin SSH: la instancia se opera con Session Manager.
+
+#### Diferencias con la arquitectura prevista
+
+La arquitectura prevista usaba contenedores gestionados detrás de un balanceador, PostgreSQL gestionado con alta disponibilidad, CDN con WAF y un gestor de secretos. Producción es distinta **para ahorrar costes mientras el proyecto no escale**, dentro del límite de 40 €/mes: unos 20 USD/mes, frente a más de 100 con lo previsto (los costes evitados se detallan en la guía).
+
+| Área | Previsto | Elegido | Evolución cuando el proyecto escale |
+|---|---|---|---|
+| Cómputo | Contenedores gestionados y balanceador o API Gateway | Una instancia EC2 con Docker Compose, sin alta disponibilidad | ECS Fargate con ALB |
+| Base de datos | PostgreSQL gestionado con alta disponibilidad | PostgreSQL 16 en la instancia, sin alta disponibilidad, con copias cada 6 horas (RPO 6 h) y volumen propio | Amazon RDS y después Multi-AZ |
+| Protección web | CDN + WAF | CloudFront sin WAF y límites de peticiones en el proxy | WAF (plan de CloudFront o Web ACL) |
+| DNS | Sin detallar | Route 53, sin DNSSEC | DNSSEC |
+| Red | Base de datos en red privada | Subred pública sin NAT; base solo en la red interna de Compose; origen por HTTP con cabecera secreta | Origen cifrado y orígenes VPC de CloudFront |
+| Secretos | Gestor de secretos | Parameter Store, solo por entorno | Secrets Manager para la contraseña de RDS |
+
+Cada diferencia, con su motivo, coste evitado y riesgo aceptado, está en [«Decisiones de arquitectura»](infra/aws/README.md#decisiones-de-arquitectura); los pasos de evolución, en orden y con su señal de disparo y su coste, en [«Evolución»](infra/aws/README.md#evolución).
+
+#### Integración y despliegue continuos
+
+Todo cambio llega a `main` por *pull request* y solo se fusiona si pasan las comprobaciones de [`.github/workflows/ci.yml`](.github/workflows/ci.yml), las mismas órdenes que en local (`make ci-api`, `make ci-web`, `make tf-lint`, `make shellcheck`):
+
+- `api`: ruff y pytest con PostgreSQL; `web`: lint, tipos y pruebas; `infra`: Terraform, tflint, checkov y shellcheck;
+- `images (api)` e `images (web)`: construyen las imágenes de producción para arm64;
+- `docs-infra`: un cambio de infraestructura debe actualizar `infra/aws/README.md`.
+
+Al fusionar, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) repite esas comprobaciones, publica las imágenes del commit en ECR, las despliega con un documento de SSM (migraciones con copia previa, comprobación de salud y **vuelta atrás automática** si la versión nueva no arranca) y prueba la URL pública. Nunca hay dos despliegues a la vez, y cualquier commit anterior de `main` se puede volver a desplegar a mano. GitHub Actions usa credenciales temporales de un rol que solo puede publicar imágenes y lanzar ese despliegue. Detalle en «Integración continua» y «Despliegue continuo» de [`infra/aws/README.md`](infra/aws/README.md).
 
 #### Diferencias técnicas principales
 
-- **Ejecución:** Compose coordina contenedores en una sola máquina; en cloud, los servicios pueden ejecutarse en plataformas administradas y escalar según la demanda.
-- **Persistencia:** los volúmenes locales sirven para desarrollo. En producción, la base de datos y las imágenes deben residir en almacenamiento gestionado, con copias de seguridad y políticas de retención.
-- **Seguridad:** producción requiere HTTPS, secretos protegidos, reglas de red restrictivas y acceso privado desde la API a la base de datos. JWT, RBAC y CORS siguen aplicándose en la API.
-- **Disponibilidad y observabilidad:** la producción necesita monitorización, alertas, gestión de errores y un plan de recuperación ante fallos.
-- **Despliegue:** una canalización CI/CD puede construir y publicar imágenes Docker, ejecutar comprobaciones y desplegar versiones controladas.
-
-Para un MVP, conviene usar servicios gestionados para PostgreSQL y almacenamiento de imágenes, y mantener frontend y API en contenedores desplegables de forma independiente.
-
-**Pendiente**: La infraestructura cloud concreta depende del proveedor y del tráfico esperado. Se completará en la entrega 3 del presente proyecto. 
-
+- **Ejecución:** en local, Compose con imágenes de desarrollo; en producción, el mismo Compose con imágenes de producción por *digest*, contenedores endurecidos y una sola instancia, sin autoescalado.
+- **Persistencia:** en local, volúmenes de Docker; en producción, PostgreSQL en un volumen EBS propio con copias en S3, e imágenes en S3 en lugar de MinIO.
+- **Secretos:** en local, `.env`; en producción, Parameter Store y solo por entorno (sin Secrets Manager: el nivel estándar de Parameter Store es gratuito).
+- **Correo:** en local, Mailpit por SMTP; en producción, SES por su API.
+- **Red:** en producción la web solo es accesible a través de CloudFront, la API y PostgreSQL solo desde redes internas de Docker, y la instancia no tiene SSH.
+- **Despliegue:** en local, `make dev`; en producción, GitHub Actions y SSM en cada fusión a `main`.
 
 ### **2.5. Seguridad**
 
-Según la arquitectura descrita en el README, el proyecto contempla las siguientes prácticas de seguridad. Como el desarrollo y el despliegue figuran como pendientes, se presentan como medidas previstas; su implementación debe confirmarse en el código y en la configuración de producción.
+Medidas implementadas en la aplicación y en producción (detalle en [`infra/aws/README.md`](infra/aws/README.md)):
 
-- **Autenticación mediante JWT:** la API valida los tokens de acceso para identificar al usuario en las solicitudes protegidas. Por ejemplo, al crear un anuncio, el frontend enviaría `Authorization: Bearer <token>`. La clave de firma debe guardarse como secreto y no incluirse en el repositorio.
+- **Autenticación mediante JWT:** la API valida el token y que el usuario siga activo en cada petición. El navegador nunca recibe el JWT: la web lo guarda en la *cookie* `HttpOnly` y `Secure` `ev_session` y llama a la API desde el servidor con `Authorization: Bearer <token>`. La clave de firma vive en Parameter Store.
 
-- **Autorización basada en roles (RBAC):** el backend comprueba los permisos antes de realizar cada operación. Por ejemplo, solo un administrador de comunidad debería poder aprobar solicitudes o moderar publicaciones. Ocultar un botón en la interfaz no sustituye la comprobación de permisos en la API.
+- **Autorización basada en roles (RBAC):** la API comprueba la membresía y el rol en la comunidad antes de cada operación (`CommunityAccess`); ocultar un botón en la interfaz no sustituye esa comprobación.
 
-- **Control de orígenes mediante CORS:** la API debe aceptar solicitudes web únicamente desde los dominios autorizados. Por ejemplo, producción podría permitir `https://entrevecinos.example.com` y rechazar otros orígenes. CORS no reemplaza la autenticación ni impide por sí solo las solicitudes realizadas fuera de un navegador.
+- **CORS:** la API solo acepta el origen `https://entrevecinos.org`. CORS no sustituye la autenticación.
 
-- **Cabeceras HTTP de seguridad en Next.js:** la web no usa Helmet; Next.js envía en todas las respuestas `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` y `Permissions-Policy` (`next.config.ts`), sin `X-Powered-By`. `Strict-Transport-Security` solo se envía en producción, detrás de HTTPS. La `Content-Security-Policy` se genera en `src/proxy.ts` con un *nonce* por petición, para que solo se ejecuten los scripts de la propia aplicación.
+- **Cabeceras HTTP de seguridad en Next.js:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` y, en producción, `Strict-Transport-Security`, sin `X-Powered-By` (`next.config.ts`). La `Content-Security-Policy` se genera en `src/proxy.ts` con un *nonce* por petición.
 
-- **Cifrado del tráfico:** el acceso público de producción debe utilizar HTTPS para proteger las comunicaciones entre usuarios, frontend y API. Los tokens no deben enviarse a través de conexiones HTTP sin cifrar.
+- **HTTPS y entrada protegida:** CloudFront sirve solo HTTPS (certificado de ACM, HTTP redirigido) con Shield Standard. La instancia solo admite tráfico de CloudFront (grupo de seguridad con su lista de prefijos) y el proxy rechaza con `403` las peticiones sin la cabecera secreta de origen. El proxy limita las peticiones por IP del visitante (inicio de sesión y registro, y general) con `429`.
 
-- **Aislamiento de base de datos y archivos:** PostgreSQL y MinIO —o el almacenamiento compatible con S3 usado en producción— deben permanecer en una red privada y ser accesibles desde el backend, sin exponer sus puertos directamente a Internet.
+- **Instancia endurecida:** sin SSH ni par de claves (Session Manager con registro de sesiones), IMDSv2 obligatorio, parches de seguridad automáticos y contenedores sin *root*, con el sistema de ficheros de solo lectura, sin capacidades y sin el socket de Docker.
 
-- **Gestión de secretos:** las credenciales de PostgreSQL, las claves JWT y las credenciales del almacenamiento deben guardarse en variables protegidas o en un gestor de secretos. Por ejemplo, `.env.example` puede documentar `DATABASE_URL` y `JWT_SECRET` con valores ficticios; el archivo `.env` real debe excluirse del repositorio.
+- **Mínimo privilegio en AWS:** el rol de la instancia solo puede leer y escribir lo que usa la aplicación (validado con IAM Access Analyzer). GitHub Actions usa una clave que solo puede asumir, con un identificador externo, el rol de despliegue, desde el entorno `production` limitado a `main`; las comprobaciones de CI son obligatorias para fusionar.
 
-- **Protección de datos persistentes:** la arquitectura utiliza volúmenes para conservar PostgreSQL y las imágenes. En producción, estos datos deben contar con copias de seguridad y una política de retención. Por ejemplo, se pueden programar copias periódicas y comprobar que es posible restaurarlas.
+- **Base de datos aislada:** PostgreSQL solo es accesible desde la API, por una red interna de Docker sin salida a Internet. La API usa `entrevecinos_app`, sin permisos de DDL; las migraciones, `entrevecinos_owner`.
 
-- **Validación y control de acceso a imágenes:** el backend debe verificar los permisos de quien carga o consulta una imagen y validar los ficheros recibidos. Por ejemplo, puede aceptar solo formatos permitidos, como JPEG, PNG o WebP, y aplicar un tamaño máximo.
+- **Gestión de secretos:** contraseñas, clave de los JWT y cabecera de origen en Parameter Store (`SecureString`), generadas sin quedar en el estado de Terraform (salvo la cabecera). Llegan a los contenedores solo por entorno: no hay ficheros `.env` en la instancia. En local, `.env` está excluido del repositorio y `.env.example` documenta las variables con valores ficticios.
+
+- **Copias protegidas y probadas:** copias de `pg_dump` cada 6 horas que la instancia no puede borrar (política del bucket), *snapshots* diarios, alarma si falta una copia y restauración ensayada.
+
+- **Imágenes:** el bucket es privado; la API valida el contenido (*magic bytes*), el formato (JPEG, PNG o WebP) y el tamaño, y las imágenes solo se leen con URL prefirmadas.
+
+- **Registros sin datos sensibles y alertas:** los registros no guardan contraseñas, *tokens* de validación ni *cookies* de sesión, y las alarmas avisan por correo de caídas, errores y falta de copias.
 
 ### **2.6. Tests**
 
 > Describe brevemente algunos de los tests realizados
 
-**Pendiente** para la entrega 2.
+Cada ticket se implementa con sus pruebas (regla de OpenSpec: las tareas que cambian comportamiento incluyen las pruebas) y todas se ejecutan en contenedores, igual en local que en la integración continua. Recuento de la entrega 3: **485 pruebas de la API** y **358 de la web**.
+
+```bash
+make ci-api    # ruff (lint y formato), alembic check y pytest con PostgreSQL de pruebas
+make ci-web    # ESLint, TypeScript y Vitest
+make tf-lint   # Terraform: fmt, validate, tflint y checkov
+make shellcheck
+```
+
+**API** (`apps/api/tests/`, pytest y el cliente de pruebas de FastAPI):
+
+- **Casos de uso con dobles** (`tests/fakes.py`): reglas de negocio sin base de datos, p. ej. las transiciones de estado de un anuncio (`test_listing_status_rules.py`), el registro con correo pendiente de validar (`test_register_user.py`) o la visibilidad de los anuncios (`test_listing_visibility.py`).
+- **Endpoints**: peticiones HTTP completas con autenticación y roles, p. ej. que un miembro sin aprobar no puede publicar (`test_listings_publish.py`), que un `community_admin` bloquea y expulsa miembros (`test_members_management.py`) o que la búsqueda ignora acentos (`test_listings_search.py`).
+- **Integración con PostgreSQL** (marcador `db`, base `<POSTGRES_DB>_test` que se crea y migra sola): restricciones, consultas y migraciones reales, p. ej. que una cuenta activa debe tener el correo validado salvo un `platform_admin` (`test_db_users.py`) o que cada migración se puede deshacer.
+- **Almacenamiento** (marcador `storage`, MinIO real) y **adaptadores de AWS** (S3 con URL prefirmadas y SES, con respuestas simuladas de boto3, `test_aws_adapters.py`).
+- **Arquitectura** (`test_architecture.py`): `domain` no importa frameworks y `application` solo depende de `domain`.
+- **Contrato** (`test_contract_scope.py`): las rutas implementadas son exactamente las operaciones `x-mvp: true` de `docs/api/openapi.yaml`.
+
+**Web** (`apps/web/src/**/*.test.ts(x)`, Vitest y Testing Library, junto al código):
+
+- **Server Actions y acceso a la API**: validación con zod, errores de la API convertidos en mensajes del formulario y redirecciones, p. ej. `features/auth/actions.test.ts` o `features/listings/actions.test.ts`.
+- **Componentes**: formularios, galería a pantalla completa con teclado (`ListingGallery.test.tsx`), diálogos de confirmación y acciones según el rol (`ListingActions.test.tsx`).
+- **Seguridad**: la `Content-Security-Policy` con *nonce* (`lib/security/csp.test.ts`, `proxy.test.ts`) y que el inicio de sesión guarda el JWT en una *cookie* `HttpOnly` (`features/auth/login.test.ts`).
+
+**Integración continua** (`.github/workflows/ci.yml`): en cada *pull request* se ejecutan las comprobaciones anteriores, se construyen las imágenes de producción para arm64 y se comprueba que los cambios de infraestructura actualizan su guía; ninguna fusión a `main` sin que pasen.
+
+**Producción**: cada despliegue comprueba la salud de los contenedores y la web a través del proxy (con vuelta atrás automática) y termina con una prueba de humo contra `https://entrevecinos.org`. La recuperación de copias, *snapshots* e imágenes se ha ensayado en producción ([registro de ensayos](infra/aws/README.md#registro-de-ensayos)).
 
 ---
 
@@ -928,10 +1074,11 @@ info:
     - **Imágenes:** se suben con `POST /media` y se asocian después a anuncios, perfiles o al avatar por su `id`.
     - **Borrado:** usuarios, anuncios y mensajes usan borrado lógico.
 servers:
-- url: https://api.entrevecinos.example.com/v1
-  description: Producción
 - url: http://localhost:8000/v1
   description: Desarrollo local
+- url: http://api:8000/v1
+  description: Producción, solo en la red interna de Docker (la API no es pública; la llama el servidor
+    de la web)
 security:
 - bearerAuth: []
 tags:
@@ -2488,3 +2635,54 @@ Resultado: 461 pruebas de API (más `ruff`, `alembic check` y `redocly lint`) y 
 
 **Pull Request 3**
 
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/6
+
+#### Título
+
+```
+Feature/entrega 3 sfg producción en AWS (TK-078 a TK-089), rediseño de la web y documentación
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+Tercera entrega. Pone EntreVecinos en producción en AWS (Épica 13, HU-36 y HU-37) e incluye el rediseño de la web (Épica 11) y la documentación de HU-33 a HU-35.
+
+### Producción en AWS (Épica 13)
+
+`https://entrevecinos.org` funciona en AWS. Guía, operación, costes y decisiones: `infra/aws/README.md`.
+
+| Ticket | Cambio |
+|---|---|
+| TK-078 a TK-084 | Terraform en contenedores (`make tf-*`), presupuesto, red, ECR y bucket de imágenes, PostgreSQL con copias, SES, Parameter Store, DNS en Route 53 y certificado de ACM |
+| TK-081 | La API usa las credenciales del rol para S3 y envía el correo con SES |
+| TK-085 | Instancia EC2 `t4g.small` endurecida: sin SSH (Session Manager), IMDSv2, rol de mínimo privilegio y parches automáticos |
+| TK-086 | Compose de producción endurecido (proxy nginx, web, api y db) y despliegue por SSM con migraciones, salud y vuelta atrás automática; secretos solo por entorno |
+| TK-087 | CloudFront con HTTPS, redirección de `www`, caché de estáticos y origen protegido por cabecera; límites por IP en el proxy |
+| TK-088 | Identidad de GitHub Actions de mínimo privilegio para el despliegue continuo |
+| TK-089 | CI en cada *pull request*: `api`, `web`, `infra`, `images` (arm64) y `docs-infra`; Dependabot |
+
+Decisiones que se apartan de los tickets (detalle en «Decisiones de arquitectura» de la guía):
+- **Sin WAF:** el plan gratuito de AWS deniega el plan Free de CloudFront (`pricingplanmanager:*`). Los límites por IP los pone nginx (`429`).
+- **Sin OIDC:** el plan gratuito deniega `iam:CreateOpenIDConnectProvider`. GitHub usa la clave de un usuario IAM que solo puede asumir el rol de despliegue; la clave está solo en el entorno `production`, limitado a `main`.
+- **nginx en lugar de Caddy:** el binario oficial de Caddy no arranca sin *root* con `no-new-privileges`.
+
+Verificado en producción: despliegue y vuelta atrás, aislamiento de redes, contenedores endurecidos, ningún secreto en disco, redirecciones, HSTS y CSP, caché, límites, y el recorrido completo (registro con correo real por SES, comunidad y anuncio con dos fotografías).
+
+### Otros cambios
+
+- **Épica 11:** rediseño de la web con estética natural.
+- **HU-33 a HU-35:** dónde se aplica la seguridad, alcance del MVP del modelo de datos y la API, y `docs/api/openapi.yaml` como fuente de verdad.
+- `AGENTS.md` con las instrucciones para agentes, contexto de OpenSpec y regla de documentación de la infraestructura (TK-094).
+
+## Comprobaciones
+
+- [x] Pruebas, lint y formato pasan en contenedores (ver `AGENTS.md`, «Entorno y comandos»): `make ci-api` (485 pruebas) y `make ci-web` (358 pruebas).
+- [x] Si cambia una petición o respuesta de la API, he actualizado `docs/api/openapi.yaml`.
+- [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()`.
+- [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md`.
+~~~

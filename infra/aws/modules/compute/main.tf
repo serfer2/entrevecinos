@@ -61,6 +61,21 @@ resource "aws_instance" "app" {
   }
 }
 
+# IP pública fija (TK-098): Brevo solo acepta envíos desde IP autorizadas y la IP automática cambia
+# al parar o reemplazar la instancia. Cuesta lo mismo que la automática (toda IPv4 pública se paga).
+resource "aws_eip" "app" {
+  domain   = "vpc"
+  instance = aws_instance.app.id
+
+  tags = {
+    Name = "entrevecinos-prod-app"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 resource "aws_volume_attachment" "postgres" {
   device_name                    = "/dev/sdf"
   volume_id                      = var.postgres_volume_id

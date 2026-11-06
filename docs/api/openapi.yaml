@@ -14,10 +14,10 @@ info:
     - **Imágenes:** se suben con `POST /media` y se asocian después a anuncios, perfiles o al avatar por su `id`.
     - **Borrado:** usuarios, anuncios y mensajes usan borrado lógico.
 servers:
-  - url: https://api.entrevecinos.example.com/v1
-    description: Producción
   - url: http://localhost:8000/v1
     description: Desarrollo local
+  - url: http://api:8000/v1
+    description: Producción, solo en la red interna de Docker (la API no es pública; la llama el servidor de la web)
 
 security:
   - bearerAuth: []
