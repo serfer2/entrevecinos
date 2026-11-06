@@ -1,3 +1,4 @@
+# Prueba de CI (TK-089): cambio de infraestructura sin la guía.
 # Web pública en https://<dominio> con CloudFront (TK-087): HTTPS, redirección de www, caché de
 # estáticos y alias en Route 53. Sin WAF: el plan del proyecto no admite el plan Free de CloudFront
 # y el límite de peticiones lo pone el proxy de la instancia (infra/prod/proxy).
