@@ -10,6 +10,6 @@
 
 ## 3. Verificación en GitHub
 
-- [ ] 3.1 Etiqueta `sin-cambios-en-doc-infra` y protección de `main` (manual)
-- [ ] 3.2 *Pull request* de la rama: los cinco trabajos en verde (AC1, AC3)
-- [ ] 3.3 *Pull requests* de prueba: prueba rota bloqueada (AC2) y `docs-infra` con y sin etiqueta (AC2b)
+- [x] 3.1 Etiqueta `sin-cambios-en-doc-infra` y protección de `main` (manual)
+- [x] 3.2 *Pull request* de la rama: los cinco trabajos en verde (AC1, AC3)
+- [x] 3.3 *Pull requests* de prueba: prueba rota bloqueada (AC2) y `docs-infra` con y sin etiqueta (AC2b)
