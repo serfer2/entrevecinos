@@ -4,7 +4,8 @@ delete:
   tags: [Mensajería]
   operationId: deleteMessage
   summary: Eliminar un mensaje propio
-  description: Borrado lógico (`deleted_at`). Solo el remitente.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Borrado lógico (`deleted_at`). Solo el remitente.
   x-mvp: false
   responses:
     "204":

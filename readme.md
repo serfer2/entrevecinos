@@ -164,6 +164,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Permitir que sus miembros vean los anuncios asociados a ella.
    - Incluir una gestión sencilla de acceso, por ejemplo, aprobación por parte de un administrador.
    - Las comunidades nuevas quedan pendientes hasta que un administrador de la plataforma las aprueba; las que crea él quedan activas al momento. Cada usuario puede tener solo una comunidad pendiente a la vez.
+   - El administrador de la plataforma accede a cualquier comunidad sin solicitar acceso: ve sus anuncios, publica en ella y la gestiona.
 3. **Gestión de anuncios**
    - Crear, editar y eliminar anuncios propios.
    - Marcar los anuncios propios como reservados o finalizados.
@@ -175,12 +176,12 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Filtrar por comunidad y tipo de publicación.
    - Ordenar por fecha o precio.
 5. **Detalle y contacto**
-   - Consultar la información completa del anuncio y del anunciante.
+   - Consultar la información completa del anuncio y del anunciante, con sus fotografías ampliables a pantalla completa.
    - Contactar con quien publicó el anuncio. Para el MVP puede bastar un canal de contacto directo; la mensajería interna puede añadirse cuando el flujo básico esté validado.
 6. **Administración mínima**
-   - Contar con una persona administradora que pueda gestionar miembros y retirar anuncios problemáticos.
+   - Contar con una persona administradora que pueda gestionar miembros y ocultar anuncios problemáticos.
  
-Quedan para una fase posterior el perfil profesional, las notificaciones automáticas, el sistema completo de denuncias y el panel avanzado de administración.
+Quedan para una fase posterior el perfil profesional, las notificaciones automáticas, el sistema completo de denuncias y el panel avanzado de administración. Sus entidades del modelo de datos (§3.2) y sus operaciones de la API (`x-mvp: false` en [`docs/api/`](docs/api/README.md)) ya están diseñadas y marcadas como versión futura, igual que las de la mensajería interna.
 
 ---
 
@@ -188,7 +189,16 @@ Quedan para una fase posterior el perfil profesional, las notificaciones automá
 
 > Proporciona imágenes y/o videotutorial mostrando la experiencia del usuario desde que aterriza en la aplicación, pasando por todas las funcionalidades principales.
 
-**Pendiente**. Se proporcionará una vez completado el desarrollo del frontend.
+**Pendiente** (imágenes y videotutorial). Se proporcionará una vez completado el desarrollo del frontend.
+
+La Épica 11 (HU-28 a HU-32, TK-066 a TK-072) fija la identidad visual y mejora el uso de la web:
+
+- **Identidad cercana a la naturaleza:** verde musgo para las acciones, neutros cálidos de piedra y tierra, ocre para avisos y terracota para errores, sobre un fondo claro, con contraste AA. Tipografías Figtree (texto) y Fraunces (títulos), autoalojadas, y un logotipo con un brote. Los colores se definen una sola vez en `apps/web/src/styles/globals.css`.
+- **Sencillez:** espacios amplios, paneles blancos sobre el fondo, pocos elementos decorativos e iconos solo cuando ayudan a entender una acción (búsqueda, ubicación, ampliar).
+- **Anuncios fáciles de explorar:** tarjetas que destacan fotografía, título y precio, con el tipo y «Reservado» sobre la imagen; búsqueda, filtros y orden agrupados en un panel.
+- **Fotografías a pantalla completa** en el detalle, con botones, teclado y gestos táctiles.
+- **Adaptable:** de una a cuatro columnas según el ancho; en móvil la cabecera no queda fija. Comprobado también en Firefox.
+- **Accesibilidad:** foco visible, diálogos modales que atrapan el foco y animaciones desactivadas con `prefers-reduced-motion`.
 
 ---
 
@@ -215,19 +225,18 @@ flowchart TB
 
     subgraph FE["Capa de frontend"]
         NEXT["React + Next.js v16<br/>TypeScript + TailwindCSS"]
-        HELMET["Helmet<br/>Cabeceras HTTP de seguridad"]
-        NEXT --> HELMET
-    end
-
-    subgraph SEC["Capa de seguridad"]
-        CORS["CORS<br/>Control de orígenes"]
-        JWT["JWT Auth<br/>Autenticación"]
-        RBAC["RBAC<br/>Autorización por roles"]
-        CORS --> JWT --> RBAC
+        HEADERS["Cabeceras HTTP de seguridad<br/>next.config.ts + CSP con nonce"]
+        NEXT --> HEADERS
     end
 
     subgraph BE["Backend · contenedor Docker"]
-        API["FastAPI · Python<br/>API REST y lógica de negocio"]
+        subgraph FASTAPI["FastAPI · Python"]
+            CORS["CORS<br/>Control de orígenes"]
+            JWT["JWT Auth<br/>Autenticación"]
+            RBAC["RBAC<br/>Autorización por roles"]
+            API["API REST y lógica de negocio"]
+            CORS --> JWT --> RBAC --> API
+        end
     end
 
     subgraph DATA["Persistencia · contenedores Docker"]
@@ -243,12 +252,11 @@ flowchart TB
     SMTP["Servidor SMTP<br/>Mailpit en desarrollo"]
 
     U -->|"HTTPS"| NEXT
-    HELMET -->|"Solicitudes API con JWT"| CORS
-    RBAC -->|"Solicitud autorizada"| API
+    NEXT -->|"Solicitudes API con JWT"| CORS
     API -->|"Consultas y transacciones"| DB
     API -->|"Carga y lectura de imágenes"| IMG
     API -->|"Correo de validación"| SMTP
-    SMTP -.->|"Enlace de validación"| U
+    U <-.-|"Enlace de validación"| SMTP
 ```
 
 #### Patrón arquitectónico
@@ -258,7 +266,7 @@ La solución sigue una arquitectura cliente-servidor de tres capas: presentació
 
 Next.js proporciona la interfaz web; FastAPI concentra las reglas de negocio y expone la API REST. PostgreSQL almacena los datos estructurados y relacionados. MinIO almacena los ficheros de imagen, mientras que PostgreSQL conserva sus metadatos y referencias. Los volúmenes persistentes mantienen los datos aunque se recreen los contenedores.
 
-JWT Auth valida la identidad y RBAC comprueba los permisos en el backend. CORS restringe los orígenes autorizados a comunicarse con la API. Helmet configura cabeceras HTTP de seguridad para el frontend. Como Helmet pertenece al ecosistema Node.js, si Next.js se ejecuta sin un servidor Node personalizado, las cabeceras equivalentes deben configurarse en Next.js o en un proxy frontal.
+La seguridad de la API se aplica dentro de FastAPI, en este orden: CORS restringe los orígenes autorizados, JWT Auth valida la identidad y RBAC comprueba los permisos antes de ejecutar cada caso de uso. No hay una capa intermedia entre el frontend y el backend. En la web, Next.js configura las cabeceras HTTP de seguridad y una `Content-Security-Policy` con un *nonce* por petición, sin Helmet ni un servidor Node personalizado.
 
 **Beneficios**
 
@@ -277,11 +285,9 @@ JWT Auth valida la identidad y RBAC comprueba los permisos en el backend. CORS r
 
 ### **2.2. Descripción de componentes principales:**
 
-- **Frontend web:** construido con **React**, **Next.js v16** y **TypeScript**. Presenta las páginas de la aplicación y permite a los usuarios buscar, consultar y gestionar anuncios. **TailwindCSS** se utiliza para crear y adaptar los estilos a ordenadores, tablets y móviles.
+- **Frontend web:** construido con **React**, **Next.js v16** y **TypeScript**. Presenta las páginas de la aplicación y permite a los usuarios buscar, consultar y gestionar anuncios. **TailwindCSS** se utiliza para crear y adaptar los estilos a ordenadores, tablets y móviles. Next.js añade las cabeceras HTTP de seguridad a todas las respuestas (`next.config.ts`) y genera una `Content-Security-Policy` con un *nonce* por petición (`src/proxy.ts`).
 
-- **Capa de seguridad:** protege el acceso entre frontend y backend. **JWT Auth** identifica a los usuarios mediante tokens; **RBAC** controla las acciones permitidas según el rol; **CORS** limita los orígenes autorizados; y **Helmet** configura cabeceras HTTP de seguridad en el servidor Node.js del frontend. La API debe validar los tokens y permisos en el backend.
-
-- **API y lógica de negocio:** desarrollada en **Python con FastAPI** y ejecutada en un contenedor Docker. Gestiona usuarios, comunidades y publicaciones, aplica las reglas del producto y proporciona endpoints REST al frontend. También coordina el acceso a la base de datos y al almacenamiento de imágenes.
+- **API y lógica de negocio:** desarrollada en **Python con FastAPI** y ejecutada en un contenedor Docker. Gestiona usuarios, comunidades y publicaciones, aplica las reglas del producto y proporciona endpoints REST al frontend. También coordina el acceso a la base de datos y al almacenamiento de imágenes. La seguridad se aplica dentro de la propia API, antes de cada caso de uso: **CORS** (`CORSMiddleware`) limita los orígenes autorizados; **JWT Auth** (`CurrentUserDep`) valida el token y que el usuario siga activo; y **RBAC** (`CommunityAccess`) comprueba la membresía y el rol en la comunidad, con acceso total para el administrador de plataforma.
 
 - **Base de datos relacional:** **PostgreSQL 16**, desplegada en un contenedor Docker. Guarda la información estructurada, como usuarios, comunidades, anuncios y mensajes. Un volumen persistente conserva los datos cuando se reinicia o recrea el contenedor.
 
@@ -442,7 +448,7 @@ Según la arquitectura descrita en el README, el proyecto contempla las siguient
 
 - **Control de orígenes mediante CORS:** la API debe aceptar solicitudes web únicamente desde los dominios autorizados. Por ejemplo, producción podría permitir `https://entrevecinos.example.com` y rechazar otros orígenes. CORS no reemplaza la autenticación ni impide por sí solo las solicitudes realizadas fuera de un navegador.
 
-- **Cabeceras HTTP de seguridad con Helmet:** Helmet puede configurar cabeceras como `X-Content-Type-Options: nosniff` y `Strict-Transport-Security` en el servidor Node.js del frontend. Si Next.js se ejecuta sin un servidor Node personalizado, estas cabeceras deben configurarse en Next.js o en el proxy frontal.
+- **Cabeceras HTTP de seguridad en Next.js:** la web no usa Helmet; Next.js envía en todas las respuestas `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` y `Permissions-Policy` (`next.config.ts`), sin `X-Powered-By`. `Strict-Transport-Security` solo se envía en producción, detrás de HTTPS. La `Content-Security-Policy` se genera en `src/proxy.ts` con un *nonce* por petición, para que solo se ejecuten los scripts de la propia aplicación.
 
 - **Cifrado del tráfico:** el acceso público de producción debe utilizar HTTPS para proteger las comunicaciones entre usuarios, frontend y API. Los tokens no deben enviarse a través de conexiones HTTP sin cifrar.
 
@@ -557,7 +563,7 @@ erDiagram
     }
 
     CONVERSATION {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID listing_id FK "NOT NULL; FK a listing.id"
         UUID buyer_id FK "NOT NULL; FK a user.id"
         UUID seller_id FK "NOT NULL; FK a user.id; CHECK buyer_id <> seller_id"
@@ -567,7 +573,7 @@ erDiagram
     }
 
     MESSAGE {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID conversation_id FK "NOT NULL; FK a conversation.id"
         UUID sender_id FK "NOT NULL; FK a user.id"
         TEXT body "NOT NULL; no vacío"
@@ -577,7 +583,7 @@ erDiagram
     }
 
     NOTIFICATION {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID recipient_id FK "NOT NULL; FK a user.id"
         UUID message_id FK "NULL; FK a message.id"
         notification_type type "NOT NULL"
@@ -587,7 +593,7 @@ erDiagram
     }
 
     PROFESSIONAL_PROFILE {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID user_id FK, UK "NOT NULL; FK a user.id; un perfil por usuario"
         TEXT description "NOT NULL"
         VARCHAR service_area "VARCHAR(160); NOT NULL"
@@ -598,7 +604,7 @@ erDiagram
     }
 
     PROFESSIONAL_SERVICE {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID professional_profile_id FK "NOT NULL; FK a professional_profile.id"
         VARCHAR name "VARCHAR(120); NOT NULL"
         TEXT description "NULL"
@@ -606,13 +612,13 @@ erDiagram
     }
 
     PROFESSIONAL_PROFILE_IMAGE {
-        UUID professional_profile_id PK, FK "NOT NULL; FK a professional_profile.id"
+        UUID professional_profile_id PK, FK "Versión futura; NOT NULL; FK a professional_profile.id"
         UUID asset_id PK, FK "NOT NULL; FK a media_asset.id"
         SMALLINT position "NOT NULL; DEFAULT 0; CHECK position >= 0"
     }
 
     REPORT {
-        UUID id PK "Identificador; NOT NULL"
+        UUID id PK "Versión futura; identificador; NOT NULL"
         UUID listing_id FK "NOT NULL; FK a listing.id"
         UUID reporter_id FK "NOT NULL; FK a user.id"
         report_reason reason "NOT NULL"
@@ -657,10 +663,29 @@ erDiagram
     USER o|--o{ REPORT : "revisa"
 ```
 
+El MVP implementa 8 entidades: `user` (tabla `users`), `email_verification`, `community`, `community_membership`, `category`, `listing`, `media_asset` y `listing_image`. Las otras 7 (`conversation`, `message`, `notification`, `professional_profile`, `professional_service`, `professional_profile_image` y `report`) están diseñadas para versiones futuras: su primer atributo lo indica en el diagrama y todavía no tienen tabla.
+
 
 ### **3.2. Descripción de entidades principales:**
 
-El modelo cubre las funciones descritas en el README: usuarios, comunidades, anuncios, imágenes, mensajería, notificaciones, perfiles profesionales y moderación. Se propone para **PostgreSQL 16**. Las tablas se nombran en singular, igual que las entidades (`community`, `listing`…), salvo la de usuarios, que se llama `users` porque `user` es una palabra reservada de PostgreSQL. Los campos marcados `NOT NULL` no admiten valores nulos; `NULL` indica que el dato es opcional.
+El modelo cubre las funciones descritas en el README: usuarios, comunidades, anuncios e imágenes, que forman el MVP, y mensajería, notificaciones, perfiles profesionales y denuncias, previstas para versiones futuras. La tabla relaciona cada entidad con su alcance y con las operaciones de la API que la usan; en el contrato ([`docs/api/`](docs/api/README.md)), `x-mvp: true` marca las operaciones implementadas en el MVP y `x-mvp: false` las de versiones futuras.
+
+| Entidad | Alcance | Operaciones de la API |
+|---|---|---|
+| `user` | MVP | `POST /auth/register`, `POST /auth/token`, `GET/PATCH /users/me`, `GET /users/me/memberships`. Versión futura: `DELETE /users/me`, `GET /users/me/listings`, `/admin/users` |
+| `email_verification` | MVP | `POST /auth/email-verification`, `POST /auth/email-verification/resend` |
+| `community` | MVP | `GET/POST /communities`, `GET /communities/{community_id}`, `GET /admin/communities`, `PATCH /admin/communities/{community_id}`. Versión futura: `PATCH /communities/{community_id}` |
+| `community_membership` | MVP | `GET/POST /communities/{community_id}/memberships`, `PATCH/DELETE /communities/{community_id}/memberships/{user_id}` |
+| `category` | MVP | `GET /categories`. Versión futura: `POST /categories`, `PATCH /categories/{category_id}` |
+| `listing` | MVP | `GET/POST /communities/{community_id}/listings`, `GET/PATCH/DELETE /listings/{listing_id}`, `PATCH /listings/{listing_id}/status` |
+| `media_asset` | MVP | `POST /media`, `GET /media/{asset_id}`. Versión futura: `DELETE /media/{asset_id}` |
+| `listing_image` | MVP | `PUT /listings/{listing_id}/images` |
+| `conversation`, `message` | Versión futura | Mensajería: `/listings/{listing_id}/conversations`, `/conversations…`, `/messages/{message_id}` |
+| `notification` | Versión futura | Notificaciones: `/notifications…` |
+| `professional_profile`, `professional_service`, `professional_profile_image` | Versión futura | Perfil profesional: `/professionals…`, `/users/me/professional-profile…` |
+| `report` | Versión futura | Denuncias: `/listings/{listing_id}/reports`, `/communities/{community_id}/reports`, `/reports/{report_id}` |
+
+`GET /health` no usa ninguna entidad. Se propone para **PostgreSQL 16**. Las tablas se nombran en singular, igual que las entidades (`community`, `listing`…), salvo la de usuarios, que se llama `users` porque `user` es una palabra reservada de PostgreSQL. Los campos marcados `NOT NULL` no admiten valores nulos; `NULL` indica que el dato es opcional.
 
 #### 1. `user` — Usuario
 
@@ -751,7 +776,7 @@ Guarda metadatos y ubicación del fichero; el binario se almacena en MinIO o en 
 
 La clave compuesta `(listing_id, asset_id)` evita asociar dos veces la misma imagen al mismo anuncio.
 
-#### 8. `conversation` — Conversación
+#### 8. `conversation` — Conversación (versión futura)
 
 Una conversación está vinculada a un anuncio y a sus dos participantes.
 
@@ -765,7 +790,7 @@ Una conversación está vinculada a un anuncio y a sus dos participantes.
 
 Restricciones recomendadas: `CHECK (buyer_id <> seller_id)` y `UNIQUE (listing_id, buyer_id, seller_id)` para evitar conversaciones duplicadas entre los mismos usuarios por el mismo anuncio.
 
-#### 9. `message` — Mensaje
+#### 9. `message` — Mensaje (versión futura)
 
 - `id UUID` — **PK**.
 - `conversation_id UUID` — `NOT NULL`, **FK** → `conversation.id`.
@@ -777,7 +802,7 @@ Restricciones recomendadas: `CHECK (buyer_id <> seller_id)` y `UNIQUE (listing_i
 
 La aplicación debe comprobar que el remitente pertenece a la conversación.
 
-#### 10. `notification` — Notificación
+#### 10. `notification` — Notificación (versión futura)
 
 - `id UUID` — **PK**.
 - `recipient_id UUID` — `NOT NULL`, **FK** → `user.id`.
@@ -787,7 +812,7 @@ La aplicación debe comprobar que el remitente pertenece a la conversación.
 - `created_at TIMESTAMPTZ` — `NOT NULL`.
 - `read_at TIMESTAMPTZ` — `NULL`.
 
-#### 11. `professional_profile` — Perfil profesional
+#### 11. `professional_profile` — Perfil profesional (versión futura)
 
 - `id UUID` — **PK**.
 - `user_id UUID` — `NOT NULL`, `UNIQUE`, **FK** → `user.id`; un perfil profesional por usuario.
@@ -798,7 +823,7 @@ La aplicación debe comprobar que el remitente pertenece a la conversación.
 - `created_at TIMESTAMPTZ` — `NOT NULL`.
 - `updated_at TIMESTAMPTZ` — `NOT NULL`.
 
-#### 12. `professional_service` — Servicio profesional ofrecido
+#### 12. `professional_service` — Servicio profesional ofrecido (versión futura)
 
 - `id UUID` — **PK**.
 - `professional_profile_id UUID` — `NOT NULL`, **FK** → `professional_profile.id`.
@@ -806,13 +831,13 @@ La aplicación debe comprobar que el remitente pertenece a la conversación.
 - `description TEXT` — `NULL`.
 - `is_active BOOLEAN` — `NOT NULL`, `DEFAULT TRUE`.
 
-#### 13. `professional_profile_image` — Imagen de perfil profesional
+#### 13. `professional_profile_image` — Imagen de perfil profesional (versión futura)
 
 - `professional_profile_id UUID` — **PK compuesta**, **FK** → `professional_profile.id`.
 - `asset_id UUID` — **PK compuesta**, **FK** → `media_asset.id`.
 - `position SMALLINT` — `NOT NULL`, `DEFAULT 0`, `CHECK (position >= 0)`.
 
-#### 14. `report` — Denuncia
+#### 14. `report` — Denuncia (versión futura)
 
 - `id UUID` — **PK**.
 - `listing_id UUID` — `NOT NULL`, **FK** → `listing.id`.
@@ -847,10 +872,10 @@ Se recomienda definir estos enums en PostgreSQL:
 - `membership_status`: `pending`, `approved`, `rejected`, `blocked`
 - `listing_type`: `sell`, `wanted`, `offer_service`, `need_service`, `free`, `other`
 - `listing_status`: `draft`, `active`, `reserved`, `completed`, `hidden`, `deleted`
-- `conversation_status`: `open`, `closed`, `archived`
-- `notification_type`: `new_message`, `listing_response`, `system`
-- `report_reason`: `inappropriate`, `fraud`, `prohibited_item`, `spam`, `other`
-- `report_status`: `pending`, `reviewing`, `resolved`, `rejected`
+- `conversation_status`: `open`, `closed`, `archived` (versión futura)
+- `notification_type`: `new_message`, `listing_response`, `system` (versión futura)
+- `report_reason`: `inappropriate`, `fraud`, `prohibited_item`, `spam`, `other` (versión futura)
+- `report_status`: `pending`, `reviewing`, `resolved`, `rejected` (versión futura)
 
 #### Índices recomendados
 
@@ -866,12 +891,12 @@ Las claves primarias y restricciones `UNIQUE` crean índices automáticamente. A
 | `listing` | `(price)` | Ordenar por precio |
 | `listing` | GIN sobre `title` y `description` | Búsqueda de texto completo |
 | `listing_image` | `(asset_id)` | Encontrar anuncios que referencian una imagen |
-| `conversation` | `(listing_id, buyer_id, seller_id)` | Localizar conversaciones de un anuncio |
-| `message` | `(conversation_id, created_at)` | Cargar mensajes en orden cronológico |
-| `notification` | `(recipient_id, read_at, created_at DESC)` | Consultar notificaciones recientes y pendientes |
-| `report` | `(status, created_at)` | Listar denuncias pendientes de revisión |
-| `professional_service` | `(professional_profile_id, is_active)` | Listar servicios activos de un perfil |
-| `professional_profile_image` | `(asset_id)` | Encontrar perfiles que referencian una imagen |
+| `conversation` | `(listing_id, buyer_id, seller_id)` | Localizar conversaciones de un anuncio (versión futura) |
+| `message` | `(conversation_id, created_at)` | Cargar mensajes en orden cronológico (versión futura) |
+| `notification` | `(recipient_id, read_at, created_at DESC)` | Consultar notificaciones recientes y pendientes (versión futura) |
+| `report` | `(status, created_at)` | Listar denuncias pendientes de revisión (versión futura) |
+| `professional_service` | `(professional_profile_id, is_active)` | Listar servicios activos de un perfil (versión futura) |
+| `professional_profile_image` | `(asset_id)` | Encontrar perfiles que referencian una imagen (versión futura) |
 
 Para búsqueda de texto completo, puede crearse una columna `tsvector` generada o un índice GIN sobre una expresión `to_tsvector` que combine título y descripción. Si la mayoría de consultas solo muestran anuncios activos, pueden evaluarse índices parciales con `WHERE status = 'active'`.
 
@@ -881,234 +906,598 @@ Las reglas `ON DELETE` deben definirse explícitamente. Para anuncios y usuarios
 
 ## 4. Especificación de la API
 
-El endpoint de consulta incluye búsqueda, filtros y ordenación; el de creación exige un JWT y una membresía aprobada en la comunidad. El canal de contacto del MVP puede basarse en los datos del anunciante; la mensajería interna queda fuera de estos endpoints iniciales.
+La especificación completa de la API es [`docs/api/openapi.yaml`](docs/api/openapi.yaml) (OpenAPI 3.1), la **fuente de verdad** del contrato. [`docs/api/README.md`](docs/api/README.md) explica su estructura y convenciones, cómo validarla y previsualizarla, y resume qué operaciones son del MVP y cuáles de versiones futuras: `x-mvp: true` marca las implementadas en el MVP y `x-mvp: false` las pendientes, y las pruebas de la API comprueban que coinciden con lo implementado.
 
+Este es un extracto del contrato con tres operaciones del recorrido principal: listar y publicar anuncios en una comunidad, registrarse e iniciar sesión. El listado incluye búsqueda, filtros y ordenación; la publicación exige un JWT y una membresía aprobada en la comunidad. El contacto del MVP usa los datos del anunciante; la mensajería interna es de una versión futura. **Si el extracto y el contrato difieren, prevalece el contrato**; para regenerarlo, consulta `docs/api/README.md`.
+
+<!-- openapi-extract:start -->
 ```yaml
 openapi: 3.1.0
 info:
   title: API de EntreVecinos
   version: 1.0.0
-  description: API REST para el MVP del marketplace local EntreVecinos.
+  description: |
+    API REST del marketplace de proximidad **EntreVecinos**.
+
+    ## Convenciones
+    - **Autenticación:** JWT en `Authorization: Bearer <token>` (`/auth/token`, o `/auth/email-verification` tras registrarse con `/auth/register`). Los endpoints públicos declaran `security: []`.
+    - **Autorización (RBAC):** cada operación indica en su descripción el rol necesario: usuario autenticado, miembro aprobado de la comunidad, `community_admin`/`moderator` o `platform_admin`.
+    - **MVP:** la extensión `x-mvp` vale `true` en las operaciones implementadas en el MVP y `false` en las pendientes de una versión futura, cuya descripción empieza por «Versión futura».
+    - **Paginación:** los listados aceptan `page` y `page_size` y devuelven `{items, page, page_size, total}`.
+    - **Errores:** cuerpo `{"detail": "..."}`; los errores de validación (422) siguen el formato estándar de FastAPI.
+    - **Imágenes:** se suben con `POST /media` y se asocian después a anuncios, perfiles o al avatar por su `id`.
+    - **Borrado:** usuarios, anuncios y mensajes usan borrado lógico.
 servers:
-  - url: https://api.entrevecinos.example.com/v1
-    description: Producción
-  - url: http://localhost:8000/v1
-    description: Desarrollo local
-
+- url: https://api.entrevecinos.example.com/v1
+  description: Producción
+- url: http://localhost:8000/v1
+  description: Desarrollo local
+security:
+- bearerAuth: []
 tags:
-  - name: Anuncios
-    description: Consulta y publicación de anuncios
-  - name: Autenticación
-    description: Registro e inicio de sesión
-
+- name: Autenticación
+  description: Registro, validación del correo e inicio de sesión.
+- name: Anuncios
+  description: Consulta, publicación y gestión de anuncios.
 paths:
   /communities/{community_id}/listings:
     parameters:
-      - name: community_id
-        in: path
-        required: true
-        description: Identificador de la comunidad cuyos anuncios se consultan o publican.
+    - $ref: '#/components/parameters/CommunityId'
+    get:
+      tags:
+      - Anuncios
+      operationId: listCommunityListings
+      summary: Buscar anuncios de una comunidad
+      description: Permite explorar anuncios y aplicar búsqueda, filtros y ordenación. Solo devuelve anuncios
+        `active` y `reserved` cuyo autor tiene una membresía aprobada en la comunidad (los de miembros
+        bloqueados o expulsados quedan ocultos). Requiere una membresía aprobada en la comunidad.
+      x-mvp: true
+      parameters:
+      - name: q
+        in: query
+        required: false
+        description: 'Busca palabras clave en el título y la descripción. Se recortan los espacios: vacío
+          equivale a no enviarlo; con menos de 2 caracteres responde 422. Las palabras de un solo carácter
+          se ignoran.'
+        schema:
+          type: string
+          maxLength: 160
+      - name: type
+        in: query
+        required: false
+        description: Filtra por modalidad de anuncio.
+        schema:
+          $ref: '#/components/schemas/ListingType'
+      - name: category_id
+        in: query
+        required: false
+        description: Filtra por categoría.
         schema:
           type: string
           format: uuid
-
-    get:
-      tags: [Anuncios]
-      summary: Buscar anuncios de una comunidad
-      description: Permite explorar anuncios y aplicar búsqueda, filtros y ordenación.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: q
-          in: query
-          required: false
-          description: >-
-            Busca palabras clave en el título y la descripción. Se recortan los espacios: vacío equivale a
-            no enviarlo; con menos de 2 caracteres responde 422. Las palabras de un solo carácter se ignoran.
-          schema:
-            type: string
-            maxLength: 160
-        - name: type
-          in: query
-          required: false
-          description: Filtra por modalidad de anuncio.
-          schema:
-            $ref: "#/components/schemas/ListingType"
-        - name: category_id
-          in: query
-          required: false
-          description: Filtra por categoría.
-          schema:
-            type: string
-            format: uuid
-        - name: sort
-          in: query
-          required: false
-          description: Campo de ordenación.
-          schema:
-            type: string
-            enum: [published_at, price]
-            default: published_at
-        - name: order
-          in: query
-          required: false
-          description: Dirección de ordenación.
-          schema:
-            type: string
-            enum: [asc, desc]
-            default: desc
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - name: page_size
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
+      - name: sort
+        in: query
+        required: false
+        description: Campo de ordenación.
+        schema:
+          type: string
+          enum:
+          - published_at
+          - price
+          default: published_at
+      - name: order
+        in: query
+        required: false
+        description: Dirección de ordenación.
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+          default: desc
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
       responses:
-        "200":
+        '200':
           description: Anuncios encontrados.
           content:
             application/json:
               schema:
-                type: object
-                required: [items, page, page_size, total]
-                properties:
-                  items:
-                    type: array
+                allOf:
+                - $ref: '#/components/schemas/PageMeta'
+                - type: object
+                  required:
+                  - items
+                  properties:
                     items:
-                      $ref: "#/components/schemas/Listing"
-                  page:
-                    type: integer
-                  page_size:
-                    type: integer
-                  total:
-                    type: integer
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: El usuario no pertenece a la comunidad o no puede acceder a ella.
-        "404":
-          description: Comunidad no encontrada.
-
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Listing'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/MembershipForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     post:
-      tags: [Anuncios]
+      tags:
+      - Anuncios
+      operationId: createListing
       summary: Publicar un anuncio
-      description: Crea un anuncio en la comunidad. El usuario debe tener una membresía aprobada.
-      security:
-        - bearerAuth: []
+      description: Crea un anuncio `active` en la comunidad. El usuario debe tener una membresía aprobada.
+      x-mvp: true
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ListingCreate"
+              $ref: '#/components/schemas/ListingCreate'
             example:
-              category_id: "98bff8e2-588e-4cdf-8ba2-03166a249477"
-              title: "Bicicleta infantil"
-              description: "Bicicleta en buen estado, poco uso."
+              category_id: 98bff8e2-588e-4cdf-8ba2-03166a249477
+              title: Bicicleta infantil
+              description: Bicicleta en buen estado, poco uso.
               type: sell
-              price: 45.00
+              price: 45
               currency: EUR
       responses:
-        "201":
+        '201':
           description: Anuncio creado.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Listing"
-        "400":
-          description: Datos inválidos o precio/moneda incompatibles.
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: El usuario no tiene una membresía aprobada en la comunidad.
-        "404":
-          description: Comunidad o categoría no encontrada.
-
+                $ref: '#/components/schemas/Listing'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/MembershipForbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /auth/register:
     post:
-      tags: [Autenticación]
+      tags:
+      - Autenticación
+      operationId: registerUser
       summary: Registrar una cuenta
-      description: Crea una cuenta y devuelve un token JWT para iniciar la sesión.
+      description: 'Crea una cuenta inactiva con rol `user` y envía un correo con un enlace de validación
+        que caduca a las 24 horas. No inicia la sesión: la cuenta se activa al validar el correo (`POST
+        /auth/email-verification`). Acceso público.'
+      x-mvp: true
       security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RegisterRequest"
+              $ref: '#/components/schemas/RegisterRequest'
             example:
-              email: "vecino@example.com"
-              password: "UnaClaveSegura123!"
-              full_name: "Alex Vecino"
+              email: vecino@example.com
+              password: UnaClaveSegura123!
+              full_name: Alex Vecino
+              phone: '+34600111222'
       responses:
-        "201":
-          description: Cuenta creada.
+        '201':
+          description: Cuenta creada, pendiente de validar el correo.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "409":
-          description: Ya existe una cuenta con ese correo electrónico.
-        "422":
-          description: Datos de registro inválidos.
-
+                $ref: '#/components/schemas/RegistrationResponse'
+              example:
+                email: vecino@example.com
+                verification_expires_at: '2026-10-22T10:00:00Z'
+        '409':
+          description: El correo ya está registrado. Con una cuenta pendiente de validación, `code` es
+            `email_pending_verification` y la cuenta no cambia.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationConflict'
+              examples:
+                enUso:
+                  value:
+                    detail: El correo ya está en uso.
+                    code: email_in_use
+                pendiente:
+                  value:
+                    detail: Este correo está pendiente de validación.
+                    code: email_pending_verification
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /auth/token:
     post:
-      tags: [Autenticación]
+      tags:
+      - Autenticación
+      operationId: loginUser
       summary: Iniciar sesión
-      description: Valida las credenciales y emite un token JWT.
+      description: Valida las credenciales y emite un token JWT. Acceso público.
+      x-mvp: true
       security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginRequest"
+              $ref: '#/components/schemas/LoginRequest'
             example:
-              email: "vecino@example.com"
-              password: "UnaClaveSegura123!"
+              email: vecino@example.com
+              password: UnaClaveSegura123!
       responses:
-        "200":
+        '200':
           description: Inicio de sesión correcto.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "401":
-          description: Correo o contraseña incorrectos.
-        "422":
-          description: Datos de acceso inválidos.
-
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Correo o contraseña incorrectos, o cuenta desactivada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Credenciales correctas, pero la cuenta no ha validado su correo (no aplica a un
+            `platform_admin`). Solo se responde tras comprobar la contraseña.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  required:
+                  - code
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - email_not_verified
+              example:
+                detail: Tienes que validar tu correo electrónico antes de iniciar sesión.
+                code: email_not_verified
+        '422':
+          $ref: '#/components/responses/ValidationError'
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Token JWT enviado en la cabecera Authorization.
-
+      description: 'Token JWT obtenido en `/auth/register` o `/auth/token`, enviado en la cabecera `Authorization:
+        Bearer <token>`.'
+  parameters:
+    CommunityId:
+      name: community_id
+      in: path
+      required: true
+      description: Identificador de la comunidad.
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Número de página (empieza en 1).
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      description: Elementos por página.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    BadRequest:
+      description: Solicitud inválida o incompatible con el estado actual del recurso.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: Datos inválidos.
+    MembershipForbidden:
+      description: El usuario no pertenece a la comunidad (o no tiene permisos), o su membresía no está
+        aprobada; en este último caso el cuerpo incluye `status`.
+      content:
+        application/json:
+          schema:
+            oneOf:
+            - $ref: '#/components/schemas/MembershipError'
+            - $ref: '#/components/schemas/Error'
+          examples:
+            notApproved:
+              summary: Membresía no aprobada
+              value:
+                detail: Tu membresía en esta comunidad no está aprobada.
+                status: pending
+            forbidden:
+              summary: Sin membresía o sin permisos
+              value:
+                detail: No tienes permisos para realizar esta acción.
+    NotFound:
+      description: El recurso no existe o no es visible para el usuario.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: Recurso no encontrado.
+    Unauthorized:
+      description: Token ausente, inválido o caducado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            detail: Autenticación requerida.
+    ValidationError:
+      description: Los datos enviados no superan la validación (formato estándar de FastAPI).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
   schemas:
-    ListingType:
-      type: string
-      enum: [sell, wanted, offer_service, need_service, free, other]
-
+    AuthResponse:
+      type: object
+      required:
+      - access_token
+      - token_type
+      - expires_in
+      - user
+      properties:
+        access_token:
+          type: string
+          description: JWT de acceso.
+        token_type:
+          type: string
+          enum:
+          - Bearer
+        expires_in:
+          type: integer
+          description: Duración del token en segundos.
+        user:
+          $ref: '#/components/schemas/User'
+    Error:
+      type: object
+      required:
+      - detail
+      properties:
+        detail:
+          type: string
+          description: Descripción legible del error.
+    Listing:
+      type: object
+      required:
+      - id
+      - community_id
+      - owner
+      - category_id
+      - title
+      - description
+      - type
+      - status
+      - published_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        community_id:
+          type: string
+          format: uuid
+        owner:
+          $ref: '#/components/schemas/ListingOwner'
+        category_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+        type:
+          $ref: '#/components/schemas/ListingType'
+        price:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+        currency:
+          type:
+          - string
+          - 'null'
+          pattern: ^[A-Z]{3}$
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ListingImage'
+        status:
+          $ref: '#/components/schemas/ListingStatus'
+        published_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ListingCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - category_id
+      - title
+      - description
+      - type
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        type:
+          $ref: '#/components/schemas/ListingType'
+        price:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          multipleOf: 0.01
+        currency:
+          type:
+          - string
+          - 'null'
+          pattern: ^[A-Z]{3}$
+          description: Código de moneda ISO 4217. Si se indica precio sin moneda, se usa `EUR`; una moneda
+            sin precio es un error.
+        image_asset_ids:
+          type: array
+          maxItems: 10
+          description: Ficheros subidos con `POST /media`. El primero se usa como portada.
+          items:
+            type: string
+            format: uuid
+    ListingImage:
+      type: object
+      required:
+      - asset_id
+      - url
+      - position
+      - is_cover
+      properties:
+        asset_id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri-reference
+        position:
+          type: integer
+          minimum: 0
+        is_cover:
+          type: boolean
+    ListingOwner:
+      type: object
+      description: Anunciante. `phone` y `email` son el canal de contacto del MVP y solo se muestran a
+        miembros aprobados de la comunidad del anuncio.
+      required:
+      - id
+      - full_name
+      - email
+      properties:
+        id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+        phone:
+          type:
+          - string
+          - 'null'
+        email:
+          type: string
+          format: email
+        avatar_url:
+          type:
+          - string
+          - 'null'
+          format: uri-reference
     ListingStatus:
       type: string
-      enum: [active, reserved, completed, hidden]
-
+      description: 'Estado visible del anuncio. `draft` y `deleted` del modelo de datos no se exponen:
+        un anuncio borrado responde 404.'
+      enum:
+      - active
+      - reserved
+      - completed
+      - hidden
+    ListingType:
+      type: string
+      description: 'Modalidad del anuncio: vendo, busco, ofrezco servicio, necesito servicio, regalo,
+        otros.'
+      enum:
+      - sell
+      - wanted
+      - offer_service
+      - need_service
+      - free
+      - other
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - email
+      - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    MembershipError:
+      description: Error de una operación sobre la membresía del usuario autenticado, con su estado actual
+        (extensión de `Error`). Permite mostrar «Solicitud pendiente» o «Sin acceso».
+      allOf:
+      - $ref: '#/components/schemas/Error'
+      - type: object
+        required:
+        - status
+        properties:
+          status:
+            $ref: '#/components/schemas/MembershipStatus'
+    MembershipStatus:
+      type: string
+      description: Estado de la solicitud de acceso a la comunidad.
+      enum:
+      - pending
+      - approved
+      - rejected
+      - blocked
+    PageMeta:
+      type: object
+      description: Metadatos de paginación comunes a todos los listados.
+      required:
+      - page
+      - page_size
+      - total
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+          description: Total de elementos que cumplen el filtro.
+    PlatformRole:
+      type: string
+      description: Rol global del usuario en la plataforma.
+      enum:
+      - user
+      - platform_admin
     RegisterRequest:
       type: object
       additionalProperties: false
-      required: [email, password, full_name]
+      required:
+      - email
+      - password
+      - full_name
       properties:
         email:
           type: string
@@ -1123,142 +1512,104 @@ components:
           type: string
           minLength: 1
           maxLength: 120
-
-    LoginRequest:
+        phone:
+          type:
+          - string
+          - 'null'
+          maxLength: 32
+    RegistrationConflict:
+      description: 'Conflicto al registrarse (extensión de `Error`): el correo ya pertenece a una cuenta
+        validada (`email_in_use`) o a una pendiente de validar (`email_pending_verification`), que puede
+        pedir otro enlace con `POST /auth/email-verification/resend`.'
+      allOf:
+      - $ref: '#/components/schemas/Error'
+      - type: object
+        required:
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - email_in_use
+            - email_pending_verification
+    RegistrationResponse:
       type: object
-      additionalProperties: false
-      required: [email, password]
+      description: Cuenta creada e inactiva hasta que se valide el correo. No incluye token de acceso.
+      required:
+      - email
+      - verification_expires_at
       properties:
         email:
           type: string
           format: email
-        password:
+          description: Correo al que se ha enviado el enlace de validación.
+        verification_expires_at:
           type: string
-          format: password
-
-    AuthResponse:
+          format: date-time
+          description: Caducidad del enlace de validación (24 horas tras el registro).
+    User:
       type: object
-      required: [access_token, token_type, expires_in, user]
-      properties:
-        access_token:
-          type: string
-          description: JWT de acceso.
-        token_type:
-          type: string
-          enum: [Bearer]
-        expires_in:
-          type: integer
-          description: Duración del token en segundos.
-        user:
-          type: object
-          required: [id, email, full_name]
-          properties:
-            id:
-              type: string
-              format: uuid
-            email:
-              type: string
-              format: email
-            full_name:
-              type: string
-
-    ListingCreate:
-      type: object
-      additionalProperties: false
-      required: [category_id, title, description, type]
-      properties:
-        category_id:
-          type: string
-          format: uuid
-        title:
-          type: string
-          minLength: 1
-          maxLength: 160
-        description:
-          type: string
-          minLength: 1
-        type:
-          $ref: "#/components/schemas/ListingType"
-        price:
-          type: ["number", "null"]
-          minimum: 0
-          multipleOf: 0.01
-        currency:
-          type: ["string", "null"]
-          pattern: "^[A-Z]{3}$"
-          description: Código de moneda ISO 4217; requerido si se indica precio.
-
-    Listing:
-      type: object
+      description: Datos completos del usuario autenticado (nunca incluye el hash de contraseña).
       required:
-        - id
-        - community_id
-        - owner
-        - category_id
-        - title
-        - description
-        - type
-        - status
-        - published_at
+      - id
+      - email
+      - full_name
+      - platform_role
+      - is_active
+      - created_at
       properties:
         id:
           type: string
           format: uuid
-        community_id:
+        email:
           type: string
-          format: uuid
-        owner:
-          type: object
-          required: [id, full_name]
-          properties:
-            id:
-              type: string
-              format: uuid
-            full_name:
-              type: string
-            phone:
-              type: ["string", "null"]
-        category_id:
+          format: email
+        full_name:
           type: string
-          format: uuid
-        title:
-          type: string
-        description:
-          type: string
-        type:
-          $ref: "#/components/schemas/ListingType"
-        price:
-          type: ["number", "null"]
-          minimum: 0
-        currency:
-          type: ["string", "null"]
-        image_urls:
-          type: array
-          items:
-            type: string
-            format: uri
-        status:
-          $ref: "#/components/schemas/ListingStatus"
-        published_at:
+        phone:
+          type:
+          - string
+          - 'null'
+        avatar_url:
+          type:
+          - string
+          - 'null'
+          format: uri-reference
+          description: URL relativa del avatar (`/media/{asset_id}`).
+        platform_role:
+          $ref: '#/components/schemas/PlatformRole'
+        is_active:
+          type: boolean
+        created_at:
           type: string
           format: date-time
-
-  responses:
-    Unauthorized:
-      description: Token ausente, inválido o caducado.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
-          example:
-            detail: "Autenticación requerida."
-
-    Error:
+    ValidationError:
       type: object
+      required:
+      - detail
       properties:
         detail:
-          type: string
+          type: array
+          items:
+            type: object
+            required:
+            - loc
+            - msg
+            - type
+            properties:
+              loc:
+                type: array
+                description: Ruta del campo erróneo (`body`, `query`, `path` y nombre del campo).
+                items:
+                  type:
+                  - string
+                  - integer
+              msg:
+                type: string
+              type:
+                type: string
 ```
+<!-- openapi-extract:end -->
 
 ---
 

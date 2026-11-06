@@ -155,7 +155,7 @@ export async function moderateListing(formData: FormData): Promise<void> {
     const community = `/comunidades/${result.data.community_id}`;
     revalidatePath(community);
     revalidatePath(`/anuncios/${listingId}`);
-    redirect(status === "hidden" ? `${community}?retirado=1` : `/anuncios/${listingId}?restaurado=1`);
+    redirect(status === "hidden" ? `${community}?ocultado=1` : `/anuncios/${listingId}?restaurado=1`);
   }
   const { status: code } = result.error;
   if (code === 404) redirect("/inicio?no-disponible=1");

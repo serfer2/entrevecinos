@@ -7,11 +7,13 @@ import { RequestAccessButton } from "./RequestAccessButton";
 type MembershipActionProps = {
   communityId: string;
   status: MembershipStatus | undefined;
+  /** `platform_admin` entra en cualquier comunidad, sea cual sea su membresía (como en la API). */
+  isPlatformAdmin?: boolean;
 };
 
 /** Acción disponible en una comunidad según mi membresía. */
-export function MembershipAction({ communityId, status }: MembershipActionProps) {
-  switch (status) {
+export function MembershipAction({ communityId, status, isPlatformAdmin = false }: MembershipActionProps) {
+  switch (isPlatformAdmin ? "approved" : status) {
     case undefined:
       return <RequestAccessButton communityId={communityId} action={requestAccess} />;
     case "pending":
@@ -20,7 +22,7 @@ export function MembershipAction({ communityId, status }: MembershipActionProps)
       return (
         <Link
           href={`/comunidades/${communityId}`}
-          className="rounded-md border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
+          className="rounded-lg border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
         >
           Entrar
         </Link>

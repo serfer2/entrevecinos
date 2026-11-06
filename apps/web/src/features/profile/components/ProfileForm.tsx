@@ -20,14 +20,14 @@ export function ProfileForm({ action, initialValues }: ProfileFormProps) {
   };
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
       {state?.success && (
-        <p role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+        <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
           {state.success}
         </p>
       )}
       {state?.formError && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
           {state.formError}
         </p>
       )}
@@ -53,7 +53,7 @@ export function ProfileForm({ action, initialValues }: ProfileFormProps) {
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-md bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
+        className="self-start rounded-lg bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
       >
         {pending ? "Guardando…" : "Guardar cambios"}
       </button>

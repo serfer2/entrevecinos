@@ -29,7 +29,7 @@ export default async function EditListingPage({ params }: EditListingPageProps) 
         <Link href={`/anuncios/${listing.id}`} className="text-sm font-medium text-emerald-800 underline">
           Volver al anuncio
         </Link>
-        <h1 className="mt-4 text-2xl font-semibold text-gray-900">Editar anuncio</h1>
+        <h1 className="mt-4 text-3xl font-semibold text-gray-900">Editar anuncio</h1>
       </div>
       <ListingForm
         action={updateListing.bind(null, listing.id)}

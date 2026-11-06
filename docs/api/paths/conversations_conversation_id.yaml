@@ -4,7 +4,8 @@ get:
   tags: [Mensajería]
   operationId: getConversation
   summary: Obtener una conversación
-  description: Solo sus participantes (`buyer` o `seller`).
+  description: >-
+    **Versión futura:** no implementada en el MVP. Solo sus participantes (`buyer` o `seller`).
   x-mvp: false
   responses:
     "200":
@@ -23,7 +24,8 @@ patch:
   tags: [Mensajería]
   operationId: updateConversation
   summary: Cerrar o archivar una conversación
-  description: Solo sus participantes. Una conversación `closed` no admite nuevos mensajes.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Solo sus participantes. Una conversación `closed` no admite nuevos mensajes.
   x-mvp: false
   requestBody:
     required: true

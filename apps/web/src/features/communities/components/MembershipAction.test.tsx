@@ -28,6 +28,13 @@ describe("MembershipAction", () => {
     expect(screen.getByRole("link", { name: "Entrar" }).getAttribute("href")).toBe(`/comunidades/${id}`);
   });
 
+  it.each([undefined, "pending", "rejected", "blocked"] as const)("platform_admin (%s): enlace «Entrar»", (status) => {
+    render(<MembershipAction communityId={id} status={status} isPlatformAdmin />);
+
+    expect(screen.getByRole("link", { name: "Entrar" }).getAttribute("href")).toBe(`/comunidades/${id}`);
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
   it.each(["rejected", "blocked"] as const)("%s: acceso no disponible", (status) => {
     render(<MembershipAction communityId={id} status={status} />);
 

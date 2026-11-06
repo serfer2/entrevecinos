@@ -1,0 +1,76 @@
+# Proxy de origen (TK-086). Solo atiende peticiones que traen la cabecera secreta que añade
+# CloudFront (TK-087); el resto recibe 403 sin llegar a la web. El TLS lo termina CloudFront.
+#
+# El entrypoint de la imagen sustituye ${ORIGIN_VERIFY} (NGINX_ENVSUBST_FILTER) al arrancar y
+# escribe la configuración en /etc/nginx/conf.d, un tmpfs: el secreto no llega al disco.
+
+server_tokens off;
+client_max_body_size 12m;
+
+# DNS de Docker: la IP de `web` cambia en cada despliegue y nginx la resolvería solo al arrancar.
+resolver 127.0.0.11 valid=10s ipv6=off;
+
+# IP del visitante (TK-087): la conexión llega de CloudFront, que añade la IP real al final de
+# X-Forwarded-For. Solo CloudFront alcanza el origen (grupo de seguridad y cabecera), así que el
+# último valor es fiable aunque el visitante envíe su propio X-Forwarded-For.
+map $http_x_forwarded_for $client_ip {
+    "~(?<last>[^,\s]+)\s*$" $last;
+    default                 $remote_addr;
+}
+
+# Sin WAF (el plan del proyecto no admite el plan Free de CloudFront), los límites por IP van aquí.
+# Inicio de sesión y registro: 20 POST en 5 minutos (4 por minuto, con ráfaga de 10).
+map $request_method $auth_client {
+    POST    $client_ip;
+    default "";
+}
+
+limit_req_zone $auth_client zone=auth:1m rate=4r/m;
+# General: 5 peticiones por segundo, con ráfaga de 100 (las páginas precargan enlaces).
+limit_req_zone $client_ip zone=client:5m rate=5r/s;
+limit_req_status 429;
+limit_req_log_level warn;
+
+# Registro con la IP del visitante, no la de CloudFront.
+log_format origin '$client_ip [$time_local] "$request" $status $body_bytes_sent $request_time "$http_user_agent"';
+
+server {
+    listen 8080;
+    access_log /dev/stdout origin;
+
+    if ($http_x_origin_verify != "${ORIGIN_VERIFY}") {
+        return 403;
+    }
+
+    set $web http://web:3000;
+    limit_req zone=client burst=100 nodelay;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # Todo el tráfico público llega por HTTPS a CloudFront.
+    proxy_set_header X-Forwarded-Proto https;
+    # La web no necesita el secreto.
+    proxy_set_header X-Origin-Verify "";
+
+    location / {
+        proxy_pass $web;
+    }
+
+    # Las Server Actions de estas páginas hacen POST a su propia ruta.
+    location ~ ^/(iniciar-sesion|registro)$ {
+        limit_req zone=auth burst=10 nodelay;
+        limit_req zone=client burst=100 nodelay;
+        proxy_pass $web;
+    }
+}
+
+# Salud del proxy, solo dentro del contenedor (no se publica): sin abrir rutas sin cabecera en :8080.
+server {
+    listen 127.0.0.1:8081;
+    access_log off;
+
+    location / {
+        return 200 "ok\n";
+    }
+}

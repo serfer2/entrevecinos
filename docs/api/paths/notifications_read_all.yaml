@@ -2,7 +2,8 @@ post:
   tags: [Notificaciones]
   operationId: markAllNotificationsRead
   summary: Marcar todas las notificaciones como leídas
-  description: Fija `read_at` en todas las notificaciones pendientes del usuario autenticado.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Fija `read_at` en todas las notificaciones pendientes del usuario autenticado.
   x-mvp: false
   responses:
     "204":

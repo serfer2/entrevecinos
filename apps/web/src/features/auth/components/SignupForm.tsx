@@ -25,7 +25,7 @@ export function SignupForm({ action, resendAction }: SignupFormProps) {
     return (
       <div
         role="status"
-        className="flex flex-col gap-2 rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+        className="flex flex-col gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
       >
         <p>
           Te hemos enviado un correo a <strong>{state.verificationSentTo}</strong>. Abre el enlace
@@ -40,7 +40,7 @@ export function SignupForm({ action, resendAction }: SignupFormProps) {
     <div className="flex flex-col gap-4">
       <form action={formAction} className="flex flex-col gap-4">
         {state?.formError && (
-          <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
             {state.formError}
           </p>
         )}
@@ -85,7 +85,7 @@ export function SignupForm({ action, resendAction }: SignupFormProps) {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
+          className="rounded-lg bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
         >
           {pending ? "Creando cuenta…" : "Crear cuenta"}
         </button>

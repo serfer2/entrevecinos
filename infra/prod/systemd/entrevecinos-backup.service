@@ -1,0 +1,12 @@
+# Copia de PostgreSQL de producción (TK-082). Lo instala deploy.sh (TK-086).
+[Unit]
+Description=Copia de PostgreSQL de EntreVecinos a S3
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+# Configuración no secreta (BACKUP_BUCKET, AWS_REGION); la contraseña se lee de
+# Parameter Store al ejecutarse.
+EnvironmentFile=/opt/entrevecinos/backup.env
+ExecStart=/opt/entrevecinos/prod/backup.sh

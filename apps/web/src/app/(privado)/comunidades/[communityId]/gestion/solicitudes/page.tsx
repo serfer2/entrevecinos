@@ -53,13 +53,13 @@ export default async function RequestsPage({ params, searchParams }: RequestsPag
         <Link href={`/comunidades/${communityId}`} className="text-sm font-medium text-emerald-800 underline">
           Volver a {community.name}
         </Link>
-        <h1 className="mt-4 text-2xl font-semibold text-gray-900">Solicitudes de acceso</h1>
+        <h1 className="mt-4 text-3xl font-semibold text-gray-900">Solicitudes de acceso</h1>
       </div>
 
       {message && (
         <p
           role={result === "error" ? "alert" : "status"}
-          className={`rounded-md px-3 py-2 text-sm ${result === "error" ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-900"}`}
+          className={`rounded-lg px-3 py-2 text-sm ${result === "error" ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-900"}`}
         >
           {message}
         </p>
@@ -68,7 +68,7 @@ export default async function RequestsPage({ params, searchParams }: RequestsPag
       {requests.items.length === 0 ? (
         <p className="text-gray-700">No hay solicitudes pendientes.</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-gray-200 rounded-md border border-gray-200">
+        <ul className="flex flex-col divide-y divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-white">
           {requests.items.map(({ user, requested_at }) => (
             <li key={user.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -82,7 +82,7 @@ export default async function RequestsPage({ params, searchParams }: RequestsPag
                   <input type="hidden" name="decision" value="approved" />
                   <button
                     type="submit"
-                    className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800"
+                    className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800"
                   >
                     Aprobar
                   </button>

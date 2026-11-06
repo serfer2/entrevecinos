@@ -5,6 +5,7 @@ post:
   operationId: startConversation
   summary: Contactar con el anunciante
   description: >-
+    **Versión futura:** no implementada en el MVP.
     Crea la conversación entre el usuario autenticado (`buyer`) y el autor del anuncio (`seller`) con un primer
     mensaje. Si ya existe una para ese anuncio, se añade el mensaje a la existente. El autor no puede
     contactarse a sí mismo. Requiere membresía aprobada en la comunidad del anuncio.

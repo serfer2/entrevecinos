@@ -4,8 +4,9 @@ patch:
   tags: [Categorías]
   operationId: updateCategory
   summary: Actualizar o desactivar una categoría
-  description: "Solo `platform_admin`. Desactivar (`is_active: false`) oculta la categoría para nuevos anuncios sin borrar los existentes."
-  x-mvp: true
+  description: >-
+    **Versión futura:** no implementada en el MVP. Solo `platform_admin`. Desactivar (`is_active: false`) oculta la categoría para nuevos anuncios sin borrar los existentes.
+  x-mvp: false
   requestBody:
     required: true
     content:

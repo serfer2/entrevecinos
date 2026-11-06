@@ -1,0 +1,11 @@
+# Cada 6 horas (TK-082). Persistent recupera la copia perdida si la instancia estaba apagada.
+[Unit]
+Description=Copia de PostgreSQL de EntreVecinos cada 6 horas
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:00:00 UTC
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

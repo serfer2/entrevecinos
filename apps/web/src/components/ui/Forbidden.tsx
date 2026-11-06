@@ -10,7 +10,7 @@ type ForbiddenProps = {
 export function Forbidden({ message, backHref = "/inicio", backLabel = "Volver al inicio" }: ForbiddenProps) {
   return (
     <main className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900">Sin permisos</h1>
+      <h1 className="text-3xl font-semibold text-gray-900">Sin permisos</h1>
       <p role="alert" className="text-gray-700">
         {message}
       </p>

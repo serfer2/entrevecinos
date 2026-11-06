@@ -9,10 +9,11 @@ Historias del MVP definido en la sección 1.2 del `readme.md`. Las inferencias q
 - **Miembro**: vecino con acceso aprobado a una comunidad.
 - **Administrador de comunidad**: persona que gestiona los miembros y los anuncios de su comunidad.
 - **Administrador de plataforma** (`platform_admin`): persona que aprueba las comunidades nuevas y puede gestionar cualquier comunidad. Se nombra directamente en la base de datos (asumido).
+- **Desarrollador**: persona que mantiene o evalúa el código y la documentación técnica del proyecto (asumido).
 
 ## Fuera de alcance
 
-No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Tampoco la recuperación de contraseña, que no aparece en el README.
+No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Tampoco la recuperación de contraseña, que no aparece en el README. Las entidades y operaciones de la API de estas funcionalidades están marcadas como versión futura en el modelo de datos (`readme.md` §3.2) y en el contrato (`x-mvp: false` en `docs/api/`).
 
 ## Índice
 
@@ -28,6 +29,9 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23 |
 | 9. Cierre de sesión | HU-24 |
 | 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
+| 11. Experiencia de usuario | HU-28, HU-29, HU-30, HU-31, HU-32 |
+| 12. Documentación técnica | HU-33, HU-34, HU-35 |
+| 13. Puesta en producción en AWS | HU-36, HU-37, HU-38, HU-39 |
 
 ---
 
@@ -744,3 +748,313 @@ Las cuentas nuevas solo se activan cuando su titular demuestra que controla la d
 - **Given** un token que no se ha enviado nunca por correo
 - **When** se usa
 - **Then** la respuesta no revela si un correo está registrado ni su estado (asumido)
+
+---
+
+## Épica 11 — Experiencia de usuario
+
+Mejoras de presentación y de uso sobre las funcionalidades existentes, sin añadir funcionalidad de negocio nueva.
+
+### HU-28 Usar una interfaz sencilla, clara y con identidad propia
+
+**Como** vecino, **quiero** una web limpia, legible y con un aspecto que transmita cercanía con la naturaleza, **para** encontrar y publicar anuncios sin esfuerzo y reconocer EntreVecinos como algo propio de mi barrio.
+
+**AC1 — Identidad visual coherente**
+
+- **Given** que navego por cualquier página de la aplicación
+- **When** la veo en un navegador de escritorio, una tableta o un móvil
+- **Then** todas usan la misma paleta (verdes suaves, tonos tierra y fondos claros), la misma tipografía y el mismo logotipo, con un contraste de texto suficiente (AA)
+
+**AC2 — Anuncios fáciles de explorar**
+
+- **Given** que estoy en el listado de mi comunidad
+- **When** recorro los anuncios
+- **Then** cada tarjeta destaca la fotografía, el título y el precio, y muestra el tipo de anuncio y si está reservado
+
+**AC3 — Búsqueda y filtros a mano**
+
+- **Given** que estoy en el listado de mi comunidad
+- **When** quiero buscar o filtrar
+- **Then** encuentro la búsqueda, los filtros y el orden agrupados en un mismo panel, encima de los anuncios
+
+**AC4 — Adaptable**
+
+- **Given** que uso un móvil
+- **When** abro cualquier página
+- **Then** el contenido se reorganiza sin desplazamiento horizontal y la cabecera no ocupa espacio fijo en la pantalla
+
+### HU-29 Usar los formularios correctamente en cualquier navegador
+
+**Como** vecino que usa Firefox, **quiero** que los formularios se vean igual de bien que en otros navegadores, **para** no encontrarme campos descuadrados o desproporcionados.
+
+**AC1 — Búsqueda de comunidades**
+
+- **Given** que uso Firefox en escritorio
+- **When** abro el buscador de comunidades
+- **Then** los campos «Nombre», «Ciudad» y «Código postal» y el botón «Buscar» caben dentro de su panel
+
+**AC2 — Campo de precio**
+
+- **Given** que publico o edito un anuncio
+- **When** veo el campo de precio
+- **Then** tiene un ancho proporcionado a su contenido y el símbolo «€» aparece dentro del campo, alineado con el importe
+
+### HU-30 Ver las fotografías de un anuncio a pantalla completa
+
+**Como** vecino interesado en un anuncio, **quiero** ampliar sus fotografías y pasar de una a otra, **para** ver bien lo que se ofrece.
+
+**AC1 — Ampliar**
+
+- **Given** que estoy en el detalle de un anuncio con fotografías
+- **When** pulso la imagen principal
+- **Then** la veo a pantalla completa, en primer plano, con el número de imagen («2 / 3») y un botón para cerrar
+
+**AC2 — Carrusel**
+
+- **Given** que veo a pantalla completa un anuncio con varias fotografías
+- **When** pulso las flechas laterales, uso las flechas del teclado o deslizo el dedo a izquierda o derecha
+- **Then** paso a la imagen siguiente o anterior, de forma circular
+
+**AC3 — Cerrar**
+
+- **Given** que veo una fotografía a pantalla completa
+- **When** pulso «Cerrar», la tecla Escape o el fondo fuera de la imagen
+- **Then** vuelvo al detalle del anuncio, que muestra la última imagen que he visto
+
+### HU-31 Acceder como administrador de plataforma a cualquier comunidad
+
+**Como** administrador de plataforma, **quiero** entrar en cualquier comunidad sin tener que solicitar acceso, **para** poder supervisarla y publicar en ella.
+
+**AC1 — Sin solicitar acceso**
+
+- **Given** que soy administrador de plataforma
+- **When** busco comunidades
+- **Then** veo «Entrar» en todas ellas, aunque no sea miembro o mi solicitud esté pendiente, rechazada o bloqueada
+
+**AC2 — Anuncios y gestión**
+
+- **Given** que soy administrador de plataforma y no tengo una membresía aprobada en una comunidad
+- **When** entro en ella
+- **Then** veo sus anuncios, la búsqueda y los botones «Publicar anuncio» y «Gestionar comunidad»
+
+**AC3 — Mis anuncios se ven**
+
+- **Given** que soy administrador de plataforma sin membresía aprobada en una comunidad
+- **When** publico un anuncio en ella
+- **Then** aparece en el listado y en la búsqueda para todos sus miembros
+
+### HU-32 Entender qué hace la moderación de un anuncio
+
+**Como** administrador de comunidad, **quiero** que la acción de moderar un anuncio se llame «Ocultar», **para** distinguirla claramente de «Eliminar» y «Marcar como finalizado».
+
+**AC1 — Ocultar**
+
+- **Given** que gestiono una comunidad y abro un anuncio visible
+- **When** veo sus acciones
+- **Then** aparece «Ocultar anuncio» y, al pulsarlo, se me pide confirmar con «¿Ocultar este anuncio?» y el botón «Ocultar»
+
+**AC2 — Textos coherentes**
+
+- **Given** que se ha ocultado un anuncio
+- **When** vuelvo al listado, lo abro como autor o gestor, o el autor intenta editarlo
+- **Then** veo «Anuncio ocultado.», «Este anuncio está oculto y no se muestra en la comunidad.» o «Este anuncio ha sido ocultado por la administración de la comunidad.», y en ningún texto visible aparece «retirar»
+
+---
+
+## Épica 12 — Documentación técnica
+
+La documentación técnica describe la arquitectura tal y como está implementada, para que quien mantiene o evalúa el proyecto no tenga que contrastarla con el código.
+
+### HU-33 Ver dónde se aplica la seguridad en el diagrama de arquitectura
+
+**Como** desarrollador, **quiero** que la documentación de arquitectura sitúe la autenticación JWT, la autorización por roles y CORS dentro de la API y describa las cabeceras de seguridad de la web como están implementadas, **para** entender dónde se aplica de verdad cada medida y no buscar componentes que no existen.
+
+**AC1 — Seguridad dentro de FastAPI**
+
+- **Given** que abro el diagrama de arquitectura del `readme.md` (§2.1)
+- **When** sigo una petición del frontend al backend
+- **Then** CORS, JWT Auth y RBAC aparecen dentro del bloque de FastAPI, en el orden en que se aplican y antes de la lógica de negocio, y no hay ninguna capa de seguridad entre el frontend y el backend
+
+**AC2 — Descripción coherente**
+
+- **Given** que leo la descripción de componentes (§2.2)
+- **When** busco dónde se aplican la autenticación, los roles y CORS
+- **Then** se describen como parte de la API y no como un componente independiente
+
+**AC3 — Cabeceras de seguridad de la web**
+
+- **Given** que leo la arquitectura (§2.1, §2.2) y la seguridad (§2.5) del `readme.md`
+- **When** busco cómo protege la web sus respuestas
+- **Then** veo que las cabeceras se configuran en Next.js (`next.config.ts`) y la `Content-Security-Policy` con un *nonce* por petición (`proxy.ts`), y Helmet no aparece como parte de la arquitectura
+
+**AC4 — Diagrama válido**
+
+- **Given** el diagrama actualizado
+- **When** se renderiza en GitHub
+- **Then** se muestra sin errores
+
+### HU-34 Distinguir qué parte del modelo de datos y de la API pertenece al MVP
+
+**Como** desarrollador, **quiero** que el modelo de datos, el contrato de la API y el resto de la documentación indiquen qué entidades y operaciones forman parte del MVP y cuáles quedan para versiones futuras, **para** saber qué está implementado sin tener que contrastarlo con el código.
+
+**AC1 — Entidades y rutas coherentes**
+
+- **Given** el modelo de datos del `readme.md` (§3) y el contrato de `docs/api/`
+- **When** comparo sus entidades con las rutas del contrato
+- **Then** cada entidad del MVP tiene sus rutas del MVP, y las rutas de entidades que no son del MVP están marcadas como pendientes de versiones futuras
+
+**AC2 — Contrato marcado**
+
+- **Given** el contrato de `docs/api/`
+- **When** consulto cualquier operación
+- **Then** `x-mvp: true` significa que está implementada en el MVP y `x-mvp: false` que queda para una versión futura, sin excepciones
+
+**AC3 — Resto de la documentación**
+
+- **Given** el `readme.md` y `docs/api/README.md`
+- **When** leo el modelo de datos o el resumen de endpoints
+- **Then** cada entidad y cada grupo de operaciones indica si pertenece al MVP o a una versión futura
+
+**AC4 — Comprobación automática**
+
+- **Given** que alguien añade o quita un endpoint de la API o cambia `x-mvp` en el contrato
+- **When** se ejecutan las pruebas de la API
+- **Then** fallan si las operaciones implementadas no coinciden con las marcadas como MVP
+
+### HU-35 Consultar la API en una única fuente de verdad
+
+**Como** desarrollador, **quiero** que el `readme.md` remita a `docs/api/openapi.yaml` como fuente de verdad de la API y que el fragmento que incluye coincida con él, **para** no encontrarme dos versiones distintas del contrato.
+
+**AC1 — Fuente de verdad**
+
+- **Given** que abro la especificación de la API del `readme.md` (§4)
+- **When** busco el contrato completo
+- **Then** encuentro un enlace a `docs/api/openapi.yaml`, indicado como fuente de verdad, y a cómo validarlo y previsualizarlo
+
+**AC2 — Fragmento coherente**
+
+- **Given** el fragmento de OpenAPI incluido en el `readme.md`
+- **When** lo comparo con las mismas operaciones de `docs/api/`
+- **Then** coinciden en rutas, parámetros, cuerpos, respuestas y esquemas
+
+## Épica 13 — Puesta en producción en AWS
+
+La aplicación se despliega en AWS (región `eu-north-1`) con toda la infraestructura definida como código en Terraform, sin secretos en el repositorio y con un gasto limitado a 40 € al mes. Mientras el proyecto no escale, para ahorrar costes, producción no tiene alta disponibilidad: la web, la API y PostgreSQL corren en una sola instancia, con copias de seguridad frecuentes. Las nuevas versiones se publican desde GitHub Actions y producción se vigila y se puede recuperar ante fallos.
+
+### HU-36 Desplegar la aplicación en AWS de forma reproducible y segura
+
+**Como** desarrollador, **quiero** crear toda la infraestructura de producción en AWS desde el código de Terraform del repositorio, **para** poner EntreVecinos al alcance de los vecinos con HTTPS y poder reconstruir el entorno sin pasos manuales ni secretos expuestos.
+
+**AC1 — Infraestructura reproducible**
+
+- **Given** una cuenta de AWS con sesión iniciada y el repositorio clonado
+- **When** sigo la guía de `infra/aws/README.md` y ejecuto `terraform apply`
+- **Then** se crean la red, la base de datos, el almacenamiento de imágenes, el correo, los secretos, la zona DNS de `entrevecinos.org` en Route 53 con todos sus registros, el certificado del dominio, la instancia y la distribución de CloudFront, y un segundo `terraform plan` no muestra cambios
+
+**AC2 — Aplicación accesible por HTTPS**
+
+- **Given** la infraestructura creada y la primera versión desplegada
+- **When** abro `https://entrevecinos.org` (o `www.entrevecinos.org`, que redirige a la raíz)
+- **Then** la web carga por HTTPS, puedo registrarme, validar el correo, iniciar sesión, publicar un anuncio con fotografías y verlas y el correo de validación llega desde `no-reply@entrevecinos.org` autenticado con SPF, DKIM y DMARC (asumido: solo a direcciones verificadas mientras SES siga en *sandbox*)
+
+**AC3 — Superficie mínima expuesta**
+
+- **Given** la infraestructura creada
+- **When** intento acceder desde Internet a la base de datos, a la API, al bucket de imágenes o a la instancia saltándome CloudFront
+- **Then** todas las conexiones se rechazan; la instancia no acepta SSH y solo se administra por Session Manager
+
+**AC4 — Sin secretos en el repositorio**
+
+- **Given** el repositorio y el estado de Terraform
+- **When** busco contraseñas, claves de acceso o el secreto de los JWT
+- **Then** no están en el repositorio; se generan en AWS, la aplicación los recibe de SSM Parameter Store (cifrados) con el rol de la instancia, sin claves de acceso de larga duración, y no se escriben en ningún fichero de la instancia
+
+**AC5 — Coste controlado**
+
+- **Given** el proyecto de AWS antes de crear ningún recurso
+- **When** consulto su configuración de facturación
+- **Then** tiene un límite de gasto de 40 € al mes, y recibo un aviso por correo cuando el gasto real supera el 50 %, el 75 % o el 90 % de ese importe o el previsto supera el 100 %
+
+### HU-37 Publicar nuevas versiones automáticamente al fusionar en `main`
+
+**Como** desarrollador, **quiero** que cada *pull request* se compruebe y que cada fusión en `main` se despliegue sola en producción, **para** publicar cambios con frecuencia sin ejecutar pasos a mano ni guardar credenciales de AWS en GitHub.
+
+**AC1 — Comprobaciones en cada *pull request***
+
+- **Given** que abro o actualizo un *pull request*
+- **When** termina el *workflow* de GitHub Actions
+- **Then** se han ejecutado el lint, el formato y las pruebas de la API y de la web, la validación de Terraform y la construcción de las imágenes de producción, y el *pull request* no puede fusionarse si alguna falla
+
+**AC2 — Despliegue continuo**
+
+- **Given** que se fusiona un cambio en `main` y las comprobaciones pasan
+- **When** termina el *workflow* de despliegue
+- **Then** producción ejecuta las imágenes de ese *commit*, con las migraciones aplicadas, y una prueba de humo contra la URL pública ha pasado
+
+**AC3 — Sin credenciales guardadas**
+
+- **Given** la configuración del repositorio en GitHub
+- **When** reviso sus secretos
+- **Then** no hay claves de acceso de AWS: el *workflow* obtiene credenciales temporales por OIDC con un rol que solo puede publicar imágenes y desplegar en la instancia de producción, y solo desde `main`
+
+**AC4 — Vuelta atrás automática**
+
+- **Given** un despliegue cuya versión nueva no supera la comprobación de salud
+- **When** termina el despliegue
+- **Then** producción vuelve a la versión anterior y el *workflow* falla
+
+### HU-38 Vigilar, recuperar y operar producción
+
+**Como** desarrollador, **quiero** que producción centralice sus registros, me avise de los fallos y tenga copias de seguridad probadas y procedimientos documentados, **para** detectar y resolver incidencias antes de que afecten a los vecinos y no perder datos.
+
+**AC1 — Registros centralizados**
+
+- **Given** la aplicación en producción
+- **When** consulto CloudWatch Logs
+- **Then** encuentro los registros de la web, de la API y del proxy, con una retención definida
+
+**AC2 — Alertas**
+
+- **Given** que la instancia o la base de datos fallan, se quedan sin recursos o la web devuelve errores `5xx` de forma sostenida
+- **When** se supera el umbral de la alarma
+- **Then** recibo un aviso por correo
+
+**AC3 — Recuperación de datos probada**
+
+- **Given** las copias automáticas de la base de datos
+- **When** sigo el procedimiento de restauración documentado
+- **Then** puedo restaurar la base de datos a cualquier copia de los últimos 30 días (la más reciente, de hace 6 horas como mucho) y comprobar que contiene los datos esperados
+
+**AC4 — Operación documentada**
+
+- **Given** la documentación de `infra/aws/README.md` y del `readme.md` (§2.4)
+- **When** necesito nombrar un `platform_admin`, volver a una versión anterior, rotar un secreto o destruir el entorno
+- **Then** encuentro los pasos exactos y el diagrama refleja la infraestructura desplegada
+
+### HU-39 Entender las decisiones de la arquitectura de producción y mantener su documentación al día
+
+**Como** desarrollador, **quiero** que la documentación explique por qué la arquitectura de producción es distinta de la prevista en el `readme.md`, cómo debe evolucionar cuando el proyecto escale y que se actualice con cada cambio de la infraestructura, **para** no tomar decisiones con información desfasada ni repetir debates ya resueltos.
+
+**AC1 — Regla de documentación**
+
+- **Given** `openspec/config.yaml` y `AGENTS.md`
+- **When** un agente o una persona prepara un cambio que toca la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`)
+- **Then** las reglas le obligan a actualizar `infra/aws/README.md` en el mismo cambio
+
+**AC2 — Comprobación automática**
+
+- **Given** un *pull request* que cambia la infraestructura sin tocar `infra/aws/README.md`
+- **When** se ejecutan las comprobaciones de CI
+- **Then** fallan con un mensaje que indica qué fichero hay que actualizar, salvo que el *pull request* lleve la etiqueta que declara que el cambio no afecta a la documentación
+
+**AC3 — Decisiones documentadas**
+
+- **Given** `infra/aws/README.md` y el `readme.md` (§2.4)
+- **When** comparo la arquitectura de producción con la prevista (contenedores gestionados, balanceador, PostgreSQL gestionado con alta disponibilidad, WAF)
+- **Then** encuentro cada diferencia con su motivo (ahorro de costes mientras el proyecto no escale), el riesgo que se acepta y su coste
+
+**AC4 — Evolución recomendada**
+
+- **Given** la sección de evolución de `infra/aws/README.md`
+- **When** el proyecto madura y tiene mucho tráfico
+- **Then** encuentro, en orden y con la señal que indica cuándo dar cada paso y su coste aproximado: RDS (y después Multi-AZ), ECS Fargate con ALB, WAF propio, DNSSEC en Route 53, origen cifrado y orígenes VPC de CloudFront

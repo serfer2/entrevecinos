@@ -2,7 +2,8 @@ get:
   tags: [Notificaciones]
   operationId: listNotifications
   summary: Listar mis notificaciones
-  description: Notificaciones del usuario autenticado, más recientes primero.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Notificaciones del usuario autenticado, más recientes primero.
   x-mvp: false
   parameters:
     - name: unread

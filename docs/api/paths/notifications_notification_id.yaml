@@ -4,7 +4,8 @@ patch:
   tags: [Notificaciones]
   operationId: updateNotification
   summary: Marcar una notificación como leída o no leída
-  description: Solo su destinatario.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Solo su destinatario.
   x-mvp: false
   requestBody:
     required: true

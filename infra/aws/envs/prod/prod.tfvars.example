@@ -1,0 +1,22 @@
+# Copia a prod.tfvars (no se versiona) y ajusta los valores.
+
+alert_email = "tu-correo@example.com"
+
+# 40 €/mes en USD con el cambio del día, redondeado hacia abajo (TK-078).
+monthly_budget_usd = 44
+
+availability_zone = "eu-north-1a"
+
+# Roles que pueden borrar copias de la base de datos (TK-082). El de administración del proyecto:
+admin_role_arns = ["arn:aws:iam::995006761619:role/AccountFullAccessRole"]
+
+# Destinatarios de prueba mientras SES esté en sandbox (TK-083).
+ses_test_recipients = []
+
+# Súbelos solo para rotar (ver infra/aws/README.md, «Secretos»).
+db_password_version   = 1
+jwt_secret_version    = 1
+origin_verify_version = 1
+
+# true solo cuando los servidores de nombres de Dinahosting ya sean los de Route 53 (TK-084).
+wait_for_certificate_validation = false

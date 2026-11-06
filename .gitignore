@@ -232,3 +232,13 @@ typings/
 
 # AI local config
 .agents/
+
+# Terraform (TK-078): estado y variables locales; el lockfile .terraform.lock.hcl sí se versiona
+.terraform/
+.terraform-lint/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+crash.log

@@ -4,7 +4,8 @@ post:
   tags: [Mensajería]
   operationId: markConversationRead
   summary: Marcar la conversación como leída
-  description: Fija `read_at` en los mensajes recibidos por el usuario autenticado que aún no lo tenían.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Fija `read_at` en los mensajes recibidos por el usuario autenticado que aún no lo tenían.
   x-mvp: false
   responses:
     "204":

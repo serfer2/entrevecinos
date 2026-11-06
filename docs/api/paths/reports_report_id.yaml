@@ -4,7 +4,8 @@ get:
   tags: [Denuncias]
   operationId: getReport
   summary: Obtener una denuncia
-  description: Su autor, los moderadores de la comunidad del anuncio o un `platform_admin`.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Su autor, los moderadores de la comunidad del anuncio o un `platform_admin`.
   x-mvp: false
   responses:
     "200":
@@ -24,6 +25,7 @@ patch:
   operationId: updateReport
   summary: Gestionar una denuncia
   description: >-
+    **Versión futura:** no implementada en el MVP.
     Pasa la denuncia a `reviewing`, `resolved` o `rejected`. Solo `community_admin`/`moderator` de la comunidad
     o `platform_admin`. Fija `reviewed_by` y `reviewed_at`.
   x-mvp: false

@@ -1,8 +1,17 @@
 """Ayudas para las pruebas de integración de la API."""
 
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 PASSWORD = "UnaClaveSegura123!"
+
+
+def contract_dir() -> Path | None:
+    """`docs/api` del repositorio, o su montaje en el contenedor (`/docs/api`)."""
+    here = Path(__file__).resolve()
+    candidates = [Path("/docs/api"), *(parent / "docs" / "api" for parent in here.parents)]
+    return next((path for path in candidates if (path / "openapi.yaml").is_file()), None)
 
 
 def sent_emails(client: TestClient):

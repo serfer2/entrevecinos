@@ -17,9 +17,9 @@ export function CommunityForm({ action }: CommunityFormProps) {
   const values = state?.values;
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
       {state?.formError && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
           {state.formError}
         </p>
       )}
@@ -59,7 +59,7 @@ export function CommunityForm({ action }: CommunityFormProps) {
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-md bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
+        className="self-start rounded-lg bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
       >
         {pending ? "Creando…" : "Crear comunidad"}
       </button>

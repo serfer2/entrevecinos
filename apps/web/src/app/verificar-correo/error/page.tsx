@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { AuthShell } from "@/components/ui/AuthShell";
 import { resendVerification } from "@/features/auth/actions";
 import { ResendVerificationButton } from "@/features/auth/components/ResendVerificationButton";
 import { LOGIN_PATH } from "@/features/auth/routes";
@@ -31,9 +32,8 @@ export default async function VerifyEmailErrorPage({ searchParams }: VerifyEmail
   const email = typeof params.email === "string" && params.email ? params.email : null;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-4 px-4 py-12">
-      <h1 className="text-2xl font-semibold text-gray-900">Validar el correo</h1>
-      <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+    <AuthShell title="Validar el correo">
+      <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
         {MESSAGES[reason]}
       </p>
       {!RESENDABLE.has(reason) ? (
@@ -51,6 +51,6 @@ export default async function VerifyEmailErrorPage({ searchParams }: VerifyEmail
       <Link href="/" className={linkClass}>
         Volver al inicio
       </Link>
-    </main>
+    </AuthShell>
   );
 }

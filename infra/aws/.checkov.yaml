@@ -1,0 +1,21 @@
+# Comprobaciones de checkov que se omiten en toda la infraestructura, con su motivo. Son decisiones
+# de coste mientras el proyecto no escale (TK-078 §8) o imposibles en el plan del proyecto; se
+# revisan con la evolución de infra/aws/README.md. Las excepciones puntuales van en el recurso.
+framework:
+  - terraform
+compact: true
+quiet: true
+skip-check:
+  # Cifrado con claves KMS propias (≈ 1 USD/mes por clave): se usan las claves gestionadas por AWS.
+  - CKV_AWS_136 # ECR con KMS: AES-256 gestionado por AWS
+  - CKV_AWS_145 # S3 con KMS: SSE-S3
+  - CKV_AWS_158 # Grupos de registros de CloudWatch con KMS
+  - CKV_AWS_189 # EBS con CMK: clave gestionada por AWS
+  - CKV_AWS_337 # Parámetros SecureString con CMK: clave gestionada aws/ssm
+  # Réplica entre regiones: el plan del proyecto no admite recursos en otras regiones.
+  - CKV_AWS_144
+  # Registro de accesos y notificaciones de eventos de S3: coste y volumen sin uso en el MVP.
+  - CKV_AWS_18
+  - CKV2_AWS_62
+  # Retención de 1 año en CloudWatch: retenciones cortas por coste (TK-079, TK-091).
+  - CKV_AWS_338

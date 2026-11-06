@@ -2,7 +2,8 @@ get:
   tags: [Perfil profesional]
   operationId: getMyProfessionalProfile
   summary: Obtener mi perfil profesional
-  description: 404 si el usuario aún no ha creado su perfil profesional.
+  description: >-
+    **Versión futura:** no implementada en el MVP. 404 si el usuario aún no ha creado su perfil profesional.
   x-mvp: false
   responses:
     "200":
@@ -19,7 +20,8 @@ put:
   tags: [Perfil profesional]
   operationId: upsertMyProfessionalProfile
   summary: Crear o actualizar mi perfil profesional
-  description: Un usuario tiene como máximo un perfil profesional. Crea el perfil si no existe y lo reemplaza si existe.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Un usuario tiene como máximo un perfil profesional. Crea el perfil si no existe y lo reemplaza si existe.
   x-mvp: false
   requestBody:
     required: true
@@ -52,7 +54,8 @@ delete:
   tags: [Perfil profesional]
   operationId: deleteMyProfessionalProfile
   summary: Eliminar mi perfil profesional
-  description: Elimina el perfil junto con sus servicios e imágenes.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Elimina el perfil junto con sus servicios e imágenes.
   x-mvp: false
   responses:
     "204":

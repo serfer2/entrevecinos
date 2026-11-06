@@ -4,7 +4,8 @@ get:
   tags: [Mensajería]
   operationId: listMessages
   summary: Listar los mensajes de una conversación
-  description: Mensajes en orden cronológico (`created_at`). Solo participantes; no incluye mensajes borrados.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Mensajes en orden cronológico (`created_at`). Solo participantes; no incluye mensajes borrados.
   x-mvp: false
   parameters:
     - $ref: ../components/parameters/Page.yaml
@@ -34,7 +35,8 @@ post:
   tags: [Mensajería]
   operationId: sendMessage
   summary: Enviar un mensaje
-  description: Solo participantes. Genera una notificación `new_message` para el otro participante.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Solo participantes. Genera una notificación `new_message` para el otro participante.
   x-mvp: false
   requestBody:
     required: true

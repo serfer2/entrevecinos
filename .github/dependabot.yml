@@ -1,0 +1,38 @@
+# Actualizaciones semanales de dependencias (TK-089). Cada pull request pasa por CI.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: uv
+    directory: /apps/api
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directories:
+      - /apps/api
+      - /apps/web
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker-compose
+    directory: /infra
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: terraform
+    directories:
+      - /infra/aws/bootstrap
+      - /infra/aws/envs/prod
+      - /infra/aws/modules/*
+    schedule:
+      interval: weekly

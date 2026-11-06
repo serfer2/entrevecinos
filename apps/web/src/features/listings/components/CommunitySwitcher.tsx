@@ -29,7 +29,7 @@ export function CommunitySwitcher({ currentId, communities, search }: CommunityS
       ))}
       <button
         type="submit"
-        className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+        className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
       >
         Cambiar
       </button>

@@ -4,7 +4,8 @@ get:
   tags: [Denuncias]
   operationId: listCommunityReports
   summary: Listar las denuncias de una comunidad
-  description: Solo `community_admin` o `moderator` de la comunidad, o `platform_admin`.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Solo `community_admin` o `moderator` de la comunidad, o `platform_admin`.
   x-mvp: false
   parameters:
     - name: status

@@ -35,7 +35,7 @@ describe("moderateListing", () => {
   it("retirar: vuelve a la comunidad con el mensaje", async () => {
     userApiFetch.mockResolvedValue(ok);
 
-    await expect(moderateListing(form("hidden"))).rejects.toThrow("NEXT_REDIRECT:/comunidades/c1?retirado=1");
+    await expect(moderateListing(form("hidden"))).rejects.toThrow("NEXT_REDIRECT:/comunidades/c1?ocultado=1");
     expect(userApiFetch).toHaveBeenCalledWith(`/listings/${id}/status`, { method: "PATCH", body: { status: "hidden" } });
     expect(revalidatePath).toHaveBeenCalledWith("/comunidades/c1");
   });

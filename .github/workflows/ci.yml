@@ -1,0 +1,121 @@
+# Comprobaciones de cada pull request (TK-089). Las mismas órdenes que en local (AGENTS.md,
+# Makefile). En main las ejecuta el despliegue (deploy.yml, TK-090) con workflow_call.
+#
+# Seguridad: solo lectura, acciones fijadas por SHA y ningún secreto ni acceso a AWS.
+name: CI
+
+on:
+  pull_request:
+    # labeled/unlabeled: la etiqueta sin-cambios-en-doc-infra vuelve a evaluar docs-infra.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_call:
+
+permissions:
+  contents: read
+
+# En pull requests, una ejecución nueva cancela la anterior. Llamado desde el despliegue, nunca:
+# cancelaría las comprobaciones de un despliegue en curso.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  api:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: .env con los valores ficticios de .env.example
+        run: cp .env.example .env
+      - name: ruff y pytest (con PostgreSQL de Compose)
+        run: make ci-api
+
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: lint, typecheck y pruebas
+        run: make ci-web
+
+  infra:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: terraform fmt y validate, tflint y checkov
+        # Token de solo lectura del workflow: tflint descarga su plugin sin el límite anónimo.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: make tf-lint
+      - name: shellcheck de infra/prod
+        run: make shellcheck
+
+  images:
+    # Etapas prod para linux/arm64 (la instancia es Graviton) en runners arm64 nativos, sin QEMU.
+    name: images (${{ matrix.service }})
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api
+            build-args: ""
+          - service: web
+            build-args: NEXT_PUBLIC_API_BASE_URL=http://api:8000/v1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Imagen ${{ matrix.service }} (sin publicar)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: apps/${{ matrix.service }}
+          target: prod
+          platforms: linux/arm64
+          push: false
+          provenance: false
+          build-args: ${{ matrix.build-args }}
+          # Imágenes base desde la réplica oficial de ECR Public: sin el límite de Docker Hub.
+          build-contexts: |
+            python:3.12-slim=docker-image://public.ecr.aws/docker/library/python:3.12-slim
+            node:22-alpine=docker-image://public.ecr.aws/docker/library/node:22-alpine
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+  docs-infra:
+    # Regla de TK-094: un cambio de infraestructura actualiza infra/aws/README.md.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Guía de la infraestructura al día
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          SKIP_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'sin-cambios-en-doc-infra') }}
+        run: |
+          changed="$(git diff --name-only "origin/$BASE_REF...HEAD")"
+          infra="$(grep -E '^(infra/aws/|infra/prod/|infra/docker-compose\.prod\.yml$|\.github/workflows/)' <<<"$changed" || true)"
+          if [[ -z $infra ]]; then
+            echo "Sin cambios de infraestructura."
+          elif grep -qx 'infra/aws/README.md' <<<"$changed"; then
+            echo "Cambios de infraestructura con la guía actualizada."
+          elif [[ $SKIP_LABEL == true ]]; then
+            echo "Cambios de infraestructura sin la guía, con la etiqueta sin-cambios-en-doc-infra."
+          else
+            printf '%s\n' "$infra"
+            echo "::error::Este pull request cambia la infraestructura: actualiza infra/aws/README.md o añade la etiqueta sin-cambios-en-doc-infra si el cambio no afecta a la documentación."
+            exit 1
+          fi

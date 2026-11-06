@@ -2,6 +2,8 @@
 
 Entorno de desarrollo de EntreVecinos con Docker Compose. Todos los comandos se ejecutan desde la **raíz del repositorio**.
 
+La producción en AWS se documenta aparte, en [`infra/aws/README.md`](aws/README.md).
+
 ## Requisitos
 
 - Docker con el plugin Compose v2 (`docker compose version`).

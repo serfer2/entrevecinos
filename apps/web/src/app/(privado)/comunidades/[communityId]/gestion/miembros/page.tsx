@@ -34,7 +34,7 @@ const DONE_MESSAGES = {
   expulsado: (name: string) => `${name} ha sido expulsado.`,
 } as const;
 
-const button = "rounded-md px-3 py-1.5 text-sm font-medium";
+const button = "rounded-lg px-3 py-1.5 text-sm font-medium";
 
 export default async function MembersPage({ params, searchParams }: MembersPageProps) {
   const user = await requireUser();
@@ -77,16 +77,16 @@ export default async function MembersPage({ params, searchParams }: MembersPageP
         <Link href={`/comunidades/${communityId}`} className="text-sm font-medium text-emerald-800 underline">
           Volver a {community.name}
         </Link>
-        <h1 className="mt-4 text-2xl font-semibold text-gray-900">Miembros</h1>
+        <h1 className="mt-4 text-3xl font-semibold text-gray-900">Miembros</h1>
       </div>
 
       {success && (
-        <p role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+        <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
           {success}
         </p>
       )}
       {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </p>
       )}
@@ -119,7 +119,7 @@ export default async function MembersPage({ params, searchParams }: MembersPageP
       {list.items.length === 0 ? (
         <p className="text-gray-700">No hay miembros con este estado.</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-gray-200 rounded-md border border-gray-200">
+        <ul className="flex flex-col divide-y divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-white">
           {list.items.map(({ user: member, role, status, joined_at }) => {
             const actions = rowActions({ status, role, userId: member.id }, user.id);
             const hidden = (

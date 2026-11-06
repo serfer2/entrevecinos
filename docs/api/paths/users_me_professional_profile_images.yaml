@@ -2,7 +2,8 @@ put:
   tags: [Perfil profesional]
   operationId: replaceProfessionalImages
   summary: Sustituir las imágenes de mi perfil profesional
-  description: Asocia ficheros subidos con `POST /media` (máximo 10); el orden del array define `position`.
+  description: >-
+    **Versión futura:** no implementada en el MVP. Asocia ficheros subidos con `POST /media` (máximo 10); el orden del array define `position`.
   x-mvp: false
   requestBody:
     required: true

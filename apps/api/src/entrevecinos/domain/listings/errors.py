@@ -32,7 +32,7 @@ class ListingStatusConflict(Exception):
 class ListingLocked(PermissionDenied):
     """El autor no puede modificar el anuncio en su estado actual (retirado, finalizado…)."""
 
-    RETIRED = "Este anuncio ha sido retirado por la administración de la comunidad."
+    RETIRED = "Este anuncio ha sido ocultado por la administración de la comunidad."
     COMPLETED = "Este anuncio está finalizado y no se puede editar."
 
     def __init__(self, detail: str) -> None:

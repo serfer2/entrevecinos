@@ -89,7 +89,7 @@ export function ImagePicker({ upload, initialIds = [], error, onBusyChange }: Im
       <legend className="text-sm font-medium text-gray-900">Fotografías (hasta 10)</legend>
       <label
         htmlFor={inputId}
-        className="self-start cursor-pointer rounded-md border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50 has-[:focus-visible]:ring-2"
+        className="self-start cursor-pointer rounded-lg border border-emerald-700 px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50 has-[:focus-visible]:ring-2"
       >
         Añadir fotografías
         <input
@@ -116,7 +116,7 @@ export function ImagePicker({ upload, initialIds = [], error, onBusyChange }: Im
         {items.map((item) => {
           const position = doneKeys.indexOf(item.key);
           return (
-            <li key={item.key} className="flex items-center gap-3 rounded-md border border-gray-200 p-2">
+            <li key={item.key} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-2">
               {item.state === "done" ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element -- URL prefirmada que cambia en cada petición */}

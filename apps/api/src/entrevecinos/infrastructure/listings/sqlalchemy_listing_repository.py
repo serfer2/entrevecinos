@@ -2,8 +2,8 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 
-from sqlalchemy import ColumnElement, Select, delete, exists, false, func, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy import ColumnElement, Select, delete, exists, false, func, or_, select, update
+from sqlalchemy.orm import Session, aliased
 
 from entrevecinos.application.listings.ports import ListingQuery
 from entrevecinos.application.pagination import PageResult
@@ -20,6 +20,7 @@ from entrevecinos.domain.listings.entities import (
     SortOrder,
 )
 from entrevecinos.domain.listings.search import prefix_tsquery
+from entrevecinos.domain.users.entities import PlatformRole
 from entrevecinos.infrastructure.db.models import (
     CommunityMembershipModel,
     ListingImageModel,
@@ -28,12 +29,22 @@ from entrevecinos.infrastructure.db.models import (
 )
 from entrevecinos.infrastructure.db.models.listing import SEARCH_CONFIG
 
-# El autor tiene una membresía aprobada en la comunidad del anuncio. Si lo bloquean o lo
-# expulsan, sus anuncios dejan de mostrarse sin cambiar su estado (TK-040).
-OWNER_IS_MEMBER = exists().where(
-    CommunityMembershipModel.community_id == ListingModel.community_id,
-    CommunityMembershipModel.user_id == ListingModel.owner_id,
-    CommunityMembershipModel.status == MembershipStatus.APPROVED,
+# Alias propio: la consulta exterior ya une `users` y el EXISTS no debe correlacionarse con él.
+_Owner = aliased(UserModel)
+
+# El autor tiene una membresía aprobada en la comunidad del anuncio, o es `platform_admin` (que,
+# como en `CommunityAccess.require_member`, cuenta como miembro de cualquier comunidad). Si
+# bloquean o expulsan a un vecino, sus anuncios dejan de mostrarse sin cambiar su estado (TK-040).
+OWNER_IS_MEMBER = or_(
+    exists().where(
+        CommunityMembershipModel.community_id == ListingModel.community_id,
+        CommunityMembershipModel.user_id == ListingModel.owner_id,
+        CommunityMembershipModel.status == MembershipStatus.APPROVED,
+    ),
+    exists().where(
+        _Owner.id == ListingModel.owner_id,
+        _Owner.platform_role == PlatformRole.PLATFORM_ADMIN,
+    ),
 )
 
 
