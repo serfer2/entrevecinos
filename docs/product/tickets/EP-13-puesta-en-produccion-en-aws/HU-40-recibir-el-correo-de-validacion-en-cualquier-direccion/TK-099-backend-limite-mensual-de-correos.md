@@ -127,9 +127,9 @@ docker compose --env-file .env -f infra/docker-compose.yml exec db \
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] Contrato, `.env.example`, `apps/api/README.md` e `infra/aws/README.md` actualizados, con el límite documentado como restricción de costes.
-- [ ] Cambios revisados y fusionados mediante *pull request*.
+- [x] Los criterios de aceptación se cumplen.
+- [x] Contrato, `.env.example`, `apps/api/README.md` e `infra/aws/README.md` actualizados, con el límite documentado como restricción de costes.
+- [x] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas
 

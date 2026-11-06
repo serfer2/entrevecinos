@@ -25,4 +25,4 @@
 ## 6. Verificación
 
 - [x] 6.1 `make ci-api`, `make ci-web`, `make tf-lint` y prueba local con `EMAIL_MONTHLY_LIMIT=2`
-- [ ] 6.2 `make tf-plan` y `make tf-apply`; despliegue y comprobación en producción
+- [x] 6.2 `make tf-plan` y `make tf-apply`; despliegue (`9908f1a`) con copia previa automática y migración `0010`; alarmas en `OK`
