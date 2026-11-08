@@ -13,9 +13,7 @@ class SqlAlchemyPasswordResetRepository:
         self._session = session
 
     def replace(self, user_id: uuid.UUID, token_hash: str, expires_at: datetime) -> None:
-        self._session.execute(
-            delete(PasswordResetModel).where(PasswordResetModel.user_id == user_id)
-        )
+        self.delete_for_user(user_id)
         self._session.add(
             PasswordResetModel(token_hash=token_hash, user_id=user_id, expires_at=expires_at)
         )
@@ -27,6 +25,11 @@ class SqlAlchemyPasswordResetRepository:
             return None
         return PasswordReset(
             user_id=model.user_id, expires_at=model.expires_at, created_at=model.created_at
+        )
+
+    def delete_for_user(self, user_id: uuid.UUID) -> None:
+        self._session.execute(
+            delete(PasswordResetModel).where(PasswordResetModel.user_id == user_id)
         )
 
     def last_created_at(self, user_id: uuid.UUID) -> datetime | None:

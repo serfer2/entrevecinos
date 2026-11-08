@@ -21,6 +21,7 @@ def to_domain(model: UserModel) -> User:
         created_at=model.created_at,
         deleted_at=model.deleted_at,
         email_verified_at=model.email_verified_at,
+        password_changed_at=model.password_changed_at,
     )
 
 
@@ -71,6 +72,14 @@ class SqlAlchemyUserRepository:
     def update_password_hash(self, user_id: uuid.UUID, password_hash: str) -> None:
         self._session.execute(
             update(UserModel).where(UserModel.id == user_id).values(password_hash=password_hash)
+        )
+
+    def change_password(self, user_id: uuid.UUID, password_hash: str) -> None:
+        self._session.execute(
+            update(UserModel)
+            .where(UserModel.id == user_id)
+            # statement_timestamp(): now() devolvería el inicio de la transacción.
+            .values(password_hash=password_hash, password_changed_at=func.statement_timestamp())
         )
 
     def update_profile(self, user_id: uuid.UUID, values: Mapping[str, str | None]) -> User:

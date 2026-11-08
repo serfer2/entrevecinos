@@ -44,3 +44,11 @@ class VerificationExpired(Exception):
     def __init__(self, email: str) -> None:
         super().__init__("Email verification expired")
         self.email = email
+
+
+class PasswordResetInvalid(Exception):
+    """El enlace para restablecer la contraseña no existe, ya se usó o se sustituyó."""
+
+
+class PasswordResetExpired(Exception):
+    """El enlace para restablecer la contraseña ha caducado."""

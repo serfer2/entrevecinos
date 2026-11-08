@@ -46,7 +46,7 @@ Con TK-101, el vecino recibe un enlace de un solo uso. Falta el paso que cambia 
 En una transacción:
 1. Busca el enlace por `hash_token(token)`; comprueba la caducidad con el reloj inyectado.
 2. Vuelve a comprobar la cuenta (no borrada ni desactivada con el correo validado); si ya no puede usarse, `400` como enlace no válido.
-3. `update_password_hash` con Argon2 y `password_changed_at = now`.
+3. `change_password` con Argon2 y `password_changed_at = statement_timestamp()` (no `update_password_hash`, que solo reescribe el hash al iniciar sesión y no debe cerrar sesiones).
 4. Si el correo estaba sin validar, `mark_email_verified` (HU-42 AC5).
 5. Borra todos los enlaces de restablecimiento del usuario.
 
@@ -119,9 +119,9 @@ $COMPOSE run --rm -v "$PWD/apps/api/tests:/app/tests" api python -m pytest -q
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] Las pruebas de la API, `ruff` y `redocly lint` pasan.
-- [ ] Contrato y `readme.md` (§2.5 y extracto de la API) actualizados.
+- [x] Los criterios de aceptación se cumplen.
+- [x] Las pruebas de la API, `ruff` y `redocly lint` pasan.
+- [x] Contrato y `readme.md` (§2.5 y extracto de la API) actualizados.
 - [ ] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas

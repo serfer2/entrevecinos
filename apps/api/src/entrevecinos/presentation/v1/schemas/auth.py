@@ -81,6 +81,18 @@ class PasswordResetRequestedResponse(BaseModel):
     detail: str
 
 
+class PasswordResetConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: Annotated[str, Field(min_length=1, max_length=256)]
+    password: Annotated[str, Field(min_length=12, max_length=128)]
+
+
+class PasswordResetErrorResponse(BaseModel):
+    detail: str
+    code: Literal["password_reset_invalid", "password_reset_expired"]
+
+
 class RegistrationConflictResponse(BaseModel):
     detail: str
     code: Literal["email_in_use", "email_pending_verification"]

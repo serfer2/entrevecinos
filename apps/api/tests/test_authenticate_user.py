@@ -1,10 +1,11 @@
 import dataclasses
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from entrevecinos.application.users.authenticate_user import AuthenticateUser, LoginCommand
 from entrevecinos.application.users.get_current_user import GetCurrentUser
+from entrevecinos.application.users.ports import TokenClaims
 from entrevecinos.domain.users.entities import NewUser, PlatformRole
 from entrevecinos.domain.users.errors import EmailNotVerified, InvalidCredentials, NotAuthenticated
 from tests.fakes import FakePasswordHasher, FakeTokenIssuer, InMemoryUserRepository
@@ -107,13 +108,43 @@ def test_outdated_hash_is_replaced(
     authenticate.execute(LoginCommand(email="vecino@example.com", password=PASSWORD))
 
     assert users.password_hashes[user.id] == f"hashed:{PASSWORD}"
+    # Reescribir el hash no es cambiar la contraseña: no cierra sesiones.
+    assert users.get_by_id(user.id).password_changed_at is None
+
+
+def claims(user_id, issued_at: datetime | None = None) -> TokenClaims:
+    return TokenClaims(user_id=user_id, issued_at=issued_at or datetime.now(UTC))
 
 
 def test_current_user_rejects_inactive_user(users: InMemoryUserRepository) -> None:
     user = users.get_by_email("vecino@example.com")
-    assert GetCurrentUser(users).execute(user.id) == user
+    assert GetCurrentUser(users).execute(claims(user.id)) == user
 
     set_user(users, is_active=False)
 
     with pytest.raises(NotAuthenticated):
-        GetCurrentUser(users).execute(user.id)
+        GetCurrentUser(users).execute(claims(user.id))
+
+
+def test_current_user_rejects_tokens_issued_before_the_password_change(
+    users: InMemoryUserRepository,
+) -> None:
+    user = users.get_by_email("vecino@example.com")
+    changed_at = datetime(2026, 11, 8, 10, 0, 0, 500000, tzinfo=UTC)
+    set_user(users, password_changed_at=changed_at)
+
+    with pytest.raises(NotAuthenticated):
+        GetCurrentUser(users).execute(claims(user.id, changed_at - timedelta(seconds=1)))
+
+
+@pytest.mark.parametrize("offset", [timedelta(0), timedelta(seconds=1)])
+def test_current_user_accepts_tokens_issued_from_the_second_of_the_change(
+    users: InMemoryUserRepository, offset: timedelta
+) -> None:
+    user = users.get_by_email("vecino@example.com")
+    changed_at = datetime(2026, 11, 8, 10, 0, 0, 500000, tzinfo=UTC)
+    set_user(users, password_changed_at=changed_at)
+    # `iat` va en segundos enteros: el token del mismo segundo lleva 10:00:00.
+    issued_at = changed_at.replace(microsecond=0) + offset
+
+    assert GetCurrentUser(users).execute(claims(user.id, issued_at)).id == user.id

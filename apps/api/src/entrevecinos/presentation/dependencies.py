@@ -16,6 +16,7 @@ from entrevecinos.application.users.ports import EmailSender
 from entrevecinos.application.users.register_user import RegisterUser
 from entrevecinos.application.users.request_password_reset import RequestPasswordReset
 from entrevecinos.application.users.resend_email_verification import ResendEmailVerification
+from entrevecinos.application.users.reset_password import ResetPassword
 from entrevecinos.application.users.verify_email import VerifyEmail
 from entrevecinos.domain.users.entities import User
 from entrevecinos.domain.users.errors import NotAuthenticated
@@ -182,6 +183,15 @@ def get_request_password_reset(
         resets, settings.web_public_url, timedelta(minutes=settings.password_reset_ttl_minutes)
     )
     return RequestPasswordReset(users, resets, issuer, quota)
+
+
+def get_reset_password(
+    users: UserRepositoryDep,
+    resets: PasswordResetRepositoryDep,
+    hasher: PasswordHasherDep,
+    quota: EmailQuotaDep,
+) -> ResetPassword:
+    return ResetPassword(users, resets, hasher, quota)
 
 
 def get_verify_email(

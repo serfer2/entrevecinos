@@ -9,6 +9,7 @@ from entrevecinos.infrastructure.db.models import PasswordResetModel, UserModel
 from entrevecinos.infrastructure.users.sqlalchemy_password_reset_repository import (
     SqlAlchemyPasswordResetRepository,
 )
+from entrevecinos.infrastructure.users.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from tests.conftest import alembic_config
 
 pytestmark = pytest.mark.db
@@ -110,3 +111,34 @@ def test_last_created_at(db_session: Session, user: UserModel) -> None:
     repository.replace(user.id, "a" * 64, IN_ONE_HOUR)
 
     assert repository.last_created_at(user.id) is not None
+
+
+def test_delete_for_user_deletes_only_its_links(db_session: Session, user: UserModel) -> None:
+    other = UserModel(email="otro@example.com", password_hash="hash", full_name="Otro")
+    other.email_verified_at = datetime.now(UTC)
+    db_session.add(other)
+    db_session.flush()
+    repository = SqlAlchemyPasswordResetRepository(db_session)
+    repository.replace(user.id, "a" * 64, IN_ONE_HOUR)
+    repository.replace(other.id, "b" * 64, IN_ONE_HOUR)
+
+    repository.delete_for_user(user.id)
+
+    assert repository.get("a" * 64) is None
+    assert repository.get("b" * 64) is not None
+
+
+def test_change_password_sets_the_change_date_and_rehash_does_not(
+    db_session: Session, user: UserModel
+) -> None:
+    repository = SqlAlchemyUserRepository(db_session)
+
+    repository.update_password_hash(user.id, "hash-reescrito")
+    assert repository.get_by_id(user.id).password_changed_at is None
+
+    repository.change_password(user.id, "hash-nuevo")
+    db_session.expire_all()
+
+    stored = db_session.get_one(UserModel, user.id)
+    assert stored.password_hash == "hash-nuevo"
+    assert repository.get_by_id(user.id).password_changed_at is not None

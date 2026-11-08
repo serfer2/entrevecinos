@@ -85,17 +85,18 @@ Cambios del contrato durante el desarrollo del MVP (compatibles salvo que se ind
 | TK-074 | `x-mvp` pasa a significar «implementada en el MVP». `deleteCurrentUser`, `listMyListings`, `createCategory`, `updateCategory`, `updateCommunity` y `deleteMedia` pasan a `x-mvp: false` (versión futura): no las usa ninguna historia del MVP. |
 | TK-099 | `registerUser` y `resendEmailVerification`: `503` con `EmailQuotaExceeded` (`Error` + `code: email_quota_exceeded`) y `Retry-After` cuando se agota el cupo de correos del periodo (límite por coste). Compatible: un estado nuevo. |
 | TK-101 | Nuevo `requestPasswordReset` (`POST /auth/password-reset`, `x-mvp: true`): siempre `202` con `PasswordResetRequested`, exista o no la cuenta; `503` con `EmailQuotaExceeded` sin cupo. Esquema `PasswordResetRequest`. Compatible: una operación nueva. |
+| TK-102 | Nuevo `confirmPasswordReset` (`POST /auth/password-reset/confirm`, `x-mvp: true`): `204` sin iniciar sesión; `400`/`410` con `PasswordResetError` (`password_reset_invalid`, `password_reset_expired`). Esquema `PasswordResetConfirmRequest`. Los JWT emitidos antes del último cambio de contraseña reciben `401` en las operaciones autenticadas. Compatible: una operación nueva. |
 
 ## Resumen de endpoints
 
-El contrato tiene 60 operaciones: 28 del MVP (`x-mvp: true`) y 32 de versiones futuras (`x-mvp: false`).
+El contrato tiene 61 operaciones: 29 del MVP (`x-mvp: true`) y 32 de versiones futuras (`x-mvp: false`).
 
 ### MVP (implementado)
 
 | Grupo | Operaciones |
 |---|---|
 | Sistema | `GET /health` |
-| Autenticación | `POST /auth/register`, `POST /auth/email-verification`, `POST /auth/email-verification/resend`, `POST /auth/password-reset`, `POST /auth/token` |
+| Autenticación | `POST /auth/register`, `POST /auth/email-verification`, `POST /auth/email-verification/resend`, `POST /auth/password-reset`, `POST /auth/password-reset/confirm`, `POST /auth/token` |
 | Usuarios | `GET/PATCH /users/me`, `GET /users/me/memberships` |
 | Categorías | `GET /categories` |
 | Comunidades | `GET/POST /communities`, `GET /communities/{community_id}` |

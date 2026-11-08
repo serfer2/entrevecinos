@@ -559,6 +559,8 @@ Medidas implementadas en la aplicación y en producción (detalle en [`infra/aws
 
 - **Autenticación mediante JWT:** la API valida el token y que el usuario siga activo en cada petición. El navegador nunca recibe el JWT: la web lo guarda en la *cookie* `HttpOnly` y `Secure` `ev_session` y llama a la API desde el servidor con `Authorization: Bearer <token>`. La clave de firma vive en Parameter Store.
 
+- **Recuperación de la contraseña:** el enlace del correo es de un solo uso y caduca en 1 hora; la base de datos solo guarda su hash. La petición responde igual exista o no la cuenta y envía como mucho un correo por minuto a cada cuenta. Cambiar la contraseña invalida los JWT emitidos antes (`users.password_changed_at`), así que cierra las sesiones abiertas en otros dispositivos, y avisa del cambio por correo.
+
 - **Autorización basada en roles (RBAC):** la API comprueba la membresía y el rol en la comunidad antes de cada operación (`CommunityAccess`); ocultar un botón en la interfaz no sustituye esa comprobación.
 
 - **CORS:** la API solo acepta el origen `https://entrevecinos.org`. CORS no sustituye la autenticación.
@@ -579,7 +581,7 @@ Medidas implementadas en la aplicación y en producción (detalle en [`infra/aws
 
 - **Imágenes:** el bucket es privado; la API valida el contenido (*magic bytes*), el formato (JPEG, PNG o WebP) y el tamaño, y las imágenes solo se leen con URL prefirmadas.
 
-- **Registros sin datos sensibles y alertas:** los registros no guardan contraseñas, *tokens* de validación ni *cookies* de sesión, y las alarmas avisan por correo de caídas, errores y falta de copias.
+- **Registros sin datos sensibles y alertas:** los registros no guardan contraseñas, *tokens* de validación o de restablecimiento ni *cookies* de sesión, y las alarmas avisan por correo de caídas, errores y falta de copias.
 
 ### **2.6. Tests**
 

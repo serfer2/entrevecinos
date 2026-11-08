@@ -13,6 +13,14 @@ class AccessToken:
     expires_in: int
 
 
+@dataclass(frozen=True, slots=True)
+class TokenClaims:
+    """Datos de un JWT válido: su usuario y cuándo se emitió."""
+
+    user_id: uuid.UUID
+    issued_at: datetime
+
+
 class UserRepository(Protocol):
     def get_by_id(self, user_id: uuid.UUID) -> User | None: ...
 
@@ -33,7 +41,13 @@ class UserRepository(Protocol):
         """Marca el correo como validado y activa la cuenta."""
         ...
 
-    def update_password_hash(self, user_id: uuid.UUID, password_hash: str) -> None: ...
+    def update_password_hash(self, user_id: uuid.UUID, password_hash: str) -> None:
+        """Reescribe el hash de la misma contraseña (parámetros nuevos); no cierra sesiones."""
+        ...
+
+    def change_password(self, user_id: uuid.UUID, password_hash: str) -> None:
+        """Guarda una contraseña nueva y fija `password_changed_at`: cierra las sesiones."""
+        ...
 
     def update_profile(self, user_id: uuid.UUID, values: Mapping[str, str | None]) -> User:
         """Actualiza solo los campos de `values` (`full_name`, `phone`)."""
@@ -58,8 +72,8 @@ class TokenIssuer(Protocol):
 
 
 class TokenService(TokenIssuer, Protocol):
-    def decode(self, token: str) -> uuid.UUID:
-        """Id del usuario del token. Lanza `NotAuthenticated` si el token no es válido."""
+    def decode(self, token: str) -> TokenClaims:
+        """Usuario y emisión del token. Lanza `NotAuthenticated` si el token no es válido."""
         ...
 
 
@@ -85,6 +99,10 @@ class PasswordResetRepository(Protocol):
         ...
 
     def get(self, token_hash: str) -> PasswordReset | None: ...
+
+    def delete_for_user(self, user_id: uuid.UUID) -> None:
+        """Borra todos los enlaces del usuario."""
+        ...
 
     def last_created_at(self, user_id: uuid.UUID) -> datetime | None:
         """Fecha del enlace más reciente del usuario, o `None` si no tiene ninguno."""

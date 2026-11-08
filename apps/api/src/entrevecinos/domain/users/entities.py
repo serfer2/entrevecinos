@@ -31,6 +31,8 @@ class User:
     created_at: datetime
     deleted_at: datetime | None = None
     email_verified_at: datetime | None = None
+    # Los JWT emitidos antes de esta fecha dejan de valer (TK-102).
+    password_changed_at: datetime | None = None
 
     @property
     def can_authenticate(self) -> bool:

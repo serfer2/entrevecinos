@@ -1,13 +1,14 @@
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Response, status
 
 from entrevecinos.application.users.authenticate_user import AuthenticateUser, LoginCommand
 from entrevecinos.application.users.ports import EmailSender, OutgoingEmail
 from entrevecinos.application.users.register_user import RegisterUser, RegisterUserCommand
 from entrevecinos.application.users.request_password_reset import RequestPasswordReset
 from entrevecinos.application.users.resend_email_verification import ResendEmailVerification
+from entrevecinos.application.users.reset_password import ResetPassword
 from entrevecinos.application.users.verify_email import VerifyEmail
 from entrevecinos.presentation.dependencies import (
     EmailSenderDep,
@@ -15,6 +16,7 @@ from entrevecinos.presentation.dependencies import (
     get_register_user,
     get_request_password_reset,
     get_resend_email_verification,
+    get_reset_password,
     get_verify_email,
 )
 from entrevecinos.presentation.v1.schemas.auth import (
@@ -23,6 +25,8 @@ from entrevecinos.presentation.v1.schemas.auth import (
     EmailQuotaExceededResponse,
     EmailVerificationRequest,
     LoginRequest,
+    PasswordResetConfirmRequest,
+    PasswordResetErrorResponse,
     PasswordResetRequest,
     PasswordResetRequestedResponse,
     RegisterRequest,
@@ -157,6 +161,34 @@ def request_password_reset(
     if message is not None:
         background_tasks.add_task(send_in_background, sender, message)
     return PasswordResetRequestedResponse(detail=PASSWORD_RESET_REQUESTED)
+
+
+@router.post(
+    "/password-reset/confirm",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    operation_id="confirmPasswordReset",
+    summary="Elegir una contraseña nueva con el enlace",
+    description=(
+        "Cambia la contraseña con el token del enlace, cierra las sesiones anteriores y avisa del "
+        "cambio por correo. No inicia sesión. Acceso público."
+    ),
+    responses={
+        400: {"model": PasswordResetErrorResponse},
+        410: {"model": PasswordResetErrorResponse},
+        **VALIDATION_ERROR,
+    },
+)
+def confirm_password_reset(
+    body: PasswordResetConfirmRequest,
+    reset: Annotated[ResetPassword, Depends(get_reset_password)],
+    sender: EmailSenderDep,
+    background_tasks: BackgroundTasks,
+) -> Response:
+    notice = reset.execute(body.token, body.password)
+    if notice is not None:
+        background_tasks.add_task(send_in_background, sender, notice)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
