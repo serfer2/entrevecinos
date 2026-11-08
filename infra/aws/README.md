@@ -105,7 +105,7 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
 
    5. IP autorizadas: la IP elástica de la instancia (`make tf-output`, TK-098).
 
-   **Límites reales del correo de producción** (TK-097): 300 correos al día en el plan gratuito de Brevo, y como mucho 5.000 por periodo en la propia API (del día 6 al día 6, por coste, TK-099). Si Brevo rechaza un envío, salta la alarma `email-send-failures`.
+   **Límites reales del correo de producción** (TK-097): 300 correos al día en el plan gratuito de Brevo, y como mucho 5.000 por periodo en la propia API (del día 6 al día 6, por coste, TK-099). Cuentan todos los correos de la aplicación: validación, reenvío, enlace para restablecer la contraseña y aviso del cambio. Si Brevo rechaza un envío, salta la alarma `email-send-failures`.
 
 7. **Primer despliegue** de la aplicación: ver «Despliegue». El mismo `make tf-apply` crea CloudFront y los alias de la web (ver «Web pública»), sin pasos en consola.
 8. **Acceso de GitHub Actions** (manual en GitHub): entorno `production`, clave del usuario de CI y variables; ver «Acceso de GitHub Actions».
@@ -123,7 +123,7 @@ La instancia ejecuta `infra/docker-compose.prod.yml` con cuatro servicios: `prox
 
 - **Proxy de origen:** responde `403` a toda petición sin la cabecera `X-Origin-Verify` con el valor de `/entrevecinos/prod/origin-verify` (la añade CloudFront, TK-087) y la quita antes de reenviar a la web. Identifica al visitante por el último valor de `X-Forwarded-For` (lo añade CloudFront; el visitante no puede falsearlo) y limita por IP con `limit_req`: 4 `POST` por minuto con ráfaga de 10 a `/iniciar-sesion` y `/registro` (≈ 20 en 5 minutos) y 5 peticiones por segundo con ráfaga de 100 en general, con `429`. Su registro de accesos lleva la IP del visitante. nginx lee la plantilla solo al arrancar: `deploy.sh` pone su huella en la etiqueta `org.entrevecinos.proxy-config`, así que cambiarla recrea el proxy en el siguiente despliegue.
 - **Contenedores endurecidos:** `proxy`, `web` y `api` sin *root*, con el sistema de ficheros de solo lectura (`tmpfs` donde hace falta), sin capacidades, con `no-new-privileges`, límites de memoria, CPU y procesos, y sin el socket de Docker. `db` mantiene solo las capacidades que usa la imagen oficial.
-- **Logs** con el *driver* `awslogs` en `/entrevecinos/prod/app/{proxy,web,api,db}` (14 días), y la salida de cada despliegue en `/entrevecinos/prod/app/deploy` (30 días). El proxy registra la ruta sin la cadena de consulta (el enlace de validación del correo lleva el *token* en `?token=`).
+- **Logs** con el *driver* `awslogs` en `/entrevecinos/prod/app/{proxy,web,api,db}` (14 días), y la salida de cada despliegue en `/entrevecinos/prod/app/deploy` (30 días). El proxy registra la ruta sin la cadena de consulta (los enlaces de validación y de restablecimiento de la contraseña llevan el *token* en `?token=`).
 
 ### Cómo se despliega
 
@@ -272,7 +272,7 @@ Cada fusión en `main` llega sola a producción con `.github/workflows/deploy.ym
 - **Redirecciones:** `http://` → `https://` (CloudFront) y `www.entrevecinos.org/<ruta>?<query>` → `301` a `https://entrevecinos.org/<ruta>?<query>` (CloudFront Function `entrevecinos-www-redirect`).
 - **Cabeceras de seguridad:** las pone Next.js (CSP con *nonce*, HSTS…); CloudFront no añade ni sustituye ninguna.
 - **Sin WAF.** El plan de tarifa plana Free de CloudFront (WAF y DDoS sin coste) no está disponible: el proyecto está en el plan FREE de AWS y su política de control de servicios deniega `pricingplanmanager:*` (también desde la consola). No se contrata una web ACL por separado (≈ 10 USD/mes). DDoS: Shield Standard de CloudFront, gratuito.
-- **Límites por IP en el proxy** (`infra/prod/proxy/default.conf.template`, ver «Despliegue»): `429` a partir de unos 20 `POST` en 5 minutos a `/iniciar-sesion` y `/registro`, o de 5 peticiones por segundo sostenidas.
+- **Límites por IP en el proxy** (`infra/prod/proxy/default.conf.template`, ver «Despliegue»): `429` a partir de unos 20 `POST` en 5 minutos entre `/iniciar-sesion`, `/registro`, `/recuperar-contrasena` y `/restablecer-contrasena` (la misma zona: quien abusa de una queda limitado en todas unos minutos), o de 5 peticiones por segundo sostenidas. El enlace del correo (`/restablecer-contrasena/enlace`) solo hace `GET` y queda en el límite general.
 - **Registros de acceso:** estándar (v2), en JSON, a `/entrevecinos/prod/cloudfront` en `us-east-1`, 7 días.
 
 Comprobaciones:
@@ -283,6 +283,7 @@ curl -sI http://entrevecinos.org/ | head -3                                  # 3
 curl -sI 'https://www.entrevecinos.org/iniciar-sesion?a=1' | grep -i '^location' # https://entrevecinos.org/iniciar-sesion?a=1
 curl -sI https://entrevecinos.org/iniciar-sesion | grep -i 'strict-transport\|content-security'
 for i in $(seq 1 14); do curl -s -o /dev/null -w '%{http_code} ' -X POST https://entrevecinos.org/iniciar-sesion; done  # 429 desde la 12.ª
+for i in $(seq 1 14); do curl -s -o /dev/null -w '%{http_code} ' -X POST https://entrevecinos.org/recuperar-contrasena; done  # ídem (TK-105)
 ```
 
 ## DNS
@@ -538,8 +539,8 @@ Sin datos sensibles: la API solo registra el asunto de los correos y la clave de
 | `web-5xx` | `Proxy5xx` / `ProxyRequests` > 5 % en 5 min, con 10 peticiones o más | `docker ps` (¿web caída?) y `/entrevecinos/prod/app/{proxy,web}`. No ve un proxy caído (CloudFront responde `502` sin llegar a él): mirar `5xxErrorRate` de CloudFront en el panel |
 | `ses-bounces` / `ses-complaints` | `Reputation.BounceRate` > 5 % / `Reputation.ComplaintRate` > 0,1 % | Revisar los rebotes en SES; AWS revisa la cuenta (y puede pausar el envío) a partir del 5 % y del 0,1 % |
 | `email-send-failures` | Un correo de la aplicación no se ha podido enviar («No se pudo enviar el correo» en `/entrevecinos/prod/app/api`): la cuenta se crea, pero el vecino no recibe el enlace | Leer la traza en el registro de la API: credenciales SMTP (rotación pendiente de desplegar), IP no autorizada en Brevo, límite diario de Brevo (300) agotado o caída del proveedor. Corregir y pedir al vecino que use «Reenviar el correo» |
-| `email-quota-80` | Se ha reservado el 80 % del cupo de correos del periodo (4.000 de 5.000) | Revisar si el crecimiento es real o un abuso (registros de la API y del proxy: muchos `POST /registro` desde pocas IP); si es real, valorar subir el límite con el presupuesto |
-| `email-quota-exceeded` | Envío bloqueado por cupo agotado (registro y reenvío responden `503` hasta el día 6) | Si es un abuso, bloquear el origen y esperar al día 6; si es crecimiento real, subir `EMAIL_MONTHLY_LIMIT` en el Compose (y el plan de Brevo y el límite de gasto si hace falta), `make tf-apply` y desplegar |
+| `email-quota-80` | Se ha reservado el 80 % del cupo de correos del periodo (4.000 de 5.000) | Revisar si el crecimiento es real o un abuso (registros de la API y del proxy: muchos `POST /registro` o `POST /recuperar-contrasena` desde pocas IP, o muchos `429`); si es real, valorar subir el límite con el presupuesto |
+| `email-quota-exceeded` | Envío bloqueado por cupo agotado (registro, reenvío y petición del enlace para restablecer la contraseña responden `503` hasta el día 6; un cambio de contraseña con un enlace ya enviado se hace igual, sin aviso por correo) | Si es un abuso, bloquear el origen y esperar al día 6; si es crecimiento real, subir `EMAIL_MONTHLY_LIMIT` en el Compose (y el plan de Brevo y el límite de gasto si hace falta), `make tf-apply` y desplegar |
 
 ```bash
 # Probar un aviso (llega un correo de ALARM y, en la siguiente evaluación, otro de OK)
@@ -699,16 +700,16 @@ Las entradas siguientes amplían cada decisión (qué, por qué, impacto, mitiga
 
 ### Límite de 5.000 correos por periodo, por coste (TK-099)
 
-- **Qué:** la API envía como mucho 5.000 correos (registro y reenvío del enlace de validación) entre el día 6 de un mes a las 00:00 (hora de Madrid) y el día 6 del siguiente. Al llegar, responde `503` (`email_quota_exceeded`) sin crear la cuenta ni enviar nada, hasta el periodo siguiente. Contador en PostgreSQL (`email_quota`) con reserva atómica; configurable con `EMAIL_MONTHLY_LIMIT` y `EMAIL_QUOTA_RESET_DAY`.
+- **Qué:** la API envía como mucho 5.000 correos (validación, reenvío, enlace para restablecer la contraseña y aviso del cambio) entre el día 6 de un mes a las 00:00 (hora de Madrid) y el día 6 del siguiente. Al llegar, responde `503` (`email_quota_exceeded`) sin crear la cuenta ni enviar nada, hasta el periodo siguiente. Contador en PostgreSQL (`email_quota`) con reserva atómica; configurable con `EMAIL_MONTHLY_LIMIT` y `EMAIL_QUOTA_RESET_DAY`.
 - **Por qué:** **restricción de costes.** El correo no puede costar más que el plan de pago más barato de Brevo (5.000 correos al mes, ≈ 9 USD/mes), y el gasto total debe seguir dentro del límite de 40 €/mes. Un tope en la propia aplicación lo garantiza aunque falle otra protección (un error que envíe en bucle o registros masivos).
-- **Impacto:** al agotarse, nadie puede registrarse ni pedir otro enlace hasta el día 6; una plaza se consume aunque el envío falle después (criterio conservador).
-- **Mitigaciones:** límites por IP del proxy contra los registros masivos; alarmas `email-quota-80` y `email-quota-exceeded`; el reenvío comprueba el cupo antes de buscar la cuenta, así que el `503` no revela qué correos existen.
+- **Impacto:** al agotarse, nadie puede registrarse, pedir otro enlace de validación ni recuperar su contraseña hasta el día 6; una plaza se consume aunque el envío falle después (criterio conservador).
+- **Mitigaciones:** límites por IP del proxy contra los registros y las peticiones de recuperación masivos; como mucho un enlace de validación o de restablecimiento por minuto y cuenta; alarmas `email-quota-80` y `email-quota-exceeded`; el reenvío y la recuperación comprueban el cupo antes de buscar la cuenta, así que el `503` no revela qué correos existen.
 - **Cuándo revisarla:** cuando el crecimiento real de registros se acerque al límite (alarma del 80 %).
 - **Cómo subirlo:** decidirlo con el presupuesto; `EMAIL_MONTHLY_LIMIT` en `infra/docker-compose.prod.yml`, el plan de Brevo si hace falta, `make tf-apply` y desplegar.
 
 ### Correo transaccional con Brevo en lugar de SES (TK-096)
 
-- **Qué:** el correo de la aplicación (validación de la cuenta y reenvío) sale por SMTP con Brevo, en su plan gratuito, en lugar de por SES. SES sigue configurado (identidad, DKIM, `MAIL FROM` y *configuration set*) como vuelta atrás.
+- **Qué:** el correo de la aplicación (validación de la cuenta, reenvío y recuperación de la contraseña) sale por SMTP con Brevo, en su plan gratuito, en lugar de por SES. SES sigue configurado (identidad, DKIM, `MAIL FROM` y *configuration set*) como vuelta atrás.
 - **Por qué:** SES sigue en *sandbox* en `eu-north-1`. La revisión del acceso de producción figura como `GRANTED`, pero `ProductionAccessEnabled` es `false`, sin número de caso ni explicación en la documentación, y la cuenta está en el plan FREE. Salir del *sandbox* depende de un caso de soporte de plazo incierto o del plan de pago, y mientras tanto nadie puede validar su cuenta. Se compararon los proveedores con el coste como primer criterio y la integración como segundo:
 
   | Proveedor | Gratis | Si se supera | Por qué |
@@ -718,7 +719,7 @@ Las entradas siguientes amplían cada decisión (qué, por qué, impacto, mitiga
   | Scaleway TEM | 300 al mes | 0,25 € por 1.000 | En la UE, pero otra cuenta cloud y poco margen gratuito |
 
   Descartados: Mailjet (logo en el plan gratuito), SMTP2GO, Mailgun, Postmark y SendGrid (sin plan gratuito o con menos margen).
-- **Impacto:** una cuenta y unas credenciales fuera de AWS y de Terraform (alta, clave SMTP e IP autorizadas); límite de 300 correos al día; el plan gratuito puede añadir un pie de Brevo (se acepta por ahora); **Brevo reescribe los enlaces del correo para su seguimiento de clics y no permite desactivarlo** (solo a petición o en Enterprise): el enlace de validación, con su *token*, pasa por su redirección (`r.send.entrevecinos.org`) y queda en sus registros. **Riesgo aceptado** el 2026-11-06: el *token* es de un solo uso y caduca en 24 horas, Brevo es encargado del tratamiento (DPA) y la alternativa (cambiar de proveedor) se descartó; la instancia necesita salida SMTP (puerto 587) y una IP fija autorizada en Brevo.
+- **Impacto:** una cuenta y unas credenciales fuera de AWS y de Terraform (alta, clave SMTP e IP autorizadas); límite de 300 correos al día; el plan gratuito puede añadir un pie de Brevo (se acepta por ahora); **Brevo reescribe los enlaces del correo para su seguimiento de clics y no permite desactivarlo** (solo a petición o en Enterprise): el enlace de validación, con su *token*, pasa por su redirección (`r.send.entrevecinos.org`) y queda en sus registros. **Riesgo aceptado** el 2026-11-06: el *token* es de un solo uso y caduca en 24 horas, Brevo es encargado del tratamiento (DPA) y la alternativa (cambiar de proveedor) se descartó. Desde la Épica 14 también pasa por esa redirección el enlace para restablecer la contraseña, más sensible porque permite cambiarla: es de un solo uso, caduca en 1 hora, la web lo pasa a una *cookie* `HttpOnly` sin consumirlo hasta enviar el formulario, cambiarla avisa por correo y no inicia sesión; **riesgo aceptado** también para este enlace el 2026-11-08 (TK-105); la instancia necesita salida SMTP (puerto 587) y una IP fija autorizada en Brevo.
 - **Mitigaciones:** credenciales solo en Parameter Store y por entorno; dominio autenticado con DKIM alineado (DMARC estricto); alarma de fallos de envío (TK-097) y límite propio de 5.000 envíos por periodo, por coste (TK-099).
 - **Cuándo revisarla:** si AWS activa el acceso de producción de SES, si el volumen supera el plan gratuito o si la marca del pie molesta.
 - **Evolución:** volver a SES cuando tenga acceso de producción (solo configuración: variables del Compose, `make tf-apply` y despliegue) o pasar al plan de pago de Brevo.
