@@ -13,7 +13,7 @@ Historias del MVP definido en la sección 1.2 del `readme.md`. Las inferencias q
 
 ## Fuera de alcance
 
-No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Tampoco la recuperación de contraseña, que no aparece en el README. Las entidades y operaciones de la API de estas funcionalidades están marcadas como versión futura en el modelo de datos (`readme.md` §3.2) y en el contrato (`x-mvp: false` en `docs/api/`).
+No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Las entidades y operaciones de la API de estas funcionalidades están marcadas como versión futura en el modelo de datos (`readme.md` §3.2) y en el contrato (`x-mvp: false` en `docs/api/`). La recuperación de la contraseña sí forma parte del MVP (Épica 14): sin ella, quien olvida su contraseña pierde el acceso a su cuenta.
 
 ## Índice
 
@@ -32,6 +32,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 11. Experiencia de usuario | HU-28, HU-29, HU-30, HU-31, HU-32 |
 | 12. Documentación técnica | HU-33, HU-34, HU-35 |
 | 13. Puesta en producción en AWS | HU-36, HU-37, HU-38, HU-39, HU-40 |
+| 14. Recuperación de la contraseña | HU-41, HU-42 |
 
 ---
 
@@ -1095,3 +1096,76 @@ Hoy SES sigue en *sandbox* en `eu-north-1`: solo entrega a direcciones verificad
 - **When** alguien se registra o pide de nuevo el correo de validación
 - **Then** no se envía nada, veo un mensaje que me pide intentarlo más tarde y el equipo recibe un aviso; el día 6 siguiente el envío vuelve a funcionar. El límite es una restricción de costes y está documentado como tal
 
+---
+
+## Épica 14 — Recuperación de la contraseña
+
+Hoy la pantalla de inicio de sesión no ofrece ninguna salida a quien ha olvidado su contraseña: no puede volver a entrar ni registrarse de nuevo con el mismo correo. La recuperación por correo forma parte del MVP.
+
+### HU-41 Pedir un enlace para restablecer mi contraseña
+
+**Como** vecino registrado que ha olvidado su contraseña, **quiero** pedir desde el inicio de sesión un enlace para elegir otra, **para** recuperar el acceso a mi cuenta sin ayuda de nadie.
+
+**AC1 — Enlace en el inicio de sesión**
+
+- **Given** que estoy en la pantalla de inicio de sesión
+- **When** busco cómo recuperar mi contraseña
+- **Then** veo el enlace «¿Has olvidado tu contraseña?», que me lleva a un formulario donde escribo mi correo
+
+**AC2 — Correo con el enlace**
+
+- **Given** que tengo una cuenta con ese correo
+- **When** pido el enlace
+- **Then** recibo un correo de EntreVecinos con un enlace para elegir una contraseña nueva, válido durante 1 hora (asumido)
+
+**AC3 — Respuesta que no revela cuentas**
+
+- **Given** que pido el enlace con cualquier correo, tenga cuenta o no
+- **When** envío el formulario
+- **Then** veo siempre el mismo mensaje: «Si hay una cuenta con ese correo, te hemos enviado un enlace para restablecer la contraseña.», y nadie puede averiguar así qué correos están registrados
+
+**AC4 — Solo vale el último enlace**
+
+- **Given** que pido el enlace varias veces
+- **When** abro un enlace anterior al último
+- **Then** no funciona; solo vale el más reciente
+
+**AC5 — Sin abusos**
+
+- **Given** que alguien pide enlaces en bucle para el mismo correo o desde la misma IP
+- **When** supera el límite
+- **Then** no se envían más correos durante un tiempo (como mucho uno por minuto para cada cuenta) y los envíos cuentan para el límite de 5.000 correos por periodo (HU-40 AC5)
+
+### HU-42 Elegir una contraseña nueva con el enlace recibido
+
+**Como** vecino que ha pedido restablecer su contraseña, **quiero** elegir una contraseña nueva desde el enlace del correo, **para** volver a iniciar sesión con ella.
+
+**AC1 — Contraseña nueva**
+
+- **Given** que abro el enlace del correo antes de que caduque
+- **When** escribo una contraseña nueva válida (de 12 a 128 caracteres, como en el registro) y la repito
+- **Then** la contraseña cambia, el enlace deja de valer y vuelvo al inicio de sesión con el aviso «Tu contraseña se ha cambiado. Inicia sesión con la nueva.»
+
+**AC2 — Enlace caducado, usado o no válido**
+
+- **Given** que el enlace ha caducado, ya se ha usado o no es el último que pedí
+- **When** lo abro
+- **Then** veo que el enlace no es válido o ha caducado y puedo pedir otro
+
+**AC3 — Sesiones anteriores cerradas**
+
+- **Given** que tenía la sesión iniciada en otro dispositivo
+- **When** cambio la contraseña con el enlace
+- **Then** esas sesiones dejan de funcionar y hay que iniciar sesión de nuevo (asumido)
+
+**AC4 — Aviso del cambio**
+
+- **Given** que mi contraseña acaba de cambiar
+- **When** reviso mi correo
+- **Then** tengo un aviso de que la contraseña ha cambiado, para detectar un cambio que no he hecho yo (asumido)
+
+**AC5 — Cuenta sin validar**
+
+- **Given** que mi cuenta todavía no había validado el correo
+- **When** elijo una contraseña nueva con el enlace
+- **Then** el correo queda validado y la cuenta activa, porque el enlace demuestra que el correo es mío (asumido)

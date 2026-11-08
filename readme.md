@@ -156,6 +156,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
 1. **Registro y perfil básico**
    - Registro, inicio y cierre de sesión con correo electrónico.
    - Validación del correo por enlace, con caducidad de 24 horas y posibilidad de recibirlo de nuevo; sin validarlo, la cuenta no se activa (salvo la de un administrador de la plataforma).
+   - Recuperación de la contraseña olvidada desde el inicio de sesión: un enlace por correo, válido 1 hora, para elegir una contraseña nueva; al cambiarla se cierran las sesiones abiertas.
    - Perfil con nombre y datos de contacto.
    - Asociación del usuario a una comunidad.
    - Tras registrarse o iniciar sesión, llevar al usuario a la lista de comunidades si todavía no pertenece a ninguna, o directamente a su comunidad si solo pertenece a una.
