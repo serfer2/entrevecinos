@@ -84,17 +84,18 @@ Cambios del contrato durante el desarrollo del MVP (compatibles salvo que se ind
 | TK-064 | `verifyEmail`: el `400` distingue `verification_invalid`, `email_already_verified` y `verification_superseded` (con `email`). Compatible para clientes que solo miran el estado. |
 | TK-074 | `x-mvp` pasa a significar «implementada en el MVP». `deleteCurrentUser`, `listMyListings`, `createCategory`, `updateCategory`, `updateCommunity` y `deleteMedia` pasan a `x-mvp: false` (versión futura): no las usa ninguna historia del MVP. |
 | TK-099 | `registerUser` y `resendEmailVerification`: `503` con `EmailQuotaExceeded` (`Error` + `code: email_quota_exceeded`) y `Retry-After` cuando se agota el cupo de correos del periodo (límite por coste). Compatible: un estado nuevo. |
+| TK-101 | Nuevo `requestPasswordReset` (`POST /auth/password-reset`, `x-mvp: true`): siempre `202` con `PasswordResetRequested`, exista o no la cuenta; `503` con `EmailQuotaExceeded` sin cupo. Esquema `PasswordResetRequest`. Compatible: una operación nueva. |
 
 ## Resumen de endpoints
 
-El contrato tiene 59 operaciones: 27 del MVP (`x-mvp: true`) y 32 de versiones futuras (`x-mvp: false`).
+El contrato tiene 60 operaciones: 28 del MVP (`x-mvp: true`) y 32 de versiones futuras (`x-mvp: false`).
 
 ### MVP (implementado)
 
 | Grupo | Operaciones |
 |---|---|
 | Sistema | `GET /health` |
-| Autenticación | `POST /auth/register`, `POST /auth/email-verification`, `POST /auth/email-verification/resend`, `POST /auth/token` |
+| Autenticación | `POST /auth/register`, `POST /auth/email-verification`, `POST /auth/email-verification/resend`, `POST /auth/password-reset`, `POST /auth/token` |
 | Usuarios | `GET/PATCH /users/me`, `GET /users/me/memberships` |
 | Categorías | `GET /categories` |
 | Comunidades | `GET/POST /communities`, `GET /communities/{community_id}` |

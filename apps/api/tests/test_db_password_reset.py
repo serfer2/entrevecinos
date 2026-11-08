@@ -6,6 +6,9 @@ from sqlalchemy import Engine, inspect, select, text
 from sqlalchemy.orm import Session
 
 from entrevecinos.infrastructure.db.models import PasswordResetModel, UserModel
+from entrevecinos.infrastructure.users.sqlalchemy_password_reset_repository import (
+    SqlAlchemyPasswordResetRepository,
+)
 from tests.conftest import alembic_config
 
 pytestmark = pytest.mark.db
@@ -77,3 +80,33 @@ def test_migration_0011_is_reversible_and_keeps_existing_users(db_engine: Engine
     finally:
         with db_engine.begin() as connection:
             connection.execute(text("DELETE FROM users WHERE email = 'antes@example.com'"))
+
+
+def test_replace_deletes_the_previous_links_of_the_user(
+    db_session: Session, user: UserModel
+) -> None:
+    other = UserModel(email="otro@example.com", password_hash="hash", full_name="Otro")
+    other.email_verified_at = datetime.now(UTC)
+    db_session.add(other)
+    db_session.flush()
+    repository = SqlAlchemyPasswordResetRepository(db_session)
+    repository.replace(other.id, "c" * 64, IN_ONE_HOUR)
+
+    repository.replace(user.id, "a" * 64, IN_ONE_HOUR)
+    repository.replace(user.id, "b" * 64, IN_ONE_HOUR)
+
+    assert repository.get("a" * 64) is None
+    stored = repository.get("b" * 64)
+    assert stored is not None
+    assert stored.user_id == user.id
+    assert stored.expires_at == IN_ONE_HOUR
+    assert repository.get("c" * 64) is not None
+
+
+def test_last_created_at(db_session: Session, user: UserModel) -> None:
+    repository = SqlAlchemyPasswordResetRepository(db_session)
+    assert repository.last_created_at(user.id) is None
+
+    repository.replace(user.id, "a" * 64, IN_ONE_HOUR)
+
+    assert repository.last_created_at(user.id) is not None

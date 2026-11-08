@@ -61,6 +61,8 @@ paths:
     $ref: ./paths/auth_email_verification.yaml
   /auth/email-verification/resend:
     $ref: ./paths/auth_email_verification_resend.yaml
+  /auth/password-reset:
+    $ref: ./paths/auth_password_reset.yaml
   /users/me:
     $ref: ./paths/users_me.yaml
   /users/me/memberships:
@@ -265,6 +267,10 @@ components:
       $ref: ./components/schemas/NotificationUpdate.yaml
     PageMeta:
       $ref: ./components/schemas/PageMeta.yaml
+    PasswordResetRequest:
+      $ref: ./components/schemas/PasswordResetRequest.yaml
+    PasswordResetRequested:
+      $ref: ./components/schemas/PasswordResetRequested.yaml
     PlatformRole:
       $ref: ./components/schemas/PlatformRole.yaml
     ProfessionalImage:

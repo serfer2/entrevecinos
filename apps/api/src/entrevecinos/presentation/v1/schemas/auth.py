@@ -71,6 +71,16 @@ class ResendVerificationResponse(BaseModel):
     detail: str
 
 
+class PasswordResetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: Annotated[EmailStr, Field(max_length=320)]
+
+
+class PasswordResetRequestedResponse(BaseModel):
+    detail: str
+
+
 class RegistrationConflictResponse(BaseModel):
     detail: str
     code: Literal["email_in_use", "email_pending_verification"]

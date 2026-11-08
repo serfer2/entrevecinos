@@ -53,14 +53,14 @@ Devuelve el mensaje a enviar o `None`; el llamante no distingue los casos.
 ### 3.3 `POST /v1/auth/password-reset`
 
 - Público (`security: []`). Cuerpo `{"email": "..."}` (`extra="forbid"`, formato de correo).
-- Siempre `202` sin cuerpo, exista o no la cuenta (HU-41 AC3). El correo se envía con `BackgroundTasks` después de confirmar la transacción (`send_in_background`), así que el tiempo de respuesta no depende de si se envía.
+- Siempre `202` con `{"detail": "Si hay una cuenta con ese correo, te enviaremos un enlace para restablecer la contraseña."}`, exista o no la cuenta (HU-41 AC3), con la misma forma que el reenvío del correo de validación. El correo se envía con `BackgroundTasks` después de confirmar la transacción (`send_in_background`), así que el tiempo de respuesta no depende de si se envía.
 - Sin cupo → `503` `email_quota_exceeded` con `Retry-After`.
 - Cuerpo inválido → `422`.
 - Los registros no incluyen el correo pedido ni el *token*.
 
 ### 3.4 Contrato
 
-- `docs/api/paths/auth_password_reset.yaml`, operación `requestPasswordReset` con `x-mvp: true`; esquema `PasswordResetRequest`.
+- `docs/api/paths/auth_password_reset.yaml`, operación `requestPasswordReset` con `x-mvp: true`; esquemas `PasswordResetRequest` y `PasswordResetRequested`.
 - `test_contract_scope.py` sigue pasando: la ruta existe y está marcada como MVP.
 
 ### 3.5 Pruebas
@@ -116,9 +116,9 @@ curl -i -X POST localhost:8000/v1/auth/password-reset -H 'Content-Type: applicat
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] Las pruebas de la API, `ruff` y `redocly lint` pasan.
-- [ ] Contrato, `.env.example` y `apps/api/README.md` actualizados.
+- [x] Los criterios de aceptación se cumplen.
+- [x] Las pruebas de la API, `ruff` y `redocly lint` pasan.
+- [x] Contrato, `.env.example` y `apps/api/README.md` actualizados.
 - [ ] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas

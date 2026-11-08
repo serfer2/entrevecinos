@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from entrevecinos.domain.users.entities import EmailVerification, NewUser, User
+from entrevecinos.domain.users.entities import EmailVerification, NewUser, PasswordReset, User
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +76,18 @@ class EmailVerificationRepository(Protocol):
 
     def mark_used(self, token_hash: str) -> None:
         """Marca el enlace como usado y los demás vigentes de su usuario como sustituidos."""
+        ...
+
+
+class PasswordResetRepository(Protocol):
+    def replace(self, user_id: uuid.UUID, token_hash: str, expires_at: datetime) -> None:
+        """Guarda el enlace nuevo y borra los anteriores del usuario: solo vale el último."""
+        ...
+
+    def get(self, token_hash: str) -> PasswordReset | None: ...
+
+    def last_created_at(self, user_id: uuid.UUID) -> datetime | None:
+        """Fecha del enlace más reciente del usuario, o `None` si no tiene ninguno."""
         ...
 
 

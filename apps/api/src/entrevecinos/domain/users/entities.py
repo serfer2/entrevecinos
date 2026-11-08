@@ -45,6 +45,15 @@ class User:
             and self.deleted_at is None
         )
 
+    @property
+    def can_reset_password(self) -> bool:
+        """Puede recibir un enlace para restablecer la contraseña (TK-101).
+
+        Las cuentas activas y las pendientes de validar el correo; no las borradas ni las
+        desactivadas con el correo ya validado (bloqueadas por otros motivos).
+        """
+        return self.deleted_at is None and (self.is_active or self.email_verified_at is None)
+
 
 @dataclass(frozen=True, slots=True)
 class EmailVerification:
@@ -56,3 +65,12 @@ class EmailVerification:
     used_at: datetime | None = None
     # Otro enlace más reciente lo sustituyó: solo vale el último.
     superseded_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PasswordReset:
+    """Enlace para restablecer la contraseña. No incluye el token: solo viaja por correo."""
+
+    user_id: uuid.UUID
+    expires_at: datetime
+    created_at: datetime
