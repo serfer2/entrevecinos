@@ -53,6 +53,6 @@ $COMPOSE exec web npm run lint && $COMPOSE exec web npm run typecheck && $COMPOS
 
 ## 7. Definición de terminado
 
-- [ ] El criterio de aceptación se cumple.
-- [ ] Lint, tipos y pruebas de la web pasan.
+- [x] El criterio de aceptación se cumple.
+- [x] Lint, tipos y pruebas de la web pasan.
 - [ ] Cambios revisados y fusionados mediante *pull request*.

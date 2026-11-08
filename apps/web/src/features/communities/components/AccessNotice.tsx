@@ -3,7 +3,7 @@ import { MembershipAction } from "./MembershipAction";
 
 const NOTICES = {
   pending:
-    "Tu solicitud está pendiente de aprobación. Podrás ver y publicar anuncios cuando un administrador la apruebe.",
+    "Hemos enviado tu solicitud a la administración de la comunidad, que la revisará. Te avisaremos por correo cuando la apruebe.",
   rejected: "No tienes acceso a esta comunidad.",
   blocked: "No tienes acceso a esta comunidad.",
 } as const;
