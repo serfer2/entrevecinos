@@ -49,9 +49,9 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 
 ### 3.3 Caso de uso y envío
 
-- `RequestMembership` devuelve, además de la membresía, los mensajes a enviar. Prepara un aviso por destinatario y reserva una plaza del cupo para cada uno con `EmailQuota.reserve()`.
+- `MembershipNotices.request_received(community, requester)` (`application/communities/membership_notices.py`) prepara un aviso por destinatario y reserva una plaza del cupo para cada uno con `EmailQuota.reserve()`. `RequestMembership` no cambia; el endpoint llama a los dos. TK-108 añadirá a `MembershipNotices` el aviso de aprobación.
 - Sin cupo (`EmailQuotaExceeded`): la solicitud se crea igual y no se envían más avisos; queda en el registro como en TK-099 (HU-43 AC4).
-- El endpoint envía los avisos con `BackgroundTasks` después de confirmar la transacción, con el mismo `send_in_background` que la autenticación (moverlo a un módulo compartido de presentación). Un fallo del SMTP solo deja «No se pudo enviar el correo…» en el registro, que dispara la alarma `email-send-failures`.
+- El endpoint envía los avisos con `BackgroundTasks` después de confirmar la transacción, con `send_in_background`, que pasa de la autenticación a `presentation/v1/mail.py` para compartirlo. Un fallo del SMTP solo deja «No se pudo enviar el correo…» en el registro, que dispara la alarma `email-send-failures`.
 - La respuesta de `requestMembership` no cambia (`201` con `Membership`; `409` si ya existe).
 
 ### 3.4 Contrato y documentación
@@ -108,9 +108,9 @@ $COMPOSE run --rm -v "$PWD/apps/api/tests:/app/tests" api python -m pytest -q
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] Las pruebas de la API, `ruff` y `redocly lint` pasan.
-- [ ] Contrato, `apps/api/README.md` e `infra/aws/README.md` actualizados.
+- [x] Los criterios de aceptación se cumplen.
+- [x] Las pruebas de la API, `ruff` y `redocly lint` pasan.
+- [x] Contrato, `apps/api/README.md` e `infra/aws/README.md` actualizados.
 - [ ] Cambios revisados y fusionados mediante *pull request*.
 - [ ] Comprobado en producción con una solicitud real.
 

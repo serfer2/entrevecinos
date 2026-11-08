@@ -11,6 +11,7 @@ from entrevecinos.domain.communities.entities import (
     MyMembership,
     NewCommunity,
 )
+from entrevecinos.domain.users.entities import User
 
 
 class CommunityRepository(Protocol):
@@ -66,6 +67,10 @@ class MembershipRepository(Protocol):
 
     def count_admins(self, community_id: uuid.UUID) -> int:
         """Administradores de la comunidad con membresía aprobada."""
+        ...
+
+    def list_admin_recipients(self, community_id: uuid.UUID) -> list[User]:
+        """Administradores aprobados de la comunidad con la cuenta activa, por nombre (TK-106)."""
         ...
 
     def delete(self, community_id: uuid.UUID, user_id: uuid.UUID) -> None: ...

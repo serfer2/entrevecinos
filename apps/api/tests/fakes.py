@@ -234,6 +234,22 @@ class InMemoryMembershipRepository:
     def __init__(self, communities: InMemoryCommunityRepository) -> None:
         self.communities = communities
         self.memberships = communities.memberships
+        # Cuentas conocidas, para los destinatarios de los avisos (TK-106).
+        self.users: dict[uuid.UUID, User] = {}
+
+    def list_admin_recipients(self, community_id: uuid.UUID) -> list[User]:
+        admins = [
+            self.users[m.user_id]
+            for (c, _), m in self.memberships.items()
+            if c == community_id
+            and m.role is MembershipRole.COMMUNITY_ADMIN
+            and m.status is MembershipStatus.APPROVED
+            and m.user_id in self.users
+        ]
+        return sorted(
+            (u for u in admins if u.is_active and u.deleted_at is None),
+            key=lambda u: u.full_name,
+        )
 
     def get(self, community_id: uuid.UUID, user_id: uuid.UUID) -> Membership | None:
         return self.memberships.get((community_id, user_id))

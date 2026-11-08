@@ -1,10 +1,8 @@
-import logging
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Response, status
 
 from entrevecinos.application.users.authenticate_user import AuthenticateUser, LoginCommand
-from entrevecinos.application.users.ports import EmailSender, OutgoingEmail
 from entrevecinos.application.users.register_user import RegisterUser, RegisterUserCommand
 from entrevecinos.application.users.request_password_reset import RequestPasswordReset
 from entrevecinos.application.users.resend_email_verification import ResendEmailVerification
@@ -19,6 +17,7 @@ from entrevecinos.presentation.dependencies import (
     get_reset_password,
     get_verify_email,
 )
+from entrevecinos.presentation.v1.mail import send_in_background
 from entrevecinos.presentation.v1.schemas.auth import (
     AuthResponse,
     EmailNotVerifiedResponse,
@@ -39,17 +38,7 @@ from entrevecinos.presentation.v1.schemas.auth import (
 from entrevecinos.presentation.v1.schemas.common import UNAUTHORIZED, VALIDATION_ERROR
 from entrevecinos.presentation.v1.schemas.users import UserResponse
 
-logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
-
-
-def send_in_background(sender: EmailSender, email: OutgoingEmail) -> None:
-    """Se ejecuta tras responder: si el SMTP falla, la cuenta sigue creada y se anota el error."""
-    try:
-        sender.send(email)
-    except Exception:
-        logger.exception("No se pudo enviar el correo «%s»", email.subject)
 
 
 @router.post(

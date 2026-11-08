@@ -42,7 +42,10 @@ post:
   summary: Solicitar el acceso a una comunidad
   description: >-
     Crea una membresía `pending` con rol `member` para el usuario autenticado; un administrador
-    debe aprobarla. Sin cuerpo de petición.
+    debe aprobarla. Avisa por correo a cada `community_admin` aprobado y activo de la comunidad,
+    con el nombre del solicitante (sin sus datos de contacto) y un enlace a las solicitudes
+    pendientes: un correo y una plaza del cupo de correos por destinatario; sin cupo, la solicitud
+    se crea igual y no se avisa. Sin cuerpo de petición.
   x-mvp: true
   responses:
     "201":

@@ -14,6 +14,7 @@ from entrevecinos.domain.communities.entities import (
     MyMembership,
 )
 from entrevecinos.domain.communities.errors import MembershipAlreadyExists
+from entrevecinos.domain.users.entities import User
 from entrevecinos.infrastructure.communities.sqlalchemy_community_repository import (
     community_to_domain,
 )
@@ -22,6 +23,7 @@ from entrevecinos.infrastructure.db.models import (
     CommunityModel,
     UserModel,
 )
+from entrevecinos.infrastructure.users.sqlalchemy_user_repository import to_domain as user_to_domain
 
 STATUS_ORDER = case(
     {
@@ -157,6 +159,21 @@ class SqlAlchemyMembershipRepository:
         self._session.flush()
         self._session.refresh(model)
         return detail_to_domain(model, self._session.get_one(UserModel, user_id))
+
+    def list_admin_recipients(self, community_id: uuid.UUID) -> list[User]:
+        users = self._session.scalars(
+            select(UserModel)
+            .join(CommunityMembershipModel, CommunityMembershipModel.user_id == UserModel.id)
+            .where(
+                CommunityMembershipModel.community_id == community_id,
+                CommunityMembershipModel.role == MembershipRole.COMMUNITY_ADMIN,
+                CommunityMembershipModel.status == MembershipStatus.APPROVED,
+                UserModel.is_active.is_(True),
+                UserModel.deleted_at.is_(None),
+            )
+            .order_by(UserModel.full_name, UserModel.id)
+        )
+        return [user_to_domain(user) for user in users]
 
     def list_for_user(
         self, user_id: uuid.UUID, status: MembershipStatus | None = None

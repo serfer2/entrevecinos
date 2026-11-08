@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from entrevecinos.application.authorization.community_access import CommunityAccess
+from entrevecinos.application.communities.membership_notices import MembershipNotices
 from entrevecinos.application.mail.email_quota import EmailQuota
 from entrevecinos.application.users.authenticate_user import AuthenticateUser
 from entrevecinos.application.users.email_verification import EmailVerificationIssuer
@@ -224,6 +225,15 @@ def get_current_user(
 
 
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
+
+
+def get_membership_notices(
+    memberships: MembershipRepositoryDep, quota: EmailQuotaDep, settings: SettingsDep
+) -> MembershipNotices:
+    return MembershipNotices(memberships, quota, settings.web_public_url)
+
+
+MembershipNoticesDep = Annotated[MembershipNotices, Depends(get_membership_notices)]
 
 
 def get_community_access(
