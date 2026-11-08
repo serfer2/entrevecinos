@@ -91,7 +91,7 @@ aws cloudwatch set-alarm-state --profile entrevecinos --alarm-name entrevecinos-
 
 - [x] Los criterios de aceptación se cumplen.
 - [x] Ninguna dirección real en el repositorio.
-- [ ] Cambios revisados y fusionados mediante *pull request*.
+- [x] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas
 

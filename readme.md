@@ -2716,3 +2716,128 @@ Verificado en producción: despliegue y vuelta atrás, aislamiento de redes, con
 - [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()`.
 - [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md`.
 ~~~
+
+**Pull Request 4**
+
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/37
+
+#### Título
+
+```
+Feature/entrega 3 sfg - fix SMTP sending
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+**HU-40 (TK-096 y TK-098):** el correo de producción pasa a Brevo por SMTP, porque SES sigue en *sandbox*. Incluye IP elástica autorizada en Brevo, dominio autenticado (DKIM alineado y DMARC con informes a Brevo), salida SMTP por el 587 y credenciales solo en Parameter Store. `SmtpEmailSender` ahora verifica el certificado del servidor en STARTTLS. El seguimiento de clics de Brevo no se puede desactivar y se acepta como riesgo documentado.
+- **Revisión de la documentación:** secciones pendientes del `readme.md`, `prompts.md` y URL del contrato.
+~~~
+
+**Pull Request 5**
+
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/38
+
+#### Título
+
+```
+Feature/entrega 3 sfg - feat: límite de 5.000 correos por periodo por coste (TK-099)
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+HU-40 AC5. **Restricción de costes:** el correo de producción no puede costar más que el plan de pago más barato de Brevo (5.000 correos al mes, ≈ 9 USD/mes), y el proyecto debe seguir por debajo del límite de 40 €/mes. Hasta ahora nada impedía que un error o un registro masivo lo superase.
+
+### Cupo de correos (TK-099)
+- La API envía como mucho **5.000 correos por periodo**, desde el **día 6 a las 00:00 (hora de Madrid)**
+hasta el día 6 del mes siguiente. Se configura con `EMAIL_MONTHLY_LIMIT` (5000) y
+`EMAIL_QUOTA_RESET_DAY` (6).                                                                            
+- Contador en PostgreSQL (migración `0010`, tabla `email_quota`, una fila por periodo) con **reserva
+atómica** (`INSERT … ON CONFLICT … WHERE sent < límite`): dos peticiones simultáneas no pueden pasarse  
+del límite.
+- **Registro:** reserva plaza antes de crear la cuenta; si el registro falla después (p. ej. correo     
+duplicado), la plaza se devuelve con la transacción.
+- **Reenvío:** comprueba el cupo antes de buscar la cuenta, así que el `503` no revela si un correo está
+registrado; reserva plaza solo cuando envía.
+- **Sin cupo:** `503` con `code: email_quota_exceeded` y `Retry-After` hasta el siguiente periodo; no se
+crea la cuenta ni el enlace y no se envía nada. La web lo explica y conserva los datos del formulario.
+- **Avisos:** aviso en el registro de la API al llegar al 80 % (una vez por periodo) y error en cada    
+envío bloqueado, sin direcciones de correo. Alarmas `email-quota-80` y `email-quota-exceeded`, yaaplicadas en AWS.
+- **Contrato:** `503` con `EmailQuotaExceeded` en `registerUser` y `resendEmailVerification`; extracto del `readme.md` regenerado.
+- **Documentación:** el límite queda documentado como restricción de costes en `infra/aws/README.md` («Decisiones de arquitectura», «Costes» y *runbook* de las alarmas), `apps/api/README.md` y `.env.example`.
+
+### Otros
+- TK-098 archivado tras verificarlo en producción: registros con Gmail y Outlook no verificados, correo en la bandeja de entrada y `dkim=pass` y `dmarc=pass`.
+
+## Despliegue
+
+`make tf-apply` ya aplicado (filtros, alarmas y variables en el documento de SSM). Al fusionar, `deploy.sh` detecta la migración pendiente, **hace una copia de la base antes de migrar**, aplica `0010` y arranca la API con el cupo.
+
+## Comprobaciones
+
+- [x] Pruebas, lint y formato pasan en contenedores (ver `AGENTS.md`, «Entorno y comandos»):
+  - `make ci-api`: 516 pruebas, con `alembic check`. Incluyen los bordes del periodo, las plazas 5.000 y 5.001, la concurrencia real contra PostgreSQL y el `503` del reenvío para un correo inexistente.
+  - `make ci-web`: 361 pruebas.
+  - Prueba local con `EMAIL_MONTHLY_LIMIT=2`: 201, 201 y 503, con el aviso y el bloqueo en los registros.
+- [x] Si cambia una petición o respuesta de la API, he actualizado `docs/api/openapi.yaml`.
+- [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()` (`0010`, probada su reversión).
+- [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md`.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+~~~
+
+**Pull Request 6**
+
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/39
+
+#### Título
+
+```
+Feature/entrega 3 sfg - feat(infra): aviso del primer fallo de envío y cierre de la HU-40 (TK-097)
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+Cierra la HU-40 y la Épica 13.
+
+### TK-097 · Correo sin restos del *sandbox* y aviso de fallos de envío
+- **Alarma `email-send-failures`:** salta con el primer «No se pudo enviar el correo» en el registro de la API. Hasta ahora un envío rechazado solo dejaba una línea de registro, mientras el registro respondía `201`; así nadie notó que el *sandbox* de SES bloqueaba los registros.
+- **Sin destinatarios de prueba de SES:** se borra la identidad de prueba y `ses:SendEmail` queda limitado al dominio y al *configuration set*. La variable se mantiene por si hay que volver a SES.
+- **`infra/aws/README.md`:** límites reales del correo (300 al día en Brevo y 5.000 por periodo en la API), *runbook* de la alarma y costes.
+
+Verificado en producción:
+- la alarma avisó al pasar a `ALARM` y al volver a `OK`;
+- SES solo conserva la identidad `entrevecinos.org`;
+- un correo a una dirección inexistente rebotó en Brevo sin disparar la alarma. La cuenta de prueba se ha borrado.
+
+### Otros
+- TK-099 archivado tras verificarlo en producción: copia previa automática, migración `0010` y alarmas del cupo en `OK`.
+- Índice de tickets: la HU-40 y la Épica 13 quedan como completadas.
+
+## Despliegue
+
+Infraestructura ya aplicada (`make tf-apply`). Al fusionar no cambia nada en producción: el despliegue vuelve a publicar las mismas imágenes.
+
+## Comprobaciones
+
+- [x] Pruebas, lint y formato pasan en contenedores (sin cambios de código en esta PR; `make tf-lint` sin fallos).
+- [x] Si cambia una petición o respuesta de la API, he actualizado `docs/api/openapi.yaml`. (No cambia)
+- [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()`. (No cambia)
+- [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md`.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+~~~
