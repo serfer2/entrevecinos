@@ -119,7 +119,7 @@ curl -i -X POST localhost:8000/v1/auth/password-reset -H 'Content-Type: applicat
 - [x] Los criterios de aceptación se cumplen.
 - [x] Las pruebas de la API, `ruff` y `redocly lint` pasan.
 - [x] Contrato, `.env.example` y `apps/api/README.md` actualizados.
-- [ ] Cambios revisados y fusionados mediante *pull request*.
+- [x] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas
 

@@ -108,8 +108,8 @@ $COMPOSE exec web npm run lint && $COMPOSE exec web npm run typecheck && $COMPOS
 
 - [x] Los criterios de aceptación se cumplen.
 - [x] Lint, tipos y pruebas de la web pasan.
-- [ ] Recorrido completo comprobado en local (hecho) y en producción (tras desplegar).
-- [ ] Cambios revisados y fusionados mediante *pull request*.
+- [x] Recorrido completo comprobado en local y en producción (PR #40, 2026-11-08).
+- [x] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas
 

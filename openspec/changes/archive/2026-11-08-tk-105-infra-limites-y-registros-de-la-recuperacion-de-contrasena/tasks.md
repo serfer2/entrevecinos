@@ -11,4 +11,4 @@
 ## 3. Producción (con confirmación)
 
 - [x] 3.1 `make tf-plan` y `make tf-apply`
-- [ ] 3.2 Tras desplegar: `429` en `/recuperar-contrasena`, enlace sin `token=` en los registros y recorrido completo con un correo real
+- [x] 3.2 Tras desplegar: `429` en `/recuperar-contrasena`, enlace sin `token=` en los registros y recorrido completo con un correo real

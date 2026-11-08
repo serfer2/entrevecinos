@@ -92,7 +92,7 @@ $COMPOSE exec web npm run lint && $COMPOSE exec web npm run typecheck && $COMPOS
 
 - [x] Los criterios de aceptación se cumplen.
 - [x] Lint, tipos y pruebas de la web pasan.
-- [ ] Cambios revisados y fusionados mediante *pull request*.
+- [x] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas
 
