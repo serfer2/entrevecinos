@@ -70,10 +70,10 @@ for i in $(seq 1 25); do curl -s -o /dev/null -w '%{http_code}\n' -X POST https:
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] `make tf-lint` y `make shellcheck` pasan; cambio aplicado y desplegado.
-- [ ] `infra/aws/README.md` actualizado.
-- [ ] Cambios revisados y fusionados mediante *pull request*.
+- [x] Los criterios de aceptación se cumplen.
+- [x] `make tf-lint` y `make shellcheck` pasan; cambio aplicado y desplegado.
+- [x] `infra/aws/README.md` actualizado.
+- [x] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas
 

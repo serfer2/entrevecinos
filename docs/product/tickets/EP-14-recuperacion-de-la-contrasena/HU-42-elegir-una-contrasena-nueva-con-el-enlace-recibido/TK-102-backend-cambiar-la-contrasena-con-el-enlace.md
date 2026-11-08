@@ -122,7 +122,7 @@ $COMPOSE run --rm -v "$PWD/apps/api/tests:/app/tests" api python -m pytest -q
 - [x] Los criterios de aceptación se cumplen.
 - [x] Las pruebas de la API, `ruff` y `redocly lint` pasan.
 - [x] Contrato y `readme.md` (§2.5 y extracto de la API) actualizados.
-- [ ] Cambios revisados y fusionados mediante *pull request*.
+- [x] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas
 

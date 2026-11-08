@@ -2864,3 +2864,72 @@ Infraestructura ya aplicada (`make tf-apply`). Al fusionar no cambia nada en pro
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ~~~
+
+**Pull Request 7**
+
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/40
+
+#### Título
+
+```
+Feature/entrega 3 sfg - feat: recuperación de la contraseña olvidada (Épica 14, TK-100 a TK-105)
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+La pantalla de inicio de sesión no tenía ninguna salida para quien olvidaba su contraseña: no podía volver a entrar ni registrarse de nuevo con el mismo correo. La Épica 14 (HU-41 y HU-42) añade la recuperación por correo y la documenta como funcionalidad del MVP (`readme.md` §1.2 y `user-stories.md`).
+
+### Recorrido
+
+1. En `/iniciar-sesion`, «¿Has olvidado tu contraseña?» lleva a `/recuperar-contrasena`, con el correo de un intento fallido ya escrito.
+2. El vecino pide el enlace y siempre ve el mismo aviso, exista o no la cuenta.
+3. Recibe «Restablece tu contraseña de EntreVecinos» con un enlace de un solo uso, válido 1 hora.
+4. El enlace guarda el *token* en una *cookie* `HttpOnly` y lleva a `/restablecer-contrasena`, sin el *token* en la URL.
+5. Escribe dos veces la contraseña nueva y vuelve al inicio de sesión con «Tu contraseña se ha cambiado. Inicia sesión con la nueva.». Recibe un aviso del cambio por correo.
+
+### Tickets
+
+- **TK-100 · BD:** migración `0011` con la tabla `password_reset` (solo el SHA-256 del *token*) y `users.password_changed_at`; modelo de datos del `readme.md`.
+- **TK-101 · API:** `POST /v1/auth/password-reset`. Siempre `202`; cupo comprobado antes de buscar la cuenta (`503`); un enlace por minuto y cuenta; cada envío cuenta para el cupo de 5.000.
+- **TK-102 · API:** `POST /v1/auth/password-reset/confirm`. `204` sin iniciar sesión; `410`/`400` si el enlace caducó o no vale. **Cierra las sesiones anteriores** (rechaza los JWT con `iat` anterior al cambio), valida el correo si estaba pendiente y avisa por correo.
+- **TK-103 · Web:** enlace en el inicio de sesión y página `/recuperar-contrasena`.
+- **TK-104 · Web:** `/restablecer-contrasena/enlace` (pasa el *token* a una *cookie*, sin llamar a la API) y `/restablecer-contrasena` con confirmación.
+- **TK-105 · Infra:** las rutas nuevas comparten con el inicio de sesión y el registro el límite del proxy (20 `POST` en 5 minutos por IP); `PASSWORD_RESET_TTL_MINUTES` en el Compose de producción; guía de producción.
+
+### Seguridad
+
+- No revela qué correos están registrados: la misma respuesta, y el mismo `503` sin cupo, exista o no la cuenta.
+- El *token* no queda en la base de datos (solo su hash), en la URL, en el historial, en el `Referer` (`no-referrer`) ni en los registros del proxy y de CloudFront.
+- Abrir el enlace no lo consume (un escáner de correo no lo gasta): hay que enviar el formulario.
+- Cambiar la contraseña invalida los JWT emitidos antes. Reescribir el hash al iniciar sesión no cierra sesiones.
+- **Riesgo aceptado** (2026-11-08, `infra/aws/README.md`): el seguimiento de clics de Brevo también reescribe el enlace de restablecimiento.
+
+### Contrato
+
+- Nuevas `requestPasswordReset` y `confirmPasswordReset` con `x-mvp: true`; esquemas `PasswordResetRequest`, `PasswordResetRequested`, `PasswordResetConfirmRequest` y `PasswordResetError`. En total, 61 operaciones, 29 del MVP.
+- Compatible: son dos operaciones nuevas. Las operaciones autenticadas responden `401` a un JWT emitido antes del último cambio de contraseña.
+
+### Otros
+
+- `readme.md` §7: PR #37, #38 y #39; TK-097 marcado como fusionado.
+
+## Despliegue
+
+`make tf-apply` ya aplicado (documento de SSM con el proxy y el Compose nuevos). Al fusionar, `deploy.sh` detecta la migración `0011`, **hace una copia de la base antes de migrar**, la aplica (solo añade una tabla y una columna) y despliega API, web y proxy.
+
+Tras desplegar se comprueba: `429` en `POST /recuperar-contrasena`, que el registro del proxy muestra `/restablecer-contrasena/enlace` sin `token=` y el recorrido completo con un correo real.
+
+## Comprobaciones
+
+- [x] Pruebas, lint y formato pasan en contenedores (ver `AGENTS.md`, «Entorno y comandos»): `make ci-api` (568 pruebas) y `make ci-web` (404 pruebas); recorrido completo en local con Mailpit y en el navegador.
+- [x] Si cambia una petición o respuesta de la API, he actualizado `docs/api/openapi.yaml` (`redocly lint` sin errores).
+- [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()` (`0011`, con prueba de reversión).
+- [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md` (`make tf-lint`, `make shellcheck` y `nginx -t` sin fallos).
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+~~~
