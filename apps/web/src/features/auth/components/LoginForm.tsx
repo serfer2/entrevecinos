@@ -6,6 +6,7 @@ import { useActionState } from "react";
 import { TextField } from "@/components/ui/TextField";
 
 import type { LoginState, ResendVerificationState } from "../actions";
+import { PASSWORD_RESET_REQUEST_PATH } from "../routes";
 import { ResendVerificationButton } from "./ResendVerificationButton";
 
 type LoginFormProps = {
@@ -24,6 +25,10 @@ export function LoginForm({ action, resendAction, next, notice }: LoginFormProps
   const errors = state?.fieldErrors ?? {};
 
   const email = state?.values?.email;
+  // Tras un intento fallido, el formulario de recuperación ya lleva el correo escrito.
+  const forgotHref = email
+    ? `${PASSWORD_RESET_REQUEST_PATH}?${new URLSearchParams({ email })}`
+    : PASSWORD_RESET_REQUEST_PATH;
 
   return (
     <div className="flex flex-col gap-4">
@@ -56,6 +61,11 @@ export function LoginForm({ action, resendAction, next, notice }: LoginFormProps
           required
           error={errors.password}
         />
+        <p className="-mt-2 text-right text-sm">
+          <Link href={forgotHref} className="font-medium text-emerald-800 underline">
+            ¿Has olvidado tu contraseña?
+          </Link>
+        </p>
         <button
           type="submit"
           disabled={pending}

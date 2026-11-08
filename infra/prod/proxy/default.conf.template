@@ -19,7 +19,8 @@ map $http_x_forwarded_for $client_ip {
 }
 
 # Sin WAF (el plan del proyecto no admite el plan Free de CloudFront), los límites por IP van aquí.
-# Inicio de sesión y registro: 20 POST en 5 minutos (4 por minuto, con ráfaga de 10).
+# Inicio de sesión, registro y recuperación de la contraseña: 20 POST en 5 minutos por IP entre
+# todas ellas (4 por minuto, con ráfaga de 10).
 map $request_method $auth_client {
     POST    $client_ip;
     default "";
@@ -58,8 +59,10 @@ server {
         proxy_pass $web;
     }
 
-    # Las Server Actions de estas páginas hacen POST a su propia ruta.
-    location ~ ^/(iniciar-sesion|registro)$ {
+    # Las Server Actions de estas páginas hacen POST a su propia ruta. /recuperar-contrasena envía
+    # correos y /restablecer-contrasena prueba tokens (TK-105); el enlace del correo
+    # (/restablecer-contrasena/enlace) solo atiende GET y queda en el límite general.
+    location ~ ^/(iniciar-sesion|registro|recuperar-contrasena|restablecer-contrasena)$ {
         limit_req zone=auth burst=10 nodelay;
         limit_req zone=client burst=100 nodelay;
         proxy_pass $web;

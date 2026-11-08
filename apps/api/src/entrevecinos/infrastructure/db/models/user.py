@@ -52,6 +52,8 @@ class UserModel(Base):
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Los JWT emitidos antes de esta fecha dejan de valer (TK-102).
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class EmailVerificationModel(Base):
@@ -76,3 +78,18 @@ class EmailVerificationModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PasswordResetModel(Base):
+    """Enlace para restablecer la contraseña. Solo se guarda el SHA-256 del token.
+
+    Un enlace usado o sustituido se borra: pedir uno nuevo borra los anteriores del usuario.
+    """
+
+    __tablename__ = "password_reset"
+    __table_args__ = (Index(None, "user_id"),)
+
+    token_hash: Mapped[str] = mapped_column(CHAR(64), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

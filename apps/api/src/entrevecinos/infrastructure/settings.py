@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     # Origen de los enlaces que se envían por correo: la web que abre el usuario.
     web_public_url: str = Field(min_length=1)
     email_verification_ttl_hours: int = Field(default=24, gt=0)
+    # Enlace para restablecer la contraseña (TK-101): corto, porque da acceso a la cuenta.
+    password_reset_ttl_minutes: int = Field(default=60, gt=0)
     # Cupo de correos por periodo (TK-099), por coste: no superar el plan más barato del
     # proveedor (5.000 al mes en Brevo) ni el límite de gasto. El periodo empieza ese día del mes.
     email_monthly_limit: int = Field(default=5000, gt=0)

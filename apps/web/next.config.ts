@@ -30,6 +30,11 @@ const nextConfig: NextConfig = {
       { source: "/:path*", headers: securityHeaders },
       // El enlace de validación lleva el token en la URL: que no viaje en el Referer.
       { source: "/verificar-correo", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+      // Igual con el enlace para restablecer la contraseña (TK-104).
+      {
+        source: "/restablecer-contrasena/enlace",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
     ];
   },
 };

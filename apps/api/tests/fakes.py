@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
 
-from entrevecinos.application.users.ports import AccessToken, OutgoingEmail
+from entrevecinos.application.users.ports import AccessToken, OutgoingEmail, TokenClaims
 from entrevecinos.domain.communities.entities import (
     Community,
     Membership,
@@ -17,7 +17,13 @@ from entrevecinos.domain.communities.entities import (
     NewCommunity,
 )
 from entrevecinos.domain.communities.errors import MembershipAlreadyExists, PendingCommunityExists
-from entrevecinos.domain.users.entities import EmailVerification, NewUser, PlatformRole, User
+from entrevecinos.domain.users.entities import (
+    EmailVerification,
+    NewUser,
+    PasswordReset,
+    PlatformRole,
+    User,
+)
 from entrevecinos.domain.users.errors import EmailAlreadyRegistered, NotAuthenticated
 
 
@@ -38,6 +44,12 @@ class InMemoryUserRepository:
 
     def update_password_hash(self, user_id: uuid.UUID, password_hash: str) -> None:
         self.password_hashes[user_id] = password_hash
+
+    def change_password(self, user_id: uuid.UUID, password_hash: str) -> None:
+        self.password_hashes[user_id] = password_hash
+        self.users[user_id] = dataclasses.replace(
+            self.users[user_id], password_changed_at=datetime.now(UTC)
+        )
 
     def update_profile(self, user_id: uuid.UUID, values: Mapping[str, str | None]) -> User:
         self.users[user_id] = dataclasses.replace(self.users[user_id], **values)
@@ -100,6 +112,27 @@ class InMemoryEmailVerificationRepository:
                 self.verifications[token_hash] = dataclasses.replace(v, superseded_at=now)
 
 
+class InMemoryPasswordResetRepository:
+    def __init__(self) -> None:
+        self.resets: dict[str, PasswordReset] = {}
+
+    def replace(self, user_id: uuid.UUID, token_hash: str, expires_at: datetime) -> None:
+        self.delete_for_user(user_id)
+        self.resets[token_hash] = PasswordReset(
+            user_id=user_id, expires_at=expires_at, created_at=datetime.now(UTC)
+        )
+
+    def get(self, token_hash: str) -> PasswordReset | None:
+        return self.resets.get(token_hash)
+
+    def delete_for_user(self, user_id: uuid.UUID) -> None:
+        self.resets = {h: r for h, r in self.resets.items() if r.user_id != user_id}
+
+    def last_created_at(self, user_id: uuid.UUID) -> datetime | None:
+        dates = [r.created_at for r in self.resets.values() if r.user_id == user_id]
+        return max(dates, default=None)
+
+
 class FakeEmailSender:
     """Guarda los correos en lugar de enviarlos."""
 
@@ -110,7 +143,7 @@ class FakeEmailSender:
         self.sent.append(email)
 
     def last_token(self, to: str) -> str:
-        """Token del último enlace de validación enviado a `to`."""
+        """Token del último enlace (de validación o de restablecimiento) enviado a `to`."""
         email = next(e for e in reversed(self.sent) if e.to == to)
         return email.text.split("token=", 1)[1].split()[0]
 
@@ -137,10 +170,12 @@ class FakeTokenIssuer:
     def issue(self, user_id: uuid.UUID) -> AccessToken:
         return AccessToken(token=f"token-for:{user_id}", expires_in=3600)
 
-    def decode(self, token: str) -> uuid.UUID:
+    def decode(self, token: str) -> TokenClaims:
         if not token.startswith("token-for:"):
             raise NotAuthenticated
-        return uuid.UUID(token.removeprefix("token-for:"))
+        return TokenClaims(
+            user_id=uuid.UUID(token.removeprefix("token-for:")), issued_at=datetime.now(UTC)
+        )
 
 
 class InMemoryCommunityRepository:

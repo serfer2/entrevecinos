@@ -4,13 +4,21 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from entrevecinos.domain.users.entities import EmailVerification, NewUser, User
+from entrevecinos.domain.users.entities import EmailVerification, NewUser, PasswordReset, User
 
 
 @dataclass(frozen=True, slots=True)
 class AccessToken:
     token: str
     expires_in: int
+
+
+@dataclass(frozen=True, slots=True)
+class TokenClaims:
+    """Datos de un JWT válido: su usuario y cuándo se emitió."""
+
+    user_id: uuid.UUID
+    issued_at: datetime
 
 
 class UserRepository(Protocol):
@@ -33,7 +41,13 @@ class UserRepository(Protocol):
         """Marca el correo como validado y activa la cuenta."""
         ...
 
-    def update_password_hash(self, user_id: uuid.UUID, password_hash: str) -> None: ...
+    def update_password_hash(self, user_id: uuid.UUID, password_hash: str) -> None:
+        """Reescribe el hash de la misma contraseña (parámetros nuevos); no cierra sesiones."""
+        ...
+
+    def change_password(self, user_id: uuid.UUID, password_hash: str) -> None:
+        """Guarda una contraseña nueva y fija `password_changed_at`: cierra las sesiones."""
+        ...
 
     def update_profile(self, user_id: uuid.UUID, values: Mapping[str, str | None]) -> User:
         """Actualiza solo los campos de `values` (`full_name`, `phone`)."""
@@ -58,8 +72,8 @@ class TokenIssuer(Protocol):
 
 
 class TokenService(TokenIssuer, Protocol):
-    def decode(self, token: str) -> uuid.UUID:
-        """Id del usuario del token. Lanza `NotAuthenticated` si el token no es válido."""
+    def decode(self, token: str) -> TokenClaims:
+        """Usuario y emisión del token. Lanza `NotAuthenticated` si el token no es válido."""
         ...
 
 
@@ -76,6 +90,22 @@ class EmailVerificationRepository(Protocol):
 
     def mark_used(self, token_hash: str) -> None:
         """Marca el enlace como usado y los demás vigentes de su usuario como sustituidos."""
+        ...
+
+
+class PasswordResetRepository(Protocol):
+    def replace(self, user_id: uuid.UUID, token_hash: str, expires_at: datetime) -> None:
+        """Guarda el enlace nuevo y borra los anteriores del usuario: solo vale el último."""
+        ...
+
+    def get(self, token_hash: str) -> PasswordReset | None: ...
+
+    def delete_for_user(self, user_id: uuid.UUID) -> None:
+        """Borra todos los enlaces del usuario."""
+        ...
+
+    def last_created_at(self, user_id: uuid.UUID) -> datetime | None:
+        """Fecha del enlace más reciente del usuario, o `None` si no tiene ninguno."""
         ...
 
 

@@ -68,4 +68,33 @@ describe("LoginForm", () => {
       "Tu sesión ha caducado. Vuelve a iniciar sesión.",
     );
   });
+
+  it("enlaza con la recuperación de la contraseña", () => {
+    render(<LoginForm action={vi.fn()} resendAction={vi.fn()} />);
+
+    expect(
+      screen.getByRole("link", { name: "¿Has olvidado tu contraseña?" }).getAttribute("href"),
+    ).toBe("/recuperar-contrasena");
+  });
+
+  it("tras un intento fallido, el enlace de recuperación lleva el correo escrito", async () => {
+    render(
+      <LoginForm
+        action={async () => ({
+          formError: "Correo o contraseña incorrectos.",
+          values: { email: "vecino+1@example.com" },
+        })}
+        resendAction={vi.fn()}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText("Correo electrónico"), "vecino+1@example.com");
+    await userEvent.type(screen.getByLabelText("Contraseña"), "incorrecta");
+    await userEvent.click(screen.getByRole("button", { name: "Iniciar sesión" }));
+    await screen.findByText("Correo o contraseña incorrectos.");
+
+    expect(
+      screen.getByRole("link", { name: "¿Has olvidado tu contraseña?" }).getAttribute("href"),
+    ).toBe("/recuperar-contrasena?email=vecino%2B1%40example.com");
+  });
 });

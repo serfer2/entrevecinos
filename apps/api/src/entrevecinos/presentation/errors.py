@@ -27,6 +27,8 @@ from entrevecinos.domain.users.errors import (
     EmailPendingVerification,
     InvalidCredentials,
     NotAuthenticated,
+    PasswordResetExpired,
+    PasswordResetInvalid,
     VerificationExpired,
     VerificationInvalid,
     VerificationSuperseded,
@@ -142,6 +144,30 @@ async def verification_expired_handler(request: Request, exc: VerificationExpire
             "detail": "El enlace de validación ha caducado.",
             "code": "verification_expired",
             "email": exc.email,
+        },
+    )
+
+
+async def password_reset_invalid_handler(
+    request: Request, exc: PasswordResetInvalid
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={
+            "detail": "El enlace para restablecer la contraseña no es válido.",
+            "code": "password_reset_invalid",
+        },
+    )
+
+
+async def password_reset_expired_handler(
+    request: Request, exc: PasswordResetExpired
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_410_GONE,
+        content={
+            "detail": "El enlace para restablecer la contraseña ha caducado.",
+            "code": "password_reset_expired",
         },
     )
 
@@ -275,6 +301,8 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(EmailAlreadyVerified, email_already_verified_handler)
     app.add_exception_handler(VerificationSuperseded, verification_superseded_handler)
     app.add_exception_handler(VerificationExpired, verification_expired_handler)
+    app.add_exception_handler(PasswordResetInvalid, password_reset_invalid_handler)
+    app.add_exception_handler(PasswordResetExpired, password_reset_expired_handler)
     app.add_exception_handler(NotAuthenticated, not_authenticated_handler)
     app.add_exception_handler(NotFoundError, not_found_handler)
     app.add_exception_handler(MembershipAlreadyExists, membership_already_exists_handler)

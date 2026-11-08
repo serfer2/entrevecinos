@@ -156,6 +156,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
 1. **Registro y perfil básico**
    - Registro, inicio y cierre de sesión con correo electrónico.
    - Validación del correo por enlace, con caducidad de 24 horas y posibilidad de recibirlo de nuevo; sin validarlo, la cuenta no se activa (salvo la de un administrador de la plataforma).
+   - Recuperación de la contraseña olvidada desde el inicio de sesión: un enlace por correo, válido 1 hora, para elegir una contraseña nueva; al cambiarla se cierran las sesiones abiertas.
    - Perfil con nombre y datos de contacto.
    - Asociación del usuario a una comunidad.
    - Tras registrarse o iniciar sesión, llevar al usuario a la lista de comunidades si todavía no pertenece a ninguna, o directamente a su comunidad si solo pertenece a una.
@@ -558,6 +559,8 @@ Medidas implementadas en la aplicación y en producción (detalle en [`infra/aws
 
 - **Autenticación mediante JWT:** la API valida el token y que el usuario siga activo en cada petición. El navegador nunca recibe el JWT: la web lo guarda en la *cookie* `HttpOnly` y `Secure` `ev_session` y llama a la API desde el servidor con `Authorization: Bearer <token>`. La clave de firma vive en Parameter Store.
 
+- **Recuperación de la contraseña:** el enlace del correo es de un solo uso y caduca en 1 hora; la base de datos solo guarda su hash. La petición responde igual exista o no la cuenta y envía como mucho un correo por minuto a cada cuenta. Cambiar la contraseña invalida los JWT emitidos antes (`users.password_changed_at`), así que cierra las sesiones abiertas en otros dispositivos, y avisa del cambio por correo.
+
 - **Autorización basada en roles (RBAC):** la API comprueba la membresía y el rol en la comunidad antes de cada operación (`CommunityAccess`); ocultar un botón en la interfaz no sustituye esa comprobación.
 
 - **CORS:** la API solo acepta el origen `https://entrevecinos.org`. CORS no sustituye la autenticación.
@@ -578,7 +581,7 @@ Medidas implementadas en la aplicación y en producción (detalle en [`infra/aws
 
 - **Imágenes:** el bucket es privado; la API valida el contenido (*magic bytes*), el formato (JPEG, PNG o WebP) y el tamaño, y las imágenes solo se leen con URL prefirmadas.
 
-- **Registros sin datos sensibles y alertas:** los registros no guardan contraseñas, *tokens* de validación ni *cookies* de sesión, y las alarmas avisan por correo de caídas, errores y falta de copias.
+- **Registros sin datos sensibles y alertas:** los registros no guardan contraseñas, *tokens* de validación o de restablecimiento ni *cookies* de sesión, y las alarmas avisan por correo de caídas, errores y falta de copias.
 
 ### **2.6. Tests**
 
@@ -630,6 +633,7 @@ erDiagram
         user_role platform_role "NOT NULL; DEFAULT user"
         BOOLEAN is_active "NOT NULL; DEFAULT true"
         TIMESTAMPTZ email_verified_at "NULL; correo validado"
+        TIMESTAMPTZ password_changed_at "NULL; último cambio de contraseña"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
         TIMESTAMPTZ deleted_at "NULL; borrado lógico"
@@ -642,6 +646,13 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ used_at "NULL; se validó el correo con él"
         TIMESTAMPTZ superseded_at "NULL; lo sustituyó otro más reciente"
+    }
+
+    PASSWORD_RESET {
+        CHAR token_hash PK "CHAR(64); SHA-256 del token; NOT NULL"
+        UUID user_id FK "NOT NULL; FK a user.id; ON DELETE CASCADE"
+        TIMESTAMPTZ expires_at "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     COMMUNITY {
@@ -777,6 +788,7 @@ erDiagram
     }
 
     USER ||--o{ EMAIL_VERIFICATION : "valida su correo"
+    USER ||--o{ PASSWORD_RESET : "restablece su contraseña"
     USER ||--o{ COMMUNITY : "crea"
     USER ||--o{ COMMUNITY_MEMBERSHIP : "solicita membresía"
     COMMUNITY ||--o{ COMMUNITY_MEMBERSHIP : "incluye miembros"
@@ -809,7 +821,7 @@ erDiagram
     USER o|--o{ REPORT : "revisa"
 ```
 
-El MVP implementa 8 entidades: `user` (tabla `users`), `email_verification`, `community`, `community_membership`, `category`, `listing`, `media_asset` y `listing_image`. Las otras 7 (`conversation`, `message`, `notification`, `professional_profile`, `professional_service`, `professional_profile_image` y `report`) están diseñadas para versiones futuras: su primer atributo lo indica en el diagrama y todavía no tienen tabla.
+El MVP implementa 9 entidades: `user` (tabla `users`), `email_verification`, `password_reset`, `community`, `community_membership`, `category`, `listing`, `media_asset` y `listing_image`. Las otras 7 (`conversation`, `message`, `notification`, `professional_profile`, `professional_service`, `professional_profile_image` y `report`) están diseñadas para versiones futuras: su primer atributo lo indica en el diagrama y todavía no tienen tabla.
 
 
 ### **3.2. Descripción de entidades principales:**
@@ -820,6 +832,7 @@ El modelo cubre las funciones descritas en el README: usuarios, comunidades, anu
 |---|---|---|
 | `user` | MVP | `POST /auth/register`, `POST /auth/token`, `GET/PATCH /users/me`, `GET /users/me/memberships`. Versión futura: `DELETE /users/me`, `GET /users/me/listings`, `/admin/users` |
 | `email_verification` | MVP | `POST /auth/email-verification`, `POST /auth/email-verification/resend` |
+| `password_reset` | MVP | `POST /auth/password-reset`, `POST /auth/password-reset/confirm` |
 | `community` | MVP | `GET/POST /communities`, `GET /communities/{community_id}`, `GET /admin/communities`, `PATCH /admin/communities/{community_id}`. Versión futura: `PATCH /communities/{community_id}` |
 | `community_membership` | MVP | `GET/POST /communities/{community_id}/memberships`, `PATCH/DELETE /communities/{community_id}/memberships/{user_id}` |
 | `category` | MVP | `GET /categories`. Versión futura: `POST /categories`, `PATCH /categories/{category_id}` |
@@ -847,6 +860,7 @@ El modelo cubre las funciones descritas en el README: usuarios, comunidades, anu
 - `created_at TIMESTAMPTZ` — `NOT NULL`.
 - `updated_at TIMESTAMPTZ` — `NOT NULL`.
 - `deleted_at TIMESTAMPTZ` — `NULL`; permite borrado lógico.
+- `password_changed_at TIMESTAMPTZ` — `NULL`; fecha del último cambio de contraseña. La API rechaza los JWT emitidos antes de esta fecha, así que cambiar la contraseña cierra las sesiones abiertas. Nula si la contraseña no ha cambiado desde el registro.
 
 #### 2. `community` — Comunidad
 
@@ -1008,6 +1022,15 @@ La aplicación debe comprobar que el remitente pertenece a la conversación.
 - Índice único parcial `uq_email_verification_one_active_per_user` sobre `user_id` `WHERE used_at IS NULL AND superseded_at IS NULL`: como mucho un enlace vigente por usuario.
 
 Solo vale el último enlace: emitir uno marca los anteriores como sustituidos y validar el correo marca el usado y sustituye el resto. Se conservan para explicar por qué un enlace antiguo ya no vale (HU-27); al emitir uno nuevo se borran los del usuario caducados hace más de 30 días.
+
+#### 16. `password_reset` — Enlace para restablecer la contraseña
+
+- `token_hash CHAR(64)` — **PK**; SHA-256 en hexadecimal del token. El token en claro solo viaja en el correo, así que una copia de la base de datos no permite cambiar contraseñas.
+- `user_id UUID` — `NOT NULL`, **FK** → `user.id` `ON DELETE CASCADE`, con índice.
+- `expires_at TIMESTAMPTZ` — `NOT NULL`; 1 hora tras la emisión (`PASSWORD_RESET_TTL_MINUTES`).
+- `created_at TIMESTAMPTZ` — `NOT NULL`, `DEFAULT now()`; limita las peticiones a una por minuto para cada cuenta.
+
+Solo vale el último enlace: pedir uno nuevo borra los anteriores del usuario, y cambiar la contraseña borra el usado. A diferencia de `email_verification`, no se conservan: a quien abre un enlace que ya no vale le basta con pedir otro.
 
 #### Tipos enumerados
 
@@ -2715,4 +2738,129 @@ Verificado en producción: despliegue y vuelta atrás, aislamiento de redes, con
 - [x] Si cambia una petición o respuesta de la API, he actualizado `docs/api/openapi.yaml`.
 - [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()`.
 - [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md`.
+~~~
+
+**Pull Request 4**
+
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/37
+
+#### Título
+
+```
+Feature/entrega 3 sfg - fix SMTP sending
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+**HU-40 (TK-096 y TK-098):** el correo de producción pasa a Brevo por SMTP, porque SES sigue en *sandbox*. Incluye IP elástica autorizada en Brevo, dominio autenticado (DKIM alineado y DMARC con informes a Brevo), salida SMTP por el 587 y credenciales solo en Parameter Store. `SmtpEmailSender` ahora verifica el certificado del servidor en STARTTLS. El seguimiento de clics de Brevo no se puede desactivar y se acepta como riesgo documentado.
+- **Revisión de la documentación:** secciones pendientes del `readme.md`, `prompts.md` y URL del contrato.
+~~~
+
+**Pull Request 5**
+
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/38
+
+#### Título
+
+```
+Feature/entrega 3 sfg - feat: límite de 5.000 correos por periodo por coste (TK-099)
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+HU-40 AC5. **Restricción de costes:** el correo de producción no puede costar más que el plan de pago más barato de Brevo (5.000 correos al mes, ≈ 9 USD/mes), y el proyecto debe seguir por debajo del límite de 40 €/mes. Hasta ahora nada impedía que un error o un registro masivo lo superase.
+
+### Cupo de correos (TK-099)
+- La API envía como mucho **5.000 correos por periodo**, desde el **día 6 a las 00:00 (hora de Madrid)**
+hasta el día 6 del mes siguiente. Se configura con `EMAIL_MONTHLY_LIMIT` (5000) y
+`EMAIL_QUOTA_RESET_DAY` (6).                                                                            
+- Contador en PostgreSQL (migración `0010`, tabla `email_quota`, una fila por periodo) con **reserva
+atómica** (`INSERT … ON CONFLICT … WHERE sent < límite`): dos peticiones simultáneas no pueden pasarse  
+del límite.
+- **Registro:** reserva plaza antes de crear la cuenta; si el registro falla después (p. ej. correo     
+duplicado), la plaza se devuelve con la transacción.
+- **Reenvío:** comprueba el cupo antes de buscar la cuenta, así que el `503` no revela si un correo está
+registrado; reserva plaza solo cuando envía.
+- **Sin cupo:** `503` con `code: email_quota_exceeded` y `Retry-After` hasta el siguiente periodo; no se
+crea la cuenta ni el enlace y no se envía nada. La web lo explica y conserva los datos del formulario.
+- **Avisos:** aviso en el registro de la API al llegar al 80 % (una vez por periodo) y error en cada    
+envío bloqueado, sin direcciones de correo. Alarmas `email-quota-80` y `email-quota-exceeded`, yaaplicadas en AWS.
+- **Contrato:** `503` con `EmailQuotaExceeded` en `registerUser` y `resendEmailVerification`; extracto del `readme.md` regenerado.
+- **Documentación:** el límite queda documentado como restricción de costes en `infra/aws/README.md` («Decisiones de arquitectura», «Costes» y *runbook* de las alarmas), `apps/api/README.md` y `.env.example`.
+
+### Otros
+- TK-098 archivado tras verificarlo en producción: registros con Gmail y Outlook no verificados, correo en la bandeja de entrada y `dkim=pass` y `dmarc=pass`.
+
+## Despliegue
+
+`make tf-apply` ya aplicado (filtros, alarmas y variables en el documento de SSM). Al fusionar, `deploy.sh` detecta la migración pendiente, **hace una copia de la base antes de migrar**, aplica `0010` y arranca la API con el cupo.
+
+## Comprobaciones
+
+- [x] Pruebas, lint y formato pasan en contenedores (ver `AGENTS.md`, «Entorno y comandos»):
+  - `make ci-api`: 516 pruebas, con `alembic check`. Incluyen los bordes del periodo, las plazas 5.000 y 5.001, la concurrencia real contra PostgreSQL y el `503` del reenvío para un correo inexistente.
+  - `make ci-web`: 361 pruebas.
+  - Prueba local con `EMAIL_MONTHLY_LIMIT=2`: 201, 201 y 503, con el aviso y el bloqueo en los registros.
+- [x] Si cambia una petición o respuesta de la API, he actualizado `docs/api/openapi.yaml`.
+- [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()` (`0010`, probada su reversión).
+- [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md`.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+~~~
+
+**Pull Request 6**
+
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/39
+
+#### Título
+
+```
+Feature/entrega 3 sfg - feat(infra): aviso del primer fallo de envío y cierre de la HU-40 (TK-097)
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+Cierra la HU-40 y la Épica 13.
+
+### TK-097 · Correo sin restos del *sandbox* y aviso de fallos de envío
+- **Alarma `email-send-failures`:** salta con el primer «No se pudo enviar el correo» en el registro de la API. Hasta ahora un envío rechazado solo dejaba una línea de registro, mientras el registro respondía `201`; así nadie notó que el *sandbox* de SES bloqueaba los registros.
+- **Sin destinatarios de prueba de SES:** se borra la identidad de prueba y `ses:SendEmail` queda limitado al dominio y al *configuration set*. La variable se mantiene por si hay que volver a SES.
+- **`infra/aws/README.md`:** límites reales del correo (300 al día en Brevo y 5.000 por periodo en la API), *runbook* de la alarma y costes.
+
+Verificado en producción:
+- la alarma avisó al pasar a `ALARM` y al volver a `OK`;
+- SES solo conserva la identidad `entrevecinos.org`;
+- un correo a una dirección inexistente rebotó en Brevo sin disparar la alarma. La cuenta de prueba se ha borrado.
+
+### Otros
+- TK-099 archivado tras verificarlo en producción: copia previa automática, migración `0010` y alarmas del cupo en `OK`.
+- Índice de tickets: la HU-40 y la Épica 13 quedan como completadas.
+
+## Despliegue
+
+Infraestructura ya aplicada (`make tf-apply`). Al fusionar no cambia nada en producción: el despliegue vuelve a publicar las mismas imágenes.
+
+## Comprobaciones
+
+- [x] Pruebas, lint y formato pasan en contenedores (sin cambios de código en esta PR; `make tf-lint` sin fallos).
+- [x] Si cambia una petición o respuesta de la API, he actualizado `docs/api/openapi.yaml`. (No cambia)
+- [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()`. (No cambia)
+- [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md`.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ~~~

@@ -145,3 +145,14 @@ def test_openapi_declares_bearer_auth(client: TestClient) -> None:
     assert "bearerAuth" in schema["components"]["securitySchemes"]
     assert schema["paths"]["/v1/users/me"]["get"]["security"] == [{"bearerAuth": []}]
     assert "security" not in schema["paths"]["/v1/auth/token"]["post"]
+
+
+def test_decoded_token_carries_its_user_and_issue_time() -> None:
+    service = JwtTokenService(TEST_JWT_SECRET, ttl_seconds=60)
+    user_id = uuid.uuid4()
+    before = datetime.now(UTC).replace(microsecond=0)
+
+    decoded = service.decode(service.issue(user_id).token)
+
+    assert decoded.user_id == user_id
+    assert before <= decoded.issued_at <= datetime.now(UTC)

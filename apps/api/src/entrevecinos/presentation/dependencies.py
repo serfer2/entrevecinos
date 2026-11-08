@@ -11,9 +11,12 @@ from entrevecinos.application.mail.email_quota import EmailQuota
 from entrevecinos.application.users.authenticate_user import AuthenticateUser
 from entrevecinos.application.users.email_verification import EmailVerificationIssuer
 from entrevecinos.application.users.get_current_user import GetCurrentUser
+from entrevecinos.application.users.password_reset import PasswordResetIssuer
 from entrevecinos.application.users.ports import EmailSender
 from entrevecinos.application.users.register_user import RegisterUser
+from entrevecinos.application.users.request_password_reset import RequestPasswordReset
 from entrevecinos.application.users.resend_email_verification import ResendEmailVerification
+from entrevecinos.application.users.reset_password import ResetPassword
 from entrevecinos.application.users.verify_email import VerifyEmail
 from entrevecinos.domain.users.entities import User
 from entrevecinos.domain.users.errors import NotAuthenticated
@@ -44,6 +47,9 @@ from entrevecinos.infrastructure.settings import Settings, get_settings
 from entrevecinos.infrastructure.storage.s3_object_storage import S3ObjectStorage
 from entrevecinos.infrastructure.users.sqlalchemy_email_verification_repository import (
     SqlAlchemyEmailVerificationRepository,
+)
+from entrevecinos.infrastructure.users.sqlalchemy_password_reset_repository import (
+    SqlAlchemyPasswordResetRepository,
 )
 from entrevecinos.infrastructure.users.sqlalchemy_user_repository import SqlAlchemyUserRepository
 
@@ -156,6 +162,36 @@ def get_resend_email_verification(
     quota: EmailQuotaDep,
 ) -> ResendEmailVerification:
     return ResendEmailVerification(users, verifications, issuer, quota)
+
+
+def get_password_reset_repository(session: SessionDep) -> SqlAlchemyPasswordResetRepository:
+    return SqlAlchemyPasswordResetRepository(session)
+
+
+PasswordResetRepositoryDep = Annotated[
+    SqlAlchemyPasswordResetRepository, Depends(get_password_reset_repository)
+]
+
+
+def get_request_password_reset(
+    users: UserRepositoryDep,
+    resets: PasswordResetRepositoryDep,
+    quota: EmailQuotaDep,
+    settings: SettingsDep,
+) -> RequestPasswordReset:
+    issuer = PasswordResetIssuer(
+        resets, settings.web_public_url, timedelta(minutes=settings.password_reset_ttl_minutes)
+    )
+    return RequestPasswordReset(users, resets, issuer, quota)
+
+
+def get_reset_password(
+    users: UserRepositoryDep,
+    resets: PasswordResetRepositoryDep,
+    hasher: PasswordHasherDep,
+    quota: EmailQuotaDep,
+) -> ResetPassword:
+    return ResetPassword(users, resets, hasher, quota)
 
 
 def get_verify_email(
