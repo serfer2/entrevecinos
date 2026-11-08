@@ -10,7 +10,11 @@ from entrevecinos.infrastructure.db.models.listing import (
     MediaAssetModel,
 )
 from entrevecinos.infrastructure.db.models.mail import EmailQuotaModel
-from entrevecinos.infrastructure.db.models.user import EmailVerificationModel, UserModel
+from entrevecinos.infrastructure.db.models.user import (
+    EmailVerificationModel,
+    PasswordResetModel,
+    UserModel,
+)
 
 __all__ = [
     "CategoryModel",
@@ -21,5 +25,6 @@ __all__ = [
     "ListingImageModel",
     "ListingModel",
     "MediaAssetModel",
+    "PasswordResetModel",
     "UserModel",
 ]

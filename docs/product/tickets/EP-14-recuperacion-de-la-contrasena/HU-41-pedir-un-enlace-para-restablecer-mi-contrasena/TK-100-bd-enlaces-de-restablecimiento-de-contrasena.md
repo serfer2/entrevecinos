@@ -103,8 +103,8 @@ $COMPOSE run --rm api alembic downgrade -1 && $COMPOSE run --rm api alembic upgr
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] Las pruebas de la API y `ruff` pasan; `alembic check` sin diferencias.
+- [x] Los criterios de aceptación se cumplen.
+- [x] Las pruebas de la API y `ruff` pasan; `alembic check` sin diferencias.
 - [ ] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas

@@ -631,6 +631,7 @@ erDiagram
         user_role platform_role "NOT NULL; DEFAULT user"
         BOOLEAN is_active "NOT NULL; DEFAULT true"
         TIMESTAMPTZ email_verified_at "NULL; correo validado"
+        TIMESTAMPTZ password_changed_at "NULL; último cambio de contraseña"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
         TIMESTAMPTZ deleted_at "NULL; borrado lógico"
@@ -643,6 +644,13 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ used_at "NULL; se validó el correo con él"
         TIMESTAMPTZ superseded_at "NULL; lo sustituyó otro más reciente"
+    }
+
+    PASSWORD_RESET {
+        CHAR token_hash PK "CHAR(64); SHA-256 del token; NOT NULL"
+        UUID user_id FK "NOT NULL; FK a user.id; ON DELETE CASCADE"
+        TIMESTAMPTZ expires_at "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     COMMUNITY {
@@ -778,6 +786,7 @@ erDiagram
     }
 
     USER ||--o{ EMAIL_VERIFICATION : "valida su correo"
+    USER ||--o{ PASSWORD_RESET : "restablece su contraseña"
     USER ||--o{ COMMUNITY : "crea"
     USER ||--o{ COMMUNITY_MEMBERSHIP : "solicita membresía"
     COMMUNITY ||--o{ COMMUNITY_MEMBERSHIP : "incluye miembros"
@@ -810,7 +819,7 @@ erDiagram
     USER o|--o{ REPORT : "revisa"
 ```
 
-El MVP implementa 8 entidades: `user` (tabla `users`), `email_verification`, `community`, `community_membership`, `category`, `listing`, `media_asset` y `listing_image`. Las otras 7 (`conversation`, `message`, `notification`, `professional_profile`, `professional_service`, `professional_profile_image` y `report`) están diseñadas para versiones futuras: su primer atributo lo indica en el diagrama y todavía no tienen tabla.
+El MVP implementa 9 entidades: `user` (tabla `users`), `email_verification`, `password_reset`, `community`, `community_membership`, `category`, `listing`, `media_asset` y `listing_image`. Las otras 7 (`conversation`, `message`, `notification`, `professional_profile`, `professional_service`, `professional_profile_image` y `report`) están diseñadas para versiones futuras: su primer atributo lo indica en el diagrama y todavía no tienen tabla.
 
 
 ### **3.2. Descripción de entidades principales:**
@@ -821,6 +830,7 @@ El modelo cubre las funciones descritas en el README: usuarios, comunidades, anu
 |---|---|---|
 | `user` | MVP | `POST /auth/register`, `POST /auth/token`, `GET/PATCH /users/me`, `GET /users/me/memberships`. Versión futura: `DELETE /users/me`, `GET /users/me/listings`, `/admin/users` |
 | `email_verification` | MVP | `POST /auth/email-verification`, `POST /auth/email-verification/resend` |
+| `password_reset` | MVP | `POST /auth/password-reset`, `POST /auth/password-reset/confirm` |
 | `community` | MVP | `GET/POST /communities`, `GET /communities/{community_id}`, `GET /admin/communities`, `PATCH /admin/communities/{community_id}`. Versión futura: `PATCH /communities/{community_id}` |
 | `community_membership` | MVP | `GET/POST /communities/{community_id}/memberships`, `PATCH/DELETE /communities/{community_id}/memberships/{user_id}` |
 | `category` | MVP | `GET /categories`. Versión futura: `POST /categories`, `PATCH /categories/{category_id}` |
@@ -848,6 +858,7 @@ El modelo cubre las funciones descritas en el README: usuarios, comunidades, anu
 - `created_at TIMESTAMPTZ` — `NOT NULL`.
 - `updated_at TIMESTAMPTZ` — `NOT NULL`.
 - `deleted_at TIMESTAMPTZ` — `NULL`; permite borrado lógico.
+- `password_changed_at TIMESTAMPTZ` — `NULL`; fecha del último cambio de contraseña. La API rechaza los JWT emitidos antes de esta fecha, así que cambiar la contraseña cierra las sesiones abiertas. Nula si la contraseña no ha cambiado desde el registro.
 
 #### 2. `community` — Comunidad
 
@@ -1009,6 +1020,15 @@ La aplicación debe comprobar que el remitente pertenece a la conversación.
 - Índice único parcial `uq_email_verification_one_active_per_user` sobre `user_id` `WHERE used_at IS NULL AND superseded_at IS NULL`: como mucho un enlace vigente por usuario.
 
 Solo vale el último enlace: emitir uno marca los anteriores como sustituidos y validar el correo marca el usado y sustituye el resto. Se conservan para explicar por qué un enlace antiguo ya no vale (HU-27); al emitir uno nuevo se borran los del usuario caducados hace más de 30 días.
+
+#### 16. `password_reset` — Enlace para restablecer la contraseña
+
+- `token_hash CHAR(64)` — **PK**; SHA-256 en hexadecimal del token. El token en claro solo viaja en el correo, así que una copia de la base de datos no permite cambiar contraseñas.
+- `user_id UUID` — `NOT NULL`, **FK** → `user.id` `ON DELETE CASCADE`, con índice.
+- `expires_at TIMESTAMPTZ` — `NOT NULL`; 1 hora tras la emisión (`PASSWORD_RESET_TTL_MINUTES`).
+- `created_at TIMESTAMPTZ` — `NOT NULL`, `DEFAULT now()`; limita las peticiones a una por minuto para cada cuenta.
+
+Solo vale el último enlace: pedir uno nuevo borra los anteriores del usuario, y cambiar la contraseña borra el usado. A diferencia de `email_verification`, no se conservan: a quien abre un enlace que ya no vale le basta con pedir otro.
 
 #### Tipos enumerados
 
