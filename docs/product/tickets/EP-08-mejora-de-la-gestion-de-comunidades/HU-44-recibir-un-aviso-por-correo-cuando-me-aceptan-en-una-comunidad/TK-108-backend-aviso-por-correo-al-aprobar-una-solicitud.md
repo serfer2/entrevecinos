@@ -34,7 +34,7 @@ Con TK-106, la administración se entera de cada solicitud. El vecino, en cambio
 
 ### 3.1 Cuándo se avisa
 
-- `ChangeMembershipStatus.execute` devuelve, además de la membresía, el aviso a enviar solo si el estado anterior era `pending` y el nuevo `approved`. El desbloqueo (`blocked → approved`) no avisa (asumido: no es una aceptación nueva).
+- `ChangeMembershipStatus.execute` devuelve `MembershipChange` (la membresía y su estado anterior), con `approves_request` cierto solo si el estado anterior era `pending` y el nuevo `approved`; el endpoint pide entonces el aviso a `MembershipNotices.request_approved(community_id, user_id)`, que comprueba la comunidad y la cuenta y reserva el cupo. El desbloqueo (`blocked → approved`) no avisa (asumido: no es una aceptación nueva).
 - El destinatario es el solicitante, con su cuenta activa y no borrada; si no, no se envía nada.
 
 ### 3.2 Mensaje
@@ -95,9 +95,9 @@ $COMPOSE run --rm -v "$PWD/apps/api/tests:/app/tests" api python -m pytest -q
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] Las pruebas de la API, `ruff` y `redocly lint` pasan.
-- [ ] Contrato e `infra/aws/README.md` actualizados.
+- [x] Los criterios de aceptación se cumplen.
+- [x] Las pruebas de la API, `ruff` y `redocly lint` pasan.
+- [x] Contrato e `infra/aws/README.md` actualizados.
 - [ ] Cambios revisados y fusionados mediante *pull request*.
 - [ ] Comprobado en producción con una solicitud real.
 

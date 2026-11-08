@@ -105,7 +105,7 @@ Requisitos: Docker, AWS CLI v2 y una sesión del proyecto (`aws login --profile 
 
    5. IP autorizadas: la IP elástica de la instancia (`make tf-output`, TK-098).
 
-   **Límites reales del correo de producción** (TK-097): 300 correos al día en el plan gratuito de Brevo, y como mucho 5.000 por periodo en la propia API (del día 6 al día 6, por coste, TK-099). Cuentan todos los correos de la aplicación: validación, reenvío, enlace para restablecer la contraseña, aviso del cambio y avisos de las solicitudes de acceso a la administración de la comunidad (uno por administrador). Si Brevo rechaza un envío, salta la alarma `email-send-failures`.
+   **Límites reales del correo de producción** (TK-097): 300 correos al día en el plan gratuito de Brevo, y como mucho 5.000 por periodo en la propia API (del día 6 al día 6, por coste, TK-099). Cuentan todos los correos de la aplicación: validación, reenvío, enlace para restablecer la contraseña, aviso del cambio, avisos de las solicitudes de acceso a la administración de la comunidad (uno por administrador) y aviso al vecino cuando se aprueba su solicitud. Si Brevo rechaza un envío, salta la alarma `email-send-failures`.
 
 7. **Primer despliegue** de la aplicación: ver «Despliegue». El mismo `make tf-apply` crea CloudFront y los alias de la web (ver «Web pública»), sin pasos en consola.
 8. **Acceso de GitHub Actions** (manual en GitHub): entorno `production`, clave del usuario de CI y variables; ver «Acceso de GitHub Actions».
@@ -700,9 +700,9 @@ Las entradas siguientes amplían cada decisión (qué, por qué, impacto, mitiga
 
 ### Límite de 5.000 correos por periodo, por coste (TK-099)
 
-- **Qué:** la API envía como mucho 5.000 correos (validación, reenvío, enlace para restablecer la contraseña, aviso del cambio y avisos de las solicitudes de acceso) entre el día 6 de un mes a las 00:00 (hora de Madrid) y el día 6 del siguiente. Al llegar, responde `503` (`email_quota_exceeded`) sin crear la cuenta ni enviar nada, hasta el periodo siguiente. Contador en PostgreSQL (`email_quota`) con reserva atómica; configurable con `EMAIL_MONTHLY_LIMIT` y `EMAIL_QUOTA_RESET_DAY`.
+- **Qué:** la API envía como mucho 5.000 correos (validación, reenvío, enlace para restablecer la contraseña, aviso del cambio y avisos de las solicitudes de acceso y de su aprobación) entre el día 6 de un mes a las 00:00 (hora de Madrid) y el día 6 del siguiente. Al llegar, responde `503` (`email_quota_exceeded`) sin crear la cuenta ni enviar nada, hasta el periodo siguiente. Contador en PostgreSQL (`email_quota`) con reserva atómica; configurable con `EMAIL_MONTHLY_LIMIT` y `EMAIL_QUOTA_RESET_DAY`.
 - **Por qué:** **restricción de costes.** El correo no puede costar más que el plan de pago más barato de Brevo (5.000 correos al mes, ≈ 9 USD/mes), y el gasto total debe seguir dentro del límite de 40 €/mes. Un tope en la propia aplicación lo garantiza aunque falle otra protección (un error que envíe en bucle o registros masivos).
-- **Impacto:** al agotarse, nadie puede registrarse, pedir otro enlace de validación ni recuperar su contraseña hasta el día 6, y las solicitudes de acceso se crean sin avisar a la administración; una plaza se consume aunque el envío falle después (criterio conservador).
+- **Impacto:** al agotarse, nadie puede registrarse, pedir otro enlace de validación ni recuperar su contraseña hasta el día 6, y las solicitudes de acceso se crean y se aprueban sin avisos por correo; una plaza se consume aunque el envío falle después (criterio conservador).
 - **Mitigaciones:** límites por IP del proxy contra los registros y las peticiones de recuperación masivos; como mucho un enlace de validación o de restablecimiento por minuto y cuenta; alarmas `email-quota-80` y `email-quota-exceeded`; el reenvío y la recuperación comprueban el cupo antes de buscar la cuenta, así que el `503` no revela qué correos existen.
 - **Cuándo revisarla:** cuando el crecimiento real de registros se acerque al límite (alarma del 80 %).
 - **Cómo subirlo:** decidirlo con el presupuesto; `EMAIL_MONTHLY_LIMIT` en `infra/docker-compose.prod.yml`, el plan de Brevo si hace falta, `make tf-apply` y desplegar.

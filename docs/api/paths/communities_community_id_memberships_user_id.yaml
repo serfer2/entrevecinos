@@ -8,7 +8,9 @@ patch:
   description: >-
     Aprobar, rechazar o bloquear (`status`) y asignar rol (`role`). Solo `community_admin` de la
     comunidad o `platform_admin`; solo un `community_admin` puede asignar el rol `community_admin`.
-    Al aprobar se fijan `reviewed_by`, `reviewed_at` y `joined_at`.
+    Al aprobar se fijan `reviewed_by`, `reviewed_at` y `joined_at`. Al aprobar una solicitud
+    `pending`, avisa por correo al vecino (una plaza del cupo de correos; sin cupo, se aprueba igual
+    y no se avisa); rechazar, bloquear o desbloquear no envía correo.
   x-mvp: true
   requestBody:
     required: true

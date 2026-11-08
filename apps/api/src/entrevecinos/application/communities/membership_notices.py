@@ -1,10 +1,11 @@
-"""Avisos por correo de las solicitudes de acceso a una comunidad (HU-43)."""
+"""Avisos por correo de las solicitudes de acceso a una comunidad (HU-43 y HU-44)."""
 
+import uuid
 from html import escape
 
-from entrevecinos.application.communities.ports import MembershipRepository
+from entrevecinos.application.communities.ports import CommunityRepository, MembershipRepository
 from entrevecinos.application.mail.email_quota import EmailQuota
-from entrevecinos.application.users.ports import OutgoingEmail
+from entrevecinos.application.users.ports import OutgoingEmail, UserRepository
 from entrevecinos.domain.communities.entities import Community
 from entrevecinos.domain.mail.errors import EmailQuotaExceeded
 from entrevecinos.domain.users.entities import User
@@ -18,9 +19,16 @@ class MembershipNotices:
     """
 
     def __init__(
-        self, memberships: MembershipRepository, quota: EmailQuota, web_public_url: str
+        self,
+        memberships: MembershipRepository,
+        communities: CommunityRepository,
+        users: UserRepository,
+        quota: EmailQuota,
+        web_public_url: str,
     ) -> None:
         self._memberships = memberships
+        self._communities = communities
+        self._users = users
         self._quota = quota
         self._web_public_url = web_public_url.rstrip("/")
 
@@ -35,6 +43,18 @@ class MembershipNotices:
                 break
             messages.append(_request_received(admin, requester, community, link))
         return messages
+
+    def request_approved(self, community_id: uuid.UUID, user_id: uuid.UUID) -> OutgoingEmail | None:
+        """Aviso al vecino cuya solicitud se ha aprobado, o `None` si no procede o no hay cupo."""
+        community = self._communities.get(community_id)
+        member = self._users.get_by_id(user_id)
+        if community is None or member is None or not member.can_authenticate:
+            return None
+        if not self._reserve():
+            return None
+        return _request_approved(
+            member, community, f"{self._web_public_url}/comunidades/{community.id}"
+        )
 
     def _reserve(self) -> bool:
         try:
@@ -62,6 +82,27 @@ def _request_received(
     return OutgoingEmail(
         to=admin.email,
         subject=f"Nueva solicitud para unirse a {community.name}",
+        text=text,
+        html=html,
+    )
+
+
+def _request_approved(member: User, community: Community, link: str) -> OutgoingEmail:
+    text = (
+        f"Hola, {member.full_name}:\n\n"
+        f"Tu solicitud para unirte a {community.name} ha sido aprobada. "
+        "Ya puedes ver y publicar anuncios.\n\n"
+        f"{link}\n"
+    )
+    html = (
+        f"<p>Hola, {escape(member.full_name)}:</p>"
+        f"<p>Tu solicitud para unirte a {escape(community.name)} ha sido aprobada. "
+        "Ya puedes ver y publicar anuncios.</p>"
+        f'<p><a href="{escape(link)}">Ir a {escape(community.name)}</a></p>'
+    )
+    return OutgoingEmail(
+        to=member.email,
+        subject=f"Ya eres miembro de {community.name}",
         text=text,
         html=html,
     )

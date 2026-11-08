@@ -18,6 +18,7 @@ from tests.fakes import (
     InMemoryCommunityRepository,
     InMemoryEmailQuotaRepository,
     InMemoryMembershipRepository,
+    InMemoryUserRepository,
 )
 
 NOW = datetime(2026, 11, 9, 10, 0, tzinfo=UTC)
@@ -53,11 +54,19 @@ def quota_counts() -> InMemoryEmailQuotaRepository:
 
 
 @pytest.fixture
+def users() -> InMemoryUserRepository:
+    return InMemoryUserRepository()
+
+
+@pytest.fixture
 def notices(
-    memberships: InMemoryMembershipRepository, quota_counts: InMemoryEmailQuotaRepository
+    memberships: InMemoryMembershipRepository,
+    communities: InMemoryCommunityRepository,
+    users: InMemoryUserRepository,
+    quota_counts: InMemoryEmailQuotaRepository,
 ) -> MembershipNotices:
     quota = EmailQuota(quota_counts, 5000, reset_day=6, clock=lambda: NOW)
-    return MembershipNotices(memberships, quota, "https://entrevecinos.test/")
+    return MembershipNotices(memberships, communities, users, quota, "https://entrevecinos.test/")
 
 
 @pytest.fixture
@@ -186,3 +195,57 @@ def test_without_quota_prepares_no_more_messages(
     messages = notices.request_received(community, requester)
 
     assert [m.to for m in messages] == ["ana@example.com"]
+
+
+def test_approval_notice_goes_to_the_member_with_a_link_to_the_community(
+    notices: MembershipNotices,
+    users: InMemoryUserRepository,
+    quota_counts: InMemoryEmailQuotaRepository,
+    community: Community,
+    requester: User,
+) -> None:
+    users.users[requester.id] = requester
+
+    message = notices.request_approved(community.id, requester.id)
+
+    assert message is not None
+    assert message.to == "victor@example.com"
+    assert message.subject == "Ya eres miembro de Los Olivos <norte>"
+    assert "Tu solicitud para unirte a Los Olivos <norte> ha sido aprobada." in message.text
+    assert f"https://entrevecinos.test/comunidades/{community.id}" in message.text
+    assert "Los Olivos &lt;norte&gt;" in message.html
+    assert sum(quota_counts.counts.values()) == 1
+
+
+@pytest.mark.parametrize("changes", [{"is_active": False}, {"deleted_at": NOW}])
+def test_no_approval_notice_to_an_account_that_cannot_log_in(
+    notices: MembershipNotices,
+    users: InMemoryUserRepository,
+    community: Community,
+    requester: User,
+    changes: dict,
+) -> None:
+    users.users[requester.id] = dataclasses.replace(requester, **changes)
+
+    assert notices.request_approved(community.id, requester.id) is None
+
+
+def test_no_approval_notice_without_quota(
+    notices: MembershipNotices,
+    users: InMemoryUserRepository,
+    quota_counts: InMemoryEmailQuotaRepository,
+    community: Community,
+    requester: User,
+) -> None:
+    users.users[requester.id] = requester
+    quota_counts.counts[current_period(NOW, 6).start] = 5000
+
+    assert notices.request_approved(community.id, requester.id) is None
+
+
+def test_no_approval_notice_for_an_unknown_community(
+    notices: MembershipNotices, users: InMemoryUserRepository, requester: User
+) -> None:
+    users.users[requester.id] = requester
+
+    assert notices.request_approved(uuid.uuid4(), requester.id) is None

@@ -176,7 +176,8 @@ def list_community_memberships(
         "Solo `community_admin` de la comunidad o `platform_admin`. Aprueba o rechaza una "
         "solicitud `pending` (al aprobar se fija `joined_at`), bloquea a un miembro aprobado "
         "(`blocked`: pierde el acceso, sus anuncios dejan de mostrarse y no puede volver a "
-        "solicitarlo) o lo desbloquea (`approved`). Otras transiciones, bloquear a un "
+        "solicitarlo) o lo desbloquea (`approved`). Al aprobar una solicitud avisa por correo al "
+        "vecino (una plaza del cupo; sin cupo, no se avisa). Otras transiciones, bloquear a un "
         "administrador o a uno mismo responden 409. **Pendiente:** `role` se rechaza con 422."
     ),
     responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **CONFLICT, **VALIDATION_ERROR},
@@ -188,11 +189,18 @@ def update_membership(
     user: CurrentUserDep,
     access: CommunityAccessDep,
     memberships: MembershipRepositoryDep,
+    notices: MembershipNoticesDep,
+    sender: EmailSenderDep,
+    background_tasks: BackgroundTasks,
 ) -> MembershipResponse:
-    use_case = ChangeMembershipStatus(access, memberships)
-    return MembershipResponse.from_domain(
-        use_case.execute(user, community_id, user_id, body.status)
+    change = ChangeMembershipStatus(access, memberships).execute(
+        user, community_id, user_id, body.status
     )
+    if change.approves_request:
+        notice = notices.request_approved(community_id, user_id)
+        if notice is not None:
+            background_tasks.add_task(send_in_background, sender, notice)
+    return MembershipResponse.from_domain(change.detail)
 
 
 @router.delete(

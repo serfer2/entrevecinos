@@ -228,9 +228,13 @@ CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
 def get_membership_notices(
-    memberships: MembershipRepositoryDep, quota: EmailQuotaDep, settings: SettingsDep
+    memberships: MembershipRepositoryDep,
+    communities: CommunityRepositoryDep,
+    users: UserRepositoryDep,
+    quota: EmailQuotaDep,
+    settings: SettingsDep,
 ) -> MembershipNotices:
-    return MembershipNotices(memberships, quota, settings.web_public_url)
+    return MembershipNotices(memberships, communities, users, quota, settings.web_public_url)
 
 
 MembershipNoticesDep = Annotated[MembershipNotices, Depends(get_membership_notices)]

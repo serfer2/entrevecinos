@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 
 from entrevecinos.application.authorization.community_access import (
     COMMUNITY_ADMINS,
@@ -29,6 +30,22 @@ MANAGEMENT_TRANSITIONS = frozenset(
 )
 
 
+@dataclass(frozen=True, slots=True)
+class MembershipChange:
+    """Membresía tras el cambio y su estado anterior."""
+
+    detail: MembershipDetail
+    previous: MembershipStatus
+
+    @property
+    def approves_request(self) -> bool:
+        """Se aprobó una solicitud pendiente: se avisa al vecino (TK-108). Desbloquear no cuenta."""
+        return (
+            self.previous is MembershipStatus.PENDING
+            and self.detail.membership.status is MembershipStatus.APPROVED
+        )
+
+
 class ChangeMembershipStatus:
     """Revisa solicitudes (`pending → approved | rejected`) y bloquea o desbloquea miembros."""
 
@@ -38,7 +55,7 @@ class ChangeMembershipStatus:
 
     def execute(
         self, admin: User, community_id: uuid.UUID, user_id: uuid.UUID, status: MembershipStatus
-    ) -> MembershipDetail:
+    ) -> MembershipChange:
         self._access.require_role(admin, community_id, COMMUNITY_ADMINS)
         membership = self._memberships.get(community_id, user_id)
         if membership is None:
@@ -59,7 +76,8 @@ class ChangeMembershipStatus:
         else:
             raise MembershipChangeRejected(MembershipChangeRejected.NOT_ALLOWED)
 
-        return self._memberships.review(community_id, user_id, status, admin.id)
+        detail = self._memberships.review(community_id, user_id, status, admin.id)
+        return MembershipChange(detail=detail, previous=current)
 
 
 class RemoveMembership:

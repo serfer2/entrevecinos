@@ -185,3 +185,77 @@ def test_pagination(client: TestClient, admin: dict, community: dict) -> None:
 
 def test_requires_authentication(client: TestClient, community: dict) -> None:
     assert client.get(f"/v1/communities/{community['id']}/memberships").status_code == 401
+
+
+APPROVED_SUBJECT = "Ya eres miembro de Urbanización Los Olivos"
+
+
+def approval_notices(email_sender, to: str) -> list:
+    return [e for e in email_sender.sent if e.subject == APPROVED_SUBJECT and e.to == to]
+
+
+@pytest.mark.parametrize("reviewer", ["admin", "platform_admin"])
+def test_approval_emails_the_applicant(
+    client: TestClient,
+    db_session: Session,
+    email_sender,
+    admin: dict,
+    applicant: dict,
+    community: dict,
+    reviewer: str,
+) -> None:
+    account = admin
+    if reviewer == "platform_admin":
+        account = register(client, "plataforma@example.com")
+        make_platform_admin(db_session, account)
+    request_access(client, applicant, community["id"])
+
+    response = review(client, account, community["id"], applicant["user"]["id"], "approved")
+
+    assert response.status_code == 200
+    [notice] = approval_notices(email_sender, "solicitante@example.com")
+    assert "Tu solicitud para unirte a Urbanización Los Olivos ha sido aprobada." in notice.text
+    assert f"/comunidades/{community['id']}" in notice.text
+
+
+def test_reject_block_and_unblock_send_no_approval_email(
+    client: TestClient, email_sender, admin: dict, applicant: dict, community: dict
+) -> None:
+    other = register(client, "otro@example.com", full_name="Otro Vecino")
+    request_access(client, other, community["id"])
+    assert (
+        review(client, admin, community["id"], other["user"]["id"], "rejected").status_code == 200
+    )
+    join(client, admin, applicant, community["id"])
+    applicant_id = applicant["user"]["id"]
+    assert review(client, admin, community["id"], applicant_id, "blocked").status_code == 200
+
+    assert review(client, admin, community["id"], applicant_id, "approved").status_code == 200
+
+    assert approval_notices(email_sender, "otro@example.com") == []
+    assert len(approval_notices(email_sender, "solicitante@example.com")) == 1
+
+
+def test_approval_without_quota_still_approves(
+    client: TestClient,
+    db_session: Session,
+    email_sender,
+    admin: dict,
+    applicant: dict,
+    community: dict,
+) -> None:
+    from datetime import UTC, datetime
+
+    from entrevecinos.domain.mail.quota import current_period
+    from entrevecinos.infrastructure.db.models import EmailQuotaModel
+
+    request_access(client, applicant, community["id"])
+    period = current_period(datetime.now(UTC), reset_day=6).start
+    db_session.get_one(EmailQuotaModel, period).sent = 5000
+    db_session.flush()
+
+    response = review(client, admin, community["id"], applicant["user"]["id"], "approved")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "approved"
+    assert approval_notices(email_sender, "solicitante@example.com") == []
