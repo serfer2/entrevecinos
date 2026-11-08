@@ -13,6 +13,7 @@ export const metadata: Metadata = { title: "Iniciar sesión · EntreVecinos" };
 const NOTICES: Record<string, string> = {
   "sesion-caducada": "Tu sesión ha caducado. Vuelve a iniciar sesión.",
   "correo-validado": "Tu correo ya está validado. Inicia sesión.",
+  "contrasena-cambiada": "Tu contraseña se ha cambiado. Inicia sesión con la nueva.",
 };
 
 type LoginPageProps = {

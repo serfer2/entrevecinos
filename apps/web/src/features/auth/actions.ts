@@ -6,13 +6,19 @@ import { type ApiError, errorCodeOf, invalidBodyFields } from "@/lib/api/errors"
 import { apiFetch } from "@/lib/api/server";
 
 import { postLoginPath } from "./destination";
+import type { PasswordResetLinkError } from "./password-reset-link";
 import { safeNextPath } from "./redirect";
+import { deletePasswordResetToken, getPasswordResetToken } from "./reset-token";
+import { PASSWORD_CHANGED_LOGIN_PATH } from "./routes";
 import {
   fieldErrorsOf,
   LOGIN_MESSAGES,
   type LoginField,
   loginSchema,
+  PASSWORD_RESET_MESSAGES,
+  type PasswordResetField,
   passwordResetRequestSchema,
+  passwordResetSchema,
   SIGNUP_FIELD_MESSAGES,
   signupSchema,
   type SignupField,
@@ -198,6 +204,53 @@ export async function requestPasswordReset(
     };
   }
   return { sent: true };
+}
+
+export type PasswordResetState =
+  | {
+      fieldErrors?: Partial<Record<PasswordResetField, string>>;
+      formError?: string;
+      /** El enlace ya no sirve: se ofrece pedir otro. */
+      linkError?: PasswordResetLinkError;
+    }
+  | undefined;
+
+/**
+ * Cambia la contraseña con el token del enlace, que llega en una cookie (nunca en el formulario).
+ * Al terminar cierra la sesión de este navegador: la API ya invalida todas las anteriores.
+ */
+export async function resetPassword(
+  _state: PasswordResetState,
+  formData: FormData,
+): Promise<PasswordResetState> {
+  const token = await getPasswordResetToken();
+  if (!token) return { linkError: "invalido" };
+
+  const parsed = passwordResetSchema.safeParse({
+    password: text(formData, "password"),
+    password_confirm: text(formData, "password_confirm"),
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrorsOf<PasswordResetField>(parsed.error) };
+
+  const result = await apiFetch("/auth/password-reset/confirm", {
+    method: "POST",
+    body: { token, password: parsed.data.password },
+  });
+
+  if (!result.ok) {
+    if (result.error.status === 410 || result.error.status === 400) {
+      await deletePasswordResetToken();
+      return { linkError: result.error.status === 410 ? "caducado" : "invalido" };
+    }
+    if (result.error.status === 422 && invalidBodyFields(result.error).includes("password")) {
+      return { fieldErrors: { password: PASSWORD_RESET_MESSAGES.password } };
+    }
+    return { formError: "No hemos podido cambiar la contraseña. Inténtalo de nuevo en unos minutos." };
+  }
+
+  await deletePasswordResetToken();
+  await deleteSession();
+  redirect(PASSWORD_CHANGED_LOGIN_PATH);
 }
 
 /** Cierra la sesión y va a la raíz, que lleva al inicio de sesión. Se envía por POST. */

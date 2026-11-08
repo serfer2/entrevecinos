@@ -106,9 +106,9 @@ $COMPOSE exec web npm run lint && $COMPOSE exec web npm run typecheck && $COMPOS
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] Lint, tipos y pruebas de la web pasan.
-- [ ] Recorrido completo comprobado en local y en producción.
+- [x] Los criterios de aceptación se cumplen.
+- [x] Lint, tipos y pruebas de la web pasan.
+- [ ] Recorrido completo comprobado en local (hecho) y en producción (tras desplegar).
 - [ ] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas

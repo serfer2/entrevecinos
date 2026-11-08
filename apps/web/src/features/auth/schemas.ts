@@ -73,3 +73,25 @@ export const passwordResetRequestSchema = z.object({
     .max(320, { error: LOGIN_MESSAGES.email })
     .pipe(z.email({ error: LOGIN_MESSAGES.email })),
 });
+
+export const PASSWORD_RESET_MESSAGES = {
+  password: SIGNUP_MESSAGES.password,
+  password_max: SIGNUP_MESSAGES.password_max,
+  password_confirm: "Las contraseñas no coinciden.",
+} as const;
+
+/** Contraseña nueva con confirmación: mismas reglas que el registro (`PasswordResetConfirmRequest`). */
+export const passwordResetSchema = z
+  .object({
+    password: z
+      .string()
+      .min(12, { error: PASSWORD_RESET_MESSAGES.password })
+      .max(128, { error: PASSWORD_RESET_MESSAGES.password_max }),
+    password_confirm: z.string(),
+  })
+  .refine((data) => data.password === data.password_confirm, {
+    error: PASSWORD_RESET_MESSAGES.password_confirm,
+    path: ["password_confirm"],
+  });
+
+export type PasswordResetField = keyof z.input<typeof passwordResetSchema>;
