@@ -32,7 +32,7 @@ La pantalla de inicio de sesión no ofrece ninguna salida a quien ha olvidado su
 
 ### 3.1 Inicio de sesión
 
-- `LoginForm`: enlace «¿Has olvidado tu contraseña?» junto al campo de contraseña, a `/recuperar-contrasena`. Si el usuario ya ha escrito su correo, se pasa como `?email=` para rellenar el formulario (asumido).
+- `LoginForm`: enlace «¿Has olvidado tu contraseña?» junto al campo de contraseña, a `/recuperar-contrasena`. Tras un intento fallido, el correo escrito se pasa como `?email=` para rellenar el formulario (asumido: el formulario no es controlado y es justo cuando el usuario descubre que no recuerda la contraseña).
 - Estilo del tema actual (TK-066/TK-067), accesible con teclado y con texto visible (no solo un icono).
 
 ### 3.2 `/recuperar-contrasena`
@@ -41,7 +41,7 @@ La pantalla de inicio de sesión no ofrece ninguna salida a quien ha olvidado su
 - Formulario con un campo de correo (validación con zod, mismos mensajes que el inicio de sesión) y botón «Enviar enlace».
 - Server Action `requestPasswordReset` (en `features/auth/actions.ts`, solo exporta funciones `async`):
   - `202` → el formulario se sustituye por un aviso `role="status"`: «Si hay una cuenta con ese correo, te hemos enviado un enlace para restablecer la contraseña. Caduca en 1 hora. Si no lo ves, revisa la carpeta de correo no deseado.», y enlace «Volver a iniciar sesión».
-  - `503 email_quota_exceeded` → mensaje de cupo ya existente (`EMAIL_QUOTA_MESSAGE`), conservando el correo.
+  - `503 email_quota_exceeded` → «Ahora mismo no podemos enviar correos. Inténtalo de nuevo en unos días.», conservando el correo (el mensaje del registro habla de «correos de validación»).
   - `422` → error junto al campo.
   - `429`, red o `5xx` → «No hemos podido enviar el enlace. Inténtalo de nuevo en unos minutos.».
 - Con sesión iniciada, redirige a `/inicio`, como `/iniciar-sesion`.
@@ -90,8 +90,8 @@ $COMPOSE exec web npm run lint && $COMPOSE exec web npm run typecheck && $COMPOS
 
 ## 7. Definición de terminado
 
-- [ ] Los criterios de aceptación se cumplen.
-- [ ] Lint, tipos y pruebas de la web pasan.
+- [x] Los criterios de aceptación se cumplen.
+- [x] Lint, tipos y pruebas de la web pasan.
 - [ ] Cambios revisados y fusionados mediante *pull request*.
 
 ## 8. Riesgos y decisiones abiertas

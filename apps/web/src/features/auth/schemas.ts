@@ -64,3 +64,12 @@ export const loginSchema = z.object({
 });
 
 export type LoginField = keyof z.input<typeof loginSchema>;
+
+/** Correo para pedir el enlace de restablecimiento: mismas reglas que `PasswordResetRequest`. */
+export const passwordResetRequestSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .max(320, { error: LOGIN_MESSAGES.email })
+    .pipe(z.email({ error: LOGIN_MESSAGES.email })),
+});

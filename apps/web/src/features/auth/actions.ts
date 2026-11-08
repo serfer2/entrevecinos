@@ -12,6 +12,7 @@ import {
   LOGIN_MESSAGES,
   type LoginField,
   loginSchema,
+  passwordResetRequestSchema,
   SIGNUP_FIELD_MESSAGES,
   signupSchema,
   type SignupField,
@@ -154,6 +155,47 @@ export async function resendVerification(
   if (!result.ok) {
     if (isEmailQuotaExceeded(result.error)) return { error: EMAIL_QUOTA_MESSAGE };
     return { error: "No se pudo reenviar el correo. Inténtalo de nuevo." };
+  }
+  return { sent: true };
+}
+
+export type PasswordResetRequestState =
+  | {
+      fieldErrors?: { email?: string };
+      formError?: string;
+      values?: { email: string };
+      /** Petición aceptada: la API responde igual exista o no la cuenta. */
+      sent?: boolean;
+    }
+  | undefined;
+
+/** Pide el enlace para restablecer la contraseña (HU-41). */
+export async function requestPasswordReset(
+  _state: PasswordResetRequestState,
+  formData: FormData,
+): Promise<PasswordResetRequestState> {
+  const values = { email: text(formData, "email") };
+
+  const parsed = passwordResetRequestSchema.safeParse(values);
+  if (!parsed.success) {
+    return { fieldErrors: fieldErrorsOf<"email">(parsed.error), values };
+  }
+
+  const result = await apiFetch("/auth/password-reset", { method: "POST", body: parsed.data });
+  if (!result.ok) {
+    if (isEmailQuotaExceeded(result.error)) {
+      return {
+        formError: "Ahora mismo no podemos enviar correos. Inténtalo de nuevo en unos días.",
+        values,
+      };
+    }
+    if (result.error.status === 422 && invalidBodyFields(result.error).includes("email")) {
+      return { fieldErrors: { email: LOGIN_MESSAGES.email }, values };
+    }
+    return {
+      formError: "No hemos podido enviar el enlace. Inténtalo de nuevo en unos minutos.",
+      values,
+    };
   }
   return { sent: true };
 }
