@@ -2933,3 +2933,51 @@ Tras desplegar se comprueba: `429` en `POST /recuperar-contrasena`, que el regis
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ~~~
+
+**Pull Request 8**
+
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/41
+
+#### Título
+
+```
+docs: cierre de la Épica 14 tras verificarla en producción
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+Cierra la Épica 14 (recuperación de la contraseña) tras verificarla en producción con la PR #40. Solo cambia documentación.
+
+### Verificado en producción
+
+- **Despliegue:** copia previa de la base antes de migrar (`20261108T221257Z.dump`), migración `0010 -> 0011` y despliegue correcto.
+- **Límite del proxy:** `POST /recuperar-contrasena` responde `429` desde la 12.ª petición.
+- **Enlace del correo:** `/restablecer-contrasena/enlace` responde `303` con `Referrer-Policy: no-referrer` y `Cache-Control: no-store`.
+- **Registros sin *token*:** ni el proxy ni CloudFront registran `token=`; solo la ruta `/restablecer-contrasena/enlace`.
+- **Recorrido completo con un correo real:** enlace recibido, contraseña cambiada, inicio de sesión con la nueva y aviso del cambio recibido. Sin fallos de envío en la API.
+
+### Documentación
+
+- **Tickets TK-100 a TK-105:** definición de terminado completa; TK-104 con el recorrido comprobado en producción.
+- **`docs/product/tickets/README.md`:** la Épica 14 queda implementada y verificada.
+- **OpenSpec:** TK-105 archivado; la spec `production-deployment` incluye el límite del proxy en las rutas de recuperación.
+- **`readme.md` §7:** se añade la PR #40.
+
+## Despliegue
+
+Sin cambios de código ni de infraestructura: al fusionar, el despliegue vuelve a publicar las mismas imágenes y no cambia nada en producción.
+
+## Comprobaciones
+
+- [x] Pruebas, lint y formato pasan en contenedores (sin cambios de código en esta PR).
+- [x] Si cambia una petición o respuesta de la API, he actualizado `docs/api/openapi.yaml`. (No cambia)
+- [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()`. (No cambia)
+- [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md`. (No cambia)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+~~~
