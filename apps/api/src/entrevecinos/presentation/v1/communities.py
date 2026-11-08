@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Query, Response, status
 
 from entrevecinos.application.communities.create_community import CreateCommunity
 from entrevecinos.application.communities.get_community import GetCommunity
@@ -19,8 +19,11 @@ from entrevecinos.presentation.dependencies import (
     CommunityAccessDep,
     CommunityRepositoryDep,
     CurrentUserDep,
+    EmailSenderDep,
+    MembershipNoticesDep,
     MembershipRepositoryDep,
 )
+from entrevecinos.presentation.v1.mail import send_in_background
 from entrevecinos.presentation.v1.pagination import Page, PageParams
 from entrevecinos.presentation.v1.schemas.common import (
     CONFLICT,
@@ -113,8 +116,10 @@ def get_community(
     summary="Solicitar el acceso a una comunidad",
     description=(
         "Crea una membresía `pending` con rol `member` para el usuario autenticado; un "
-        "administrador debe aprobarla. Sin cuerpo de petición. Si ya existe una membresía en "
-        "cualquier estado responde 409 con su `status`."
+        "administrador debe aprobarla. Avisa por correo a cada `community_admin` aprobado de la "
+        "comunidad (un correo y una plaza del cupo por destinatario; sin cupo, no se avisa). Sin "
+        "cuerpo de petición. Si ya existe una membresía en cualquier estado responde 409 con su "
+        "`status`."
     ),
     responses={
         **UNAUTHORIZED,
@@ -128,8 +133,16 @@ def request_membership(
     user: CurrentUserDep,
     communities: CommunityRepositoryDep,
     memberships: MembershipRepositoryDep,
+    notices: MembershipNoticesDep,
+    sender: EmailSenderDep,
+    background_tasks: BackgroundTasks,
 ) -> MembershipResponse:
     detail = RequestMembership(communities, memberships).execute(community_id, user.id)
+    # La comunidad existe: RequestMembership ya lo ha comprobado.
+    community = communities.get(community_id)
+    if community is not None:
+        for message in notices.request_received(community, user):
+            background_tasks.add_task(send_in_background, sender, message)
     return MembershipResponse.from_domain(detail)
 
 
@@ -163,7 +176,8 @@ def list_community_memberships(
         "Solo `community_admin` de la comunidad o `platform_admin`. Aprueba o rechaza una "
         "solicitud `pending` (al aprobar se fija `joined_at`), bloquea a un miembro aprobado "
         "(`blocked`: pierde el acceso, sus anuncios dejan de mostrarse y no puede volver a "
-        "solicitarlo) o lo desbloquea (`approved`). Otras transiciones, bloquear a un "
+        "solicitarlo) o lo desbloquea (`approved`). Al aprobar una solicitud avisa por correo al "
+        "vecino (una plaza del cupo; sin cupo, no se avisa). Otras transiciones, bloquear a un "
         "administrador o a uno mismo responden 409. **Pendiente:** `role` se rechaza con 422."
     ),
     responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **CONFLICT, **VALIDATION_ERROR},
@@ -175,11 +189,18 @@ def update_membership(
     user: CurrentUserDep,
     access: CommunityAccessDep,
     memberships: MembershipRepositoryDep,
+    notices: MembershipNoticesDep,
+    sender: EmailSenderDep,
+    background_tasks: BackgroundTasks,
 ) -> MembershipResponse:
-    use_case = ChangeMembershipStatus(access, memberships)
-    return MembershipResponse.from_domain(
-        use_case.execute(user, community_id, user_id, body.status)
+    change = ChangeMembershipStatus(access, memberships).execute(
+        user, community_id, user_id, body.status
     )
+    if change.approves_request:
+        notice = notices.request_approved(community_id, user_id)
+        if notice is not None:
+            background_tasks.add_task(send_in_background, sender, notice)
+    return MembershipResponse.from_domain(change.detail)
 
 
 @router.delete(

@@ -164,6 +164,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Crear o seleccionar una comunidad local.
    - Permitir que sus miembros vean los anuncios asociados a ella.
    - Incluir una gestión sencilla de acceso, por ejemplo, aprobación por parte de un administrador.
+   - Avisar por correo a los administradores de la comunidad cuando alguien solicita unirse, con un enlace a las solicitudes pendientes, y al solicitante cuando lo aprueban.
    - Las comunidades nuevas quedan pendientes hasta que un administrador de la plataforma las aprueba; las que crea él quedan activas al momento. Cada usuario puede tener solo una comunidad pendiente a la vez.
    - El administrador de la plataforma accede a cualquier comunidad sin solicitar acceso: ve sus anuncios, publica en ella y la gestiona.
 3. **Gestión de anuncios**
@@ -182,7 +183,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
 6. **Administración mínima**
    - Contar con una persona administradora que pueda gestionar miembros y ocultar anuncios problemáticos.
  
-Quedan para una fase posterior el perfil profesional, las notificaciones automáticas, el sistema completo de denuncias y el panel avanzado de administración. Sus entidades del modelo de datos (§3.2) y sus operaciones de la API (`x-mvp: false` en [`docs/api/`](docs/api/README.md)) ya están diseñadas y marcadas como versión futura, igual que las de la mensajería interna.
+Quedan para una fase posterior el perfil profesional, las notificaciones dentro de la aplicación (en el MVP solo hay avisos por correo de las solicitudes de acceso y de los cambios de contraseña), el sistema completo de denuncias y el panel avanzado de administración. Sus entidades del modelo de datos (§3.2) y sus operaciones de la API (`x-mvp: false` en [`docs/api/`](docs/api/README.md)) ya están diseñadas y marcadas como versión futura, igual que las de la mensajería interna.
 
 ---
 

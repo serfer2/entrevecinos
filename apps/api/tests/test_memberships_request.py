@@ -10,7 +10,11 @@ from entrevecinos.domain.communities.errors import MembershipAlreadyExists
 from entrevecinos.infrastructure.communities.sqlalchemy_membership_repository import (
     SqlAlchemyMembershipRepository,
 )
-from entrevecinos.infrastructure.db.models import CommunityMembershipModel, CommunityModel
+from entrevecinos.infrastructure.db.models import (
+    CommunityMembershipModel,
+    CommunityModel,
+    UserModel,
+)
 from tests.api_helpers import create_community, register
 
 pytestmark = pytest.mark.db
@@ -156,3 +160,89 @@ def test_invalid_status_filter(client: TestClient, neighbour: dict) -> None:
 def test_requires_authentication(client: TestClient, community: dict) -> None:
     assert client.post(f"/v1/communities/{community['id']}/memberships").status_code == 401
     assert client.get("/v1/users/me/memberships").status_code == 401
+
+
+NOTICE_SUBJECT = "Nueva solicitud para unirse a Los Olivos"
+
+
+def notices_sent(email_sender) -> list:
+    return [e for e in email_sender.sent if e.subject == NOTICE_SUBJECT]
+
+
+def make_admin(db_session: Session, community_id: str, account: dict, role: str) -> None:
+    db_session.add(
+        CommunityMembershipModel(
+            community_id=uuid.UUID(community_id),
+            user_id=uuid.UUID(account["user"]["id"]),
+            role=role,
+            status="approved",
+            joined_at=datetime.now(UTC),
+        )
+    )
+    db_session.flush()
+
+
+def test_request_notifies_each_approved_admin(
+    client: TestClient,
+    db_session: Session,
+    email_sender,
+    admin: dict,
+    neighbour: dict,
+    community: dict,
+) -> None:
+    berta = register(client, "berta@example.com", full_name="Berta Admin")
+    mario = register(client, "mario@example.com", full_name="Mario Moderador")
+    make_admin(db_session, community["id"], berta, "community_admin")
+    make_admin(db_session, community["id"], mario, "moderator")
+
+    response = request_access(client, neighbour, community["id"])
+
+    assert response.status_code == 201
+    notices = notices_sent(email_sender)
+    assert sorted(n.to for n in notices) == ["admin@example.com", "berta@example.com"]
+    assert all("Víctor Vecino ha pedido unirse a Los Olivos." in n.text for n in notices)
+    assert all("vecino@example.com" not in n.text for n in notices)
+    assert all(f"/comunidades/{community['id']}/gestion/solicitudes" in n.text for n in notices)
+
+
+def test_repeated_request_sends_no_notice(
+    client: TestClient, email_sender, neighbour: dict, community: dict
+) -> None:
+    request_access(client, neighbour, community["id"])
+    sent_before = len(notices_sent(email_sender))
+
+    assert request_access(client, neighbour, community["id"]).status_code == 409
+    assert len(notices_sent(email_sender)) == sent_before
+
+
+def test_request_without_quota_is_created_without_notice(
+    client: TestClient, db_session: Session, email_sender, neighbour: dict, community: dict
+) -> None:
+    from entrevecinos.domain.mail.quota import current_period
+    from entrevecinos.infrastructure.db.models import EmailQuotaModel
+
+    period = current_period(datetime.now(UTC), reset_day=6).start
+    db_session.get_one(EmailQuotaModel, period).sent = 5000
+    db_session.flush()
+
+    response = request_access(client, neighbour, community["id"])
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "pending"
+    assert notices_sent(email_sender) == []
+
+
+def test_list_admin_recipients(
+    client: TestClient, db_session: Session, admin: dict, neighbour: dict, community: dict
+) -> None:
+    berta = register(client, "berta@example.com", full_name="Berta Admin")
+    make_admin(db_session, community["id"], berta, "community_admin")
+    request_access(client, neighbour, community["id"])
+    db_session.get_one(UserModel, uuid.UUID(berta["user"]["id"])).is_active = False
+    db_session.flush()
+
+    recipients = SqlAlchemyMembershipRepository(db_session).list_admin_recipients(
+        uuid.UUID(community["id"])
+    )
+
+    assert [u.email for u in recipients] == ["admin@example.com"]

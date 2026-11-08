@@ -13,7 +13,7 @@ Historias del MVP definido en la sección 1.2 del `readme.md`. Las inferencias q
 
 ## Fuera de alcance
 
-No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Las entidades y operaciones de la API de estas funcionalidades están marcadas como versión futura en el modelo de datos (`readme.md` §3.2) y en el contrato (`x-mvp: false` en `docs/api/`). La recuperación de la contraseña sí forma parte del MVP (Épica 14): sin ella, quien olvida su contraseña pierde el acceso a su cuenta.
+No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Las entidades y operaciones de la API de estas funcionalidades están marcadas como versión futura en el modelo de datos (`readme.md` §3.2) y en el contrato (`x-mvp: false` en `docs/api/`). La recuperación de la contraseña sí forma parte del MVP (Épica 14): sin ella, quien olvida su contraseña pierde el acceso a su cuenta. También los avisos por correo de las solicitudes de acceso: a la administración de la comunidad cuando alguien solicita unirse (HU-43) y al solicitante cuando lo aprueban (HU-44); sin ellos, las solicitudes quedan pendientes sin que nadie se entere. Las notificaciones dentro de la aplicación siguen fuera del MVP.
 
 ## Índice
 
@@ -26,7 +26,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 5. Detalle y contacto | HU-14, HU-15 |
 | 6. Administración mínima | HU-16, HU-17 |
 | 7. Mejora de funcionalidades del MVP | HU-18, HU-19, HU-20 |
-| 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23 |
+| 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23, HU-43, HU-44 |
 | 9. Cierre de sesión | HU-24 |
 | 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
 | 11. Experiencia de usuario | HU-28, HU-29, HU-30, HU-31, HU-32 |
@@ -633,6 +633,64 @@ Control sobre las comunidades que se crean: un administrador de plataforma las r
 - **Given** que mi comunidad pendiente ha sido aprobada
 - **When** creo otra comunidad
 - **Then** se crea y queda pendiente de aprobación
+
+### HU-43 Recibir un aviso por correo de las solicitudes de acceso
+
+**Como** administrador de comunidad, **quiero** recibir un correo cuando alguien pide unirse a mi comunidad, **para** revisar la solicitud sin tener que entrar a mirar si hay alguna pendiente.
+
+Hoy una solicitud queda pendiente sin que nadie se entere: la administración solo la ve si entra en «Gestionar comunidad» → «Solicitudes».
+
+**AC1 — Aviso a la administración**
+
+- **Given** que soy administrador aprobado de una comunidad
+- **When** un vecino solicita unirse a ella
+- **Then** recibo un correo de EntreVecinos con el nombre del solicitante, el nombre de la comunidad y un enlace a sus solicitudes pendientes
+
+**AC2 — Todos los administradores, por separado**
+
+- **Given** que la comunidad tiene varios administradores
+- **When** llega una solicitud
+- **Then** cada uno recibe su propio correo, sin ver las direcciones de los demás; los miembros sin rol de administrador no reciben nada
+
+**AC3 — Sin datos de contacto del solicitante**
+
+- **Given** el correo de aviso
+- **When** lo leo
+- **Then** no incluye el correo ni el teléfono del solicitante (asumido: basta con el nombre, que ya aparece en la lista de solicitudes)
+
+**AC4 — La solicitud no depende del correo**
+
+- **Given** que el envío falla o no queda cupo de correos (HU-40 AC5)
+- **When** un vecino solicita unirse
+- **Then** la solicitud se crea igual y queda pendiente; el equipo recibe la alarma correspondiente
+
+**AC5 — Solicitante informado**
+
+- **Given** que acabo de solicitar el acceso
+- **When** veo el estado de mi solicitud
+- **Then** se me indica que la administración de la comunidad la revisará y que recibiré un correo cuando la apruebe
+
+### HU-44 Recibir un aviso por correo cuando me aceptan en una comunidad
+
+**Como** vecino que ha solicitado unirse a una comunidad, **quiero** recibir un correo cuando me aprueban, **para** empezar a ver y publicar anuncios sin tener que entrar a comprobar si ya me han aceptado.
+
+**AC1 — Aviso de aprobación**
+
+- **Given** que tengo una solicitud pendiente en una comunidad
+- **When** un administrador la aprueba
+- **Then** recibo un correo de EntreVecinos que me dice que ya soy miembro de esa comunidad, con un enlace a ella
+
+**AC2 — Solo al aprobar una solicitud**
+
+- **Given** que un administrador cambia mi membresía
+- **When** la rechaza, me bloquea, me desbloquea o me expulsa
+- **Then** no recibo ningún correo (asumido: solo se avisa de la aprobación de una solicitud pendiente)
+
+**AC3 — La aprobación no depende del correo**
+
+- **Given** que el envío falla o no queda cupo de correos (HU-40 AC5)
+- **When** un administrador aprueba mi solicitud
+- **Then** la aprobación se hace igual y ya puedo entrar en la comunidad; el equipo recibe la alarma correspondiente
 
 ---
 

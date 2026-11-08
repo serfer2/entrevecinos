@@ -87,7 +87,7 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 | `WEB_PUBLIC_URL` | Origen de los enlaces que se envían por correo; en producción, `https` | obligatoria |
 | `EMAIL_VERIFICATION_TTL_HOURS` | Caducidad del enlace de validación del correo (`> 0`) | `24` |
 | `PASSWORD_RESET_TTL_MINUTES` | Caducidad del enlace para restablecer la contraseña, en minutos (`> 0`) | `60` |
-| `EMAIL_MONTHLY_LIMIT` | Correos que la API puede enviar por periodo (registro, reenvío y restablecimiento de la contraseña); al llegar, responde `503` (`email_quota_exceeded`) sin crear nada. **Restricción de costes**: en producción, 5.000, el plan más barato de Brevo (TK-099) | `5000` |
+| `EMAIL_MONTHLY_LIMIT` | Correos que la API puede enviar por periodo (registro, reenvío, restablecimiento de la contraseña y avisos de las solicitudes de acceso y de su aprobación); al llegar, responde `503` (`email_quota_exceeded`) sin crear nada. **Restricción de costes**: en producción, 5.000, el plan más barato de Brevo (TK-099) | `5000` |
 | `EMAIL_QUOTA_RESET_DAY` | Día del mes (1-28) en que empieza cada periodo del cupo, a las 00:00 en hora de Madrid | `6` |
 
 ## Salud
