@@ -49,7 +49,11 @@ Puedes añadir adicionalmente la conversación completa como link o archivo adju
 - **Rules del proyecto:**
   - `AGENTS.md`: comandos, arquitectura, convenciones y límites, enlazado desde `CLAUDE.md`, junto con la guía de AWS para la cuenta del proyecto;
   - `openspec/config.yaml`: contexto del proyecto y reglas para cada artefacto (p. ej. que los cambios de infraestructura actualicen `infra/aws/README.md`).
-- **Herramientas de apoyo:** AWS CLI con sesión temporal (`aws login`), Terraform, Docker y `make` en contenedores. El servidor MCP de AWS no llegó a conectarse, así que se usó la AWS CLI.
+- **Herramientas de apoyo:** AWS CLI con sesión temporal (`aws login`), Terraform, Docker y `make` en contenedores.
+- **Servidor MCP de AWS:** hasta TK-084 el agente usó la AWS CLI; desde TK-085 (5 de noviembre) usa el servidor MCP de AWS. Terraform sigue aplicándose con `make tf-apply`. Usos principales:
+  - `run_script`, para consultar y operar producción: órdenes en la instancia con Run Command de SSM, búsqueda en los registros de CloudWatch al verificar cada despliegue, simulación de los permisos de IAM y validación con IAM Access Analyzer, y limpieza de imágenes de ECR;
+  - `search_documentation`, para consultar la documentación de AWS (p. ej. el plan de precio fijo de CloudFront y su WAF);
+  - `get_tasks`, para seguir las tareas largas.
 
 ### Prompts y workflows principales
 

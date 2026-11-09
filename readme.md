@@ -335,11 +335,11 @@ La seguridad de la API se aplica dentro de FastAPI, en este orden: CORS restring
 
 - **Base de datos relacional:** **PostgreSQL 16**, desplegada en un contenedor Docker. Guarda la información estructurada, como usuarios, comunidades, anuncios y mensajes. Un volumen persistente conserva los datos cuando se reinicia o recrea el contenedor.
 
-- **Almacenamiento de imágenes:** un servicio compatible con S3, como **MinIO**, almacena las fotografías de los anuncios y perfiles. Sus ficheros se conservan en un volumen persistente. PostgreSQL guarda las referencias y metadatos de cada imagen, mientras que el backend gestiona las cargas y lecturas.
+- **Almacenamiento de imágenes:** un servicio compatible con S3, como **MinIO**, almacena las fotografías de los anuncios; la foto del perfil (avatar) queda para una versión futura. Sus ficheros se conservan en un volumen persistente. PostgreSQL guarda las referencias y metadatos de cada imagen, mientras que el backend gestiona las cargas y lecturas.
 
 - **Envío de correo:** la API envía por **SMTP** los correos de la aplicación: el enlace de validación del registro, el de restablecimiento de la contraseña y su aviso, y los avisos de las solicitudes de acceso a una comunidad. En desarrollo los recoge **Mailpit**, que los muestra en `http://localhost:8025` sin enviarlos a nadie; en producción se envían con **Brevo**, un proveedor transaccional externo, con un tope propio de la API de 5.000 correos por periodo. **Amazon SES** queda configurado como vuelta atrás.
 
-- **Contenedores y red de despliegue:** **Docker** ejecuta frontend, backend, PostgreSQL y almacenamiento de imágenes en servicios separados. La base de datos y el almacenamiento deberían permanecer en una red interna, accesibles desde el backend, y no exponerse directamente a los usuarios.
+- **Contenedores y red de despliegue:** **Docker** ejecuta frontend, backend, PostgreSQL y almacenamiento de imágenes en servicios separados. La base de datos está en una red interna de Docker, accesible solo desde el backend y sin exponerse a los usuarios. El almacenamiento es privado: los navegadores solo leen las imágenes con URL prefirmadas que genera la API (MinIO en local, un bucket S3 privado en producción).
 
 ### **2.3. Descripción de alto nivel del proyecto y estructura de ficheros**
 
@@ -845,7 +845,7 @@ El modelo cubre las funciones descritas en el README: usuarios, comunidades, anu
 | `professional_profile`, `professional_service`, `professional_profile_image` | Versión futura | Perfil profesional: `/professionals…`, `/users/me/professional-profile…` |
 | `report` | Versión futura | Denuncias: `/listings/{listing_id}/reports`, `/communities/{community_id}/reports`, `/reports/{report_id}` |
 
-`GET /health` no usa ninguna entidad. Se propone para **PostgreSQL 16**. Las tablas se nombran en singular, igual que las entidades (`community`, `listing`…), salvo la de usuarios, que se llama `users` porque `user` es una palabra reservada de PostgreSQL. Los campos marcados `NOT NULL` no admiten valores nulos; `NULL` indica que el dato es opcional.
+`GET /health` no usa ninguna entidad. El modelo está implementado en **PostgreSQL 16** con migraciones de Alembic (`apps/api/migrations/`); las entidades de versiones futuras están diseñadas, pero todavía no tienen tablas. Las tablas se nombran en singular, igual que las entidades (`community`, `listing`…), salvo la de usuarios, que se llama `users` porque `user` es una palabra reservada de PostgreSQL. Los campos marcados `NOT NULL` no admiten valores nulos; `NULL` indica que el dato es opcional.
 
 #### 1. `user` — Usuario
 
@@ -914,7 +914,7 @@ La clave primaria compuesta `(community_id, user_id)` impide que un usuario teng
 - `updated_at TIMESTAMPTZ` — `NOT NULL`.
 - `deleted_at TIMESTAMPTZ` — `NULL`; borrado lógico.
 
-Restricciones recomendadas: `CHECK (price IS NULL OR price >= 0)` y exigir moneda cuando el anuncio tiene precio. Los anuncios sin precio, como los regalos, pueden dejar `price` y `currency` a `NULL`.
+Restricciones: `CHECK (price IS NULL OR price >= 0)` y `CHECK ((price IS NULL) = (currency IS NULL))`, que exige moneda cuando hay precio y la impide cuando no lo hay. Los anuncios sin precio, como los regalos, dejan `price` y `currency` a `NULL`.
 
 #### 6. `media_asset` — Fichero de imagen
 
@@ -949,7 +949,7 @@ Una conversación está vinculada a un anuncio y a sus dos participantes.
 - `created_at TIMESTAMPTZ` — `NOT NULL`.
 - `updated_at TIMESTAMPTZ` — `NOT NULL`.
 
-Restricciones recomendadas: `CHECK (buyer_id <> seller_id)` y `UNIQUE (listing_id, buyer_id, seller_id)` para evitar conversaciones duplicadas entre los mismos usuarios por el mismo anuncio.
+Restricciones previstas: `CHECK (buyer_id <> seller_id)` y `UNIQUE (listing_id, buyer_id, seller_id)` para evitar conversaciones duplicadas entre los mismos usuarios por el mismo anuncio.
 
 #### 9. `message` — Mensaje (versión futura)
 
@@ -1043,7 +1043,7 @@ Una fila por periodo y sin relaciones: es una restricción de costes, no un dato
 
 #### Tipos enumerados
 
-Se recomienda definir estos enums en PostgreSQL:
+Tipos enumerados de PostgreSQL. Los cinco primeros ya existen en la base de datos; los de versión futura se crearán con sus tablas:
 
 - `user_role`: `user`, `platform_admin`
 - `membership_role`: `member`, `community_admin`, `moderator`
@@ -1055,9 +1055,9 @@ Se recomienda definir estos enums en PostgreSQL:
 - `report_reason`: `inappropriate`, `fraud`, `prohibited_item`, `spam`, `other` (versión futura)
 - `report_status`: `pending`, `reviewing`, `resolved`, `rejected` (versión futura)
 
-#### Índices recomendados
+#### Índices
 
-Las claves primarias y restricciones `UNIQUE` crean índices automáticamente. Además, estos índices cubren las consultas más habituales:
+Las claves primarias y restricciones `UNIQUE` crean índices automáticamente. Además, las migraciones crean estos índices para las consultas más habituales; los marcados como versión futura se crearán con sus tablas:
 
 | Tabla | Índice | Uso |
 |---|---|---|
@@ -1067,6 +1067,7 @@ Las claves primarias y restricciones `UNIQUE` crean índices automáticamente. A
 | `listing` | `(community_id, type, published_at DESC)` | Filtrar anuncios por tipo |
 | `listing` | `(category_id, published_at DESC)` | Filtrar anuncios por categoría |
 | `listing` | `(price)` | Ordenar por precio |
+| `listing` | `(owner_id)` | Anuncios de un usuario |
 | `listing` | GIN sobre `title` y `description` | Búsqueda de texto completo |
 | `listing_image` | `(asset_id)` | Encontrar anuncios que referencian una imagen |
 | `conversation` | `(listing_id, buyer_id, seller_id)` | Localizar conversaciones de un anuncio (versión futura) |
@@ -1076,9 +1077,9 @@ Las claves primarias y restricciones `UNIQUE` crean índices automáticamente. A
 | `professional_service` | `(professional_profile_id, is_active)` | Listar servicios activos de un perfil (versión futura) |
 | `professional_profile_image` | `(asset_id)` | Encontrar perfiles que referencian una imagen (versión futura) |
 
-Para búsqueda de texto completo, puede crearse una columna `tsvector` generada o un índice GIN sobre una expresión `to_tsvector` que combine título y descripción. Si la mayoría de consultas solo muestran anuncios activos, pueden evaluarse índices parciales con `WHERE status = 'active'`.
+La búsqueda de texto completo usa la columna generada `search_vector` (`tsvector` con el título, que pesa más, y la descripción) y su índice GIN, con una configuración en español que ignora las tildes (`es_unaccent`). No hay índices parciales sobre los anuncios activos; se valorarán si el volumen de datos lo pide.
 
-Las reglas `ON DELETE` deben definirse explícitamente. Para anuncios y usuarios conviene considerar el borrado lógico para preservar el historial; para tablas de relación como `listing_image`, puede usarse `ON DELETE CASCADE` al eliminar el anuncio correspondiente.
+Todas las claves foráneas declaran su regla `ON DELETE`. Usuarios y anuncios usan borrado lógico (`deleted_at`) para conservar el historial, así que las referencias a ellos son `RESTRICT`. Se borran en cascada las filas que dependen de otra: imágenes de un anuncio (`listing_image`), membresías de una comunidad o de un usuario, y enlaces de validación y de restablecimiento de un usuario. `SET NULL` deja sin referencia el avatar borrado, quien revisó una membresía y quien ocultó un anuncio.
 
 ---
 

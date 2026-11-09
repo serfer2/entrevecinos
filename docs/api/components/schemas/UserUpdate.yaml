@@ -1,7 +1,10 @@
 type: object
 additionalProperties: false
 minProperties: 1
-description: Actualización parcial del perfil propio. `avatar_asset_id` se obtiene de `POST /media`; `null` elimina el avatar.
+description: >-
+  Actualización parcial del perfil propio: nombre y teléfono. Cualquier otro campo se rechaza con
+  `422`. Cambiar el avatar o la contraseña desde el perfil queda para una versión futura; la
+  contraseña se cambia con el enlace de restablecimiento (`POST /auth/password-reset`).
 properties:
   full_name:
     type: string
@@ -10,15 +13,5 @@ properties:
   phone:
     type: [string, "null"]
     maxLength: 32
-  avatar_asset_id:
-    type: [string, "null"]
-    format: uuid
-  password:
-    type: string
-    format: password
-    minLength: 12
-    maxLength: 128
-    description: Nueva contraseña; requiere `current_password`.
-  current_password:
-    type: string
-    format: password
+    pattern: '^\+?[0-9 ()-]{6,32}$'
+    description: Teléfono de contacto; `null` lo elimina.

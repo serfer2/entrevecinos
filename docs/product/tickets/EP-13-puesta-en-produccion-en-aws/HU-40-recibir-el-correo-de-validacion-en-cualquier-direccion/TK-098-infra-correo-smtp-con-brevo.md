@@ -15,7 +15,7 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 
 TK-096 elige Brevo como proveedor de correo de producción. La API ya admite SMTP con STARTTLS (`MAIL_BACKEND=smtp`, el mismo adaptador que usa Mailpit en local), así que no hay cambios de código. Hay que autenticar el dominio en Brevo, llevar las credenciales a los contenedores como el resto de secretos, permitir la salida SMTP de la instancia y cambiar la configuración de producción.
 
-Brevo solo acepta envíos por SMTP y por la API desde las IP que se le autorizan. El correo sale por la IP pública de la instancia (`16.16.213.236` el 2026-11-06), que AWS asigna automáticamente: cambia al parar y arrancar la instancia y al reemplazarla, y entonces Brevo rechazaría los envíos.
+Brevo solo acepta envíos por SMTP y por la API desde las IP que se le autorizan. El correo sale por la IP pública de la instancia, que AWS asigna automáticamente: cambia al parar y arrancar la instancia y al reemplazarla, y entonces Brevo rechazaría los envíos.
 
 **Objetivo:** que la API envíe por `smtp-relay.brevo.com:587` con STARTTLS como `no-reply@entrevecinos.org`, desde una IP fija autorizada en Brevo, con DKIM alineado con el dominio y SES intacto como vuelta atrás.
 

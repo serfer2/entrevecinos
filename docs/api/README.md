@@ -31,7 +31,7 @@ Nombres de fichero de `paths/`: los segmentos de la ruta separados por `_`, sin 
 - **Paginación:** `page` / `page_size`; respuesta `{items, page, page_size, total}` (`PageMeta` + `items`).
 - **Errores:** `{"detail": "..."}` (`Error`); 422 con el formato de validación de FastAPI (`ValidationError`).
 - **Request bodies:** `additionalProperties: false`; las actualizaciones parciales (`PATCH`) exigen `minProperties: 1`.
-- **Imágenes en dos pasos:** `POST /media` (multipart) devuelve un `id`; después se asocia a un anuncio (`PUT /listings/{listing_id}/images`), a un perfil profesional o al avatar (`PATCH /users/me`).
+- **Imágenes en dos pasos:** `POST /media` (multipart) devuelve un `id`; después se asocia a un anuncio (`PUT /listings/{listing_id}/images`) o, en una versión futura, a un perfil profesional o al avatar.
 - **Estados de anuncio:** la API expone `active`, `reserved`, `completed`, `hidden`. `draft` y `deleted` del modelo de datos son internos (un anuncio borrado responde 404).
 
 ## Cómo añadir o cambiar un endpoint
