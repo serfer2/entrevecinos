@@ -38,7 +38,8 @@ export async function reviewRequest(formData: FormData): Promise<void> {
 }
 
 /**
- * Bloquea, desbloquea o expulsa a un miembro y vuelve a la lista con el resultado en la URL
+ * Bloquea, desbloquea o expulsa a un miembro, o le cambia el rol (`platform_admin`, HU-45), y
+ * vuelve a la lista con el resultado en la URL
  * (`resultado` + `nombre`, o `error` con un código del 409).
  */
 export async function manageMember(formData: FormData): Promise<void> {
@@ -53,12 +54,12 @@ export async function manageMember(formData: FormData): Promise<void> {
     redirect(membersPath(communityId, { error: "error" }));
   }
 
-  const { status, done } = MEMBER_ACTIONS[action as MemberAction];
+  const { body, done } = MEMBER_ACTIONS[action as MemberAction];
   const path = `/communities/${communityId}/memberships/${userId}`;
   const result =
-    status === null
+    body === null
       ? await userApiFetch<null>(path, { method: "DELETE" })
-      : await userApiFetch<ApiMembership>(path, { method: "PATCH", body: { status } });
+      : await userApiFetch<ApiMembership>(path, { method: "PATCH", body });
 
   revalidatePath(membersPath(communityId));
   if (result.ok) redirect(membersPath(communityId, { resultado: done, nombre: name }));

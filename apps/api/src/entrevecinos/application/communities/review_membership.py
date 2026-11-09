@@ -80,6 +80,44 @@ class ChangeMembershipStatus:
         return MembershipChange(detail=detail, previous=current)
 
 
+# Roles que el `platform_admin` puede asignar (HU-45); `moderator` no tiene historia.
+ASSIGNABLE_ROLES = frozenset({MembershipRole.MEMBER, MembershipRole.COMMUNITY_ADMIN})
+
+
+class ChangeMembershipRole:
+    """Nombra o quita administradores de una comunidad (HU-45). Solo `platform_admin`."""
+
+    def __init__(self, access: CommunityAccess, memberships: MembershipRepository) -> None:
+        self._access = access
+        self._memberships = memberships
+
+    def execute(
+        self, actor: User, community_id: uuid.UUID, user_id: uuid.UUID, role: MembershipRole
+    ) -> MembershipDetail:
+        # `require_role` da el 404 de la comunidad; el cambio de rol es solo de la plataforma.
+        self._access.require_role(actor, community_id, COMMUNITY_ADMINS)
+        if actor.platform_role is not PlatformRole.PLATFORM_ADMIN:
+            raise PermissionDenied
+        if role not in ASSIGNABLE_ROLES:
+            raise MembershipChangeRejected(MembershipChangeRejected.NOT_ALLOWED)
+
+        membership = self._memberships.get(community_id, user_id)
+        if membership is None:
+            raise MembershipNotFound
+        if not membership.is_approved:
+            raise MembershipChangeRejected(MembershipChangeRejected.ONLY_APPROVED)
+        if membership.role is not role:
+            demotes_admin = membership.role is MembershipRole.COMMUNITY_ADMIN
+            if demotes_admin and self._memberships.count_admins(community_id, lock=True) <= 1:
+                raise MembershipChangeRejected(MembershipChangeRejected.LAST_ADMIN)
+            return self._memberships.set_role(community_id, user_id, role)
+
+        detail = self._memberships.get_detail(community_id, user_id)  # mismo rol: sin cambios
+        if detail is None:
+            raise MembershipNotFound
+        return detail
+
+
 class RemoveMembership:
     """Expulsión (un administrador elimina la membresía de otro) o salida (la propia).
 

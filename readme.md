@@ -167,6 +167,7 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Avisar por correo a los administradores de la comunidad cuando alguien solicita unirse, con un enlace a las solicitudes pendientes, y al solicitante cuando lo aprueban.
    - Las comunidades nuevas quedan pendientes hasta que un administrador de la plataforma las aprueba; las que crea él quedan activas al momento. Cada usuario puede tener solo una comunidad pendiente a la vez.
    - El administrador de la plataforma accede a cualquier comunidad sin solicitar acceso: ve sus anuncios, publica en ella y la gestiona.
+   - Quien crea una comunidad queda como su administrador; el administrador de la plataforma puede nombrar administradores a otros miembros aprobados, o quitarles el rol, desde la gestión de miembros (siempre queda al menos uno).
 3. **Gestión de anuncios**
    - Crear, editar y eliminar anuncios propios.
    - Marcar los anuncios propios como reservados o finalizados.

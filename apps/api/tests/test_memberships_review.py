@@ -129,7 +129,16 @@ def test_unknown_membership_or_community(client: TestClient, admin: dict, commun
     assert memberships(client, admin, str(uuid.uuid4())).status_code == 404
 
 
-@pytest.mark.parametrize("body", [{"status": "pending"}, {"role": "moderator"}, {}])
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"status": "pending"},
+        {"role": "moderator"},
+        {"status": "approved", "role": "community_admin"},
+        {"status": None, "role": None},
+        {},
+    ],
+)
 def test_unsupported_changes_are_rejected(
     client: TestClient, admin: dict, applicant: dict, community: dict, body: dict
 ) -> None:

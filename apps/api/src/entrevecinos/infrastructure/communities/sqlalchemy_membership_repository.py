@@ -119,19 +119,31 @@ class SqlAlchemyMembershipRepository:
         )
         return PageResult(items=[detail_to_domain(m, u) for m, u in rows], total=total or 0)
 
-    def count_admins(self, community_id: uuid.UUID) -> int:
+    def count_admins(self, community_id: uuid.UUID, lock: bool = False) -> int:
+        admins = (
+            CommunityMembershipModel.community_id == community_id,
+            CommunityMembershipModel.role == MembershipRole.COMMUNITY_ADMIN,
+            CommunityMembershipModel.status == MembershipStatus.APPROVED,
+        )
+        if lock:
+            # `FOR UPDATE` no admite agregados: se bloquean las filas y se cuentan.
+            query = select(CommunityMembershipModel.user_id).where(*admins).with_for_update()
+            return len(self._session.scalars(query).all())
         return (
             self._session.scalar(
-                select(func.count())
-                .select_from(CommunityMembershipModel)
-                .where(
-                    CommunityMembershipModel.community_id == community_id,
-                    CommunityMembershipModel.role == MembershipRole.COMMUNITY_ADMIN,
-                    CommunityMembershipModel.status == MembershipStatus.APPROVED,
-                )
+                select(func.count()).select_from(CommunityMembershipModel).where(*admins)
             )
             or 0
         )
+
+    def set_role(
+        self, community_id: uuid.UUID, user_id: uuid.UUID, role: MembershipRole
+    ) -> MembershipDetail:
+        model = self._session.get_one(CommunityMembershipModel, (community_id, user_id))
+        model.role = role
+        self._session.flush()
+        self._session.refresh(model)
+        return detail_to_domain(model, self._session.get_one(UserModel, user_id))
 
     def delete(self, community_id: uuid.UUID, user_id: uuid.UUID) -> None:
         self._session.execute(

@@ -7,6 +7,7 @@ from entrevecinos.domain.communities.entities import (
     CommunitySearch,
     Membership,
     MembershipDetail,
+    MembershipRole,
     MembershipStatus,
     MyMembership,
     NewCommunity,
@@ -65,8 +66,18 @@ class MembershipRepository(Protocol):
         (pendientes, miembros, bloqueados, rechazados) y nombre."""
         ...
 
-    def count_admins(self, community_id: uuid.UUID) -> int:
-        """Administradores de la comunidad con membresía aprobada."""
+    def count_admins(self, community_id: uuid.UUID, lock: bool = False) -> int:
+        """Administradores de la comunidad con membresía aprobada.
+
+        Con `lock`, bloquea sus filas hasta el final de la transacción para que dos cambios
+        simultáneos no dejen la comunidad sin administrador.
+        """
+        ...
+
+    def set_role(
+        self, community_id: uuid.UUID, user_id: uuid.UUID, role: MembershipRole
+    ) -> MembershipDetail:
+        """Fija el rol de una membresía existente sin tocar su estado ni su revisión."""
         ...
 
     def list_admin_recipients(self, community_id: uuid.UUID) -> list[User]:

@@ -254,6 +254,30 @@ class InMemoryMembershipRepository:
     def get(self, community_id: uuid.UUID, user_id: uuid.UUID) -> Membership | None:
         return self.memberships.get((community_id, user_id))
 
+    def get_detail(self, community_id: uuid.UUID, user_id: uuid.UUID) -> MembershipDetail | None:
+        membership = self.get(community_id, user_id)
+        if membership is None:
+            return None
+        return MembershipDetail(membership, MemberSummary(id=user_id, full_name="Vecino"))
+
+    def count_admins(self, community_id: uuid.UUID, lock: bool = False) -> int:
+        return sum(
+            1
+            for (c, _), m in self.memberships.items()
+            if c == community_id
+            and m.role is MembershipRole.COMMUNITY_ADMIN
+            and m.status is MembershipStatus.APPROVED
+        )
+
+    def set_role(
+        self, community_id: uuid.UUID, user_id: uuid.UUID, role: MembershipRole
+    ) -> MembershipDetail:
+        key = (community_id, user_id)
+        self.memberships[key] = dataclasses.replace(self.memberships[key], role=role)
+        detail = self.get_detail(community_id, user_id)
+        assert detail is not None
+        return detail
+
     def add_request(self, community_id: uuid.UUID, user_id: uuid.UUID) -> MembershipDetail:
         if existing := self.get(community_id, user_id):
             raise MembershipAlreadyExists(existing.status)

@@ -41,6 +41,7 @@ class MembershipChangeRejected(Exception):
     CANNOT_CHANGE_SELF = "No puedes cambiar el estado de tu propia membresía."
     NOT_ALLOWED = "Cambio de estado no permitido."
     LAST_ADMIN = "La comunidad debe tener al menos un administrador."
+    ONLY_APPROVED = "Solo se puede cambiar el rol de un miembro aprobado."
 
     def __init__(self, detail: str) -> None:
         super().__init__(detail)
