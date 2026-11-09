@@ -54,7 +54,10 @@ from entrevecinos.infrastructure.users.sqlalchemy_password_reset_repository impo
 )
 from entrevecinos.infrastructure.users.sqlalchemy_user_repository import SqlAlchemyUserRepository
 
-SessionDep = Annotated[Session, Depends(get_session)]
+# scope="function": la transacción se confirma al terminar el endpoint, antes de responder y antes
+# de las tareas en segundo plano. Con el ámbito por defecto se confirmaría después de enviar los
+# correos, y la web leería los datos sin confirmar al recargar (p. ej. «Solicitar acceso»).
+SessionDep = Annotated[Session, Depends(get_session, scope="function")]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
