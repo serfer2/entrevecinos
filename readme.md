@@ -192,7 +192,31 @@ Quedan para una fase posterior el perfil profesional, las notificaciones dentro 
 
 ### **1.3. Diseño y experiencia de usuario:**
 
-**Pendiente** (imágenes y videotutorial). Se proporcionará una vez completado el desarrollo del frontend.
+#### Videotutorial
+
+[![Videotutorial de EntreVecinos en YouTube](https://img.youtube.com/vi/I5iq3hn12h0/hqdefault.jpg)](https://youtu.be/I5iq3hn12h0)
+
+Recorrido por la aplicación en producción: [https://youtu.be/I5iq3hn12h0](https://youtu.be/I5iq3hn12h0).
+
+#### Capturas de pantalla
+
+**Inicio de sesión** (`/iniciar-sesion`): acceso con correo y contraseña, enlace para recuperar la contraseña olvidada y para registrarse.
+
+![Inicio de sesión](docs/images/login.png)
+
+**Anuncios de una comunidad** (`/comunidades/{id}`): tarjetas con fotografía, tipo, título y precio; búsqueda, filtros por tipo y categoría y orden agrupados en un panel; acciones para publicar un anuncio y, para quien la administra, gestionar la comunidad.
+
+![Listado de anuncios de una comunidad](docs/images/listado_de_anuncios_comunidad.png)
+
+**Publicar un anuncio** (`/comunidades/{id}/anuncios/nuevo`): título, descripción, categoría, tipo de anuncio, precio opcional y hasta 10 fotografías, que se pueden reordenar (la primera es la portada).
+
+![Formulario para publicar un anuncio](docs/images/publicar_anuncio.png)
+
+**Detalle de un anuncio** (`/anuncios/{id}`): fotografía ampliable a pantalla completa, tipo, categoría, título, precio, fecha de publicación y descripción, con los datos del anunciante y el botón para contactar con él. Sus administradores y moderadores, y el administrador de la plataforma, ven además «Ocultar anuncio».
+
+![Detalle de un anuncio](docs/images/anuncio.png)
+
+#### Identidad visual y usabilidad
 
 La Épica 11 (HU-28 a HU-32, TK-066 a TK-072) fija la identidad visual y mejora el uso de la web:
 
