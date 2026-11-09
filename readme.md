@@ -113,6 +113,7 @@ EntreVecinos combina las características de un **marketplace**, un **tablón de
 - Incorporación de usuarios a una comunidad.
 - Asociación de las publicaciones a las comunidades correspondientes.
 - Herramientas para que los administradores de comunidad aprueben solicitudes de acceso, gestionen usuarios y moderen publicaciones.
+- El administrador de la plataforma recibe un aviso por correo de cada comunidad nueva, la aprueba o la rechaza, gestiona cualquier comunidad y decide quién la administra: puede nombrar administradores a otros miembros o quitarles el rol.
 
 #### Publicaciones y anuncios
 
@@ -165,7 +166,8 @@ El MVP debe permitir que un vecino publique una oferta o necesidad dentro de su 
    - Permitir que sus miembros vean los anuncios asociados a ella.
    - Incluir una gestión sencilla de acceso, por ejemplo, aprobación por parte de un administrador.
    - Avisar por correo a los administradores de la comunidad cuando alguien solicita unirse, con un enlace a las solicitudes pendientes, y al solicitante cuando lo aprueban.
-   - Las comunidades nuevas quedan pendientes hasta que un administrador de la plataforma las aprueba; las que crea él quedan activas al momento. Cada usuario puede tener solo una comunidad pendiente a la vez.
+   - Avisar por correo a los administradores de la plataforma cuando un vecino crea una comunidad, con los datos de la comunidad y de quien la crea y un enlace para aprobarla o rechazarla.
+   - Las comunidades nuevas quedan pendientes hasta que un administrador de la plataforma las aprueba; las que crea él quedan activas al momento. Cada usuario puede tener solo una comunidad pendiente a la vez. Si el administrador de la plataforma la rechaza, se elimina y su creador puede crear otra.
    - El administrador de la plataforma accede a cualquier comunidad sin solicitar acceso: ve sus anuncios, publica en ella y la gestiona.
    - Quien crea una comunidad queda como su administrador; el administrador de la plataforma puede nombrar administradores a otros miembros aprobados, o quitarles el rol, desde la gestión de miembros (siempre queda al menos uno).
 3. **Gestión de anuncios**
@@ -235,7 +237,7 @@ Construye las imágenes de la web y la API, levanta PostgreSQL, MinIO (imágenes
 **3. Datos iniciales.** Las migraciones crean el esquema y las 10 categorías de anuncios; no hay más datos de ejemplo. Para probar:
 
 1. Regístrate en http://localhost:3000/registro y abre el enlace de validación que llega a Mailpit.
-2. Para tener un administrador de plataforma, que aprueba comunidades y entra en todas, promueve tu cuenta:
+2. Para tener un administrador de plataforma, que aprueba comunidades, entra en todas y nombra a sus administradores, promueve tu cuenta:
 
    ```bash
    docker compose --env-file .env -f infra/docker-compose.yml exec db \
@@ -834,13 +836,13 @@ El modelo cubre las funciones descritas en el README: usuarios, comunidades, anu
 | `user` | MVP | `POST /auth/register`, `POST /auth/token`, `GET/PATCH /users/me`, `GET /users/me/memberships`. Versión futura: `DELETE /users/me`, `GET /users/me/listings`, `/admin/users` |
 | `email_verification` | MVP | `POST /auth/email-verification`, `POST /auth/email-verification/resend` |
 | `password_reset` | MVP | `POST /auth/password-reset`, `POST /auth/password-reset/confirm` |
-| `community` | MVP | `GET/POST /communities`, `GET /communities/{community_id}`, `GET /admin/communities`, `PATCH /admin/communities/{community_id}`. Versión futura: `PATCH /communities/{community_id}` |
+| `community` | MVP | `GET/POST /communities`, `GET /communities/{community_id}`, `GET /admin/communities`, `PATCH/DELETE /admin/communities/{community_id}`. Versión futura: `PATCH /communities/{community_id}` |
 | `community_membership` | MVP | `GET/POST /communities/{community_id}/memberships`, `PATCH/DELETE /communities/{community_id}/memberships/{user_id}` |
 | `category` | MVP | `GET /categories`. Versión futura: `POST /categories`, `PATCH /categories/{category_id}` |
 | `listing` | MVP | `GET/POST /communities/{community_id}/listings`, `GET/PATCH/DELETE /listings/{listing_id}`, `PATCH /listings/{listing_id}/status` |
 | `media_asset` | MVP | `POST /media`, `GET /media/{asset_id}`. Versión futura: `DELETE /media/{asset_id}` |
 | `listing_image` | MVP | `PUT /listings/{listing_id}/images` |
-| `email_quota` | MVP | Ninguna propia: la usan las que envían correo (`POST /auth/register`, `POST /auth/email-verification/resend`, `POST /auth/password-reset`, `POST /auth/password-reset/confirm`, `POST /communities/{community_id}/memberships` y `PATCH /communities/{community_id}/memberships/{user_id}`) |
+| `email_quota` | MVP | Ninguna propia: la usan las que envían correo (`POST /auth/register`, `POST /auth/email-verification/resend`, `POST /auth/password-reset`, `POST /auth/password-reset/confirm`, `POST /communities`, `POST /communities/{community_id}/memberships` y `PATCH /communities/{community_id}/memberships/{user_id}`) |
 | `conversation`, `message` | Versión futura | Mensajería: `/listings/{listing_id}/conversations`, `/conversations…`, `/messages/{message_id}` |
 | `notification` | Versión futura | Notificaciones: `/notifications…` |
 | `professional_profile`, `professional_service`, `professional_profile_image` | Versión futura | Perfil profesional: `/professionals…`, `/users/me/professional-profile…` |
@@ -1701,7 +1703,7 @@ components:
 
 He utilizado `openspec` junto con Claude para elaborar las historias de usuario
 
-Las historias completas del MVP (18 historias en 6 épicas) están en [`docs/product/user-stories.md`](docs/product/user-stories.md). Se seleccionan tres que cubren el recorrido principal del MVP: publicar, encontrar y contactar.
+Las historias completas (48 historias en 14 épicas: las del MVP de la §1.2 y las que lo han ido mejorando, como la puesta en producción, la recuperación de la contraseña, los avisos por correo o el nombramiento de administradores de comunidad) están en [`docs/product/user-stories.md`](docs/product/user-stories.md). Se seleccionan tres que cubren el recorrido principal del MVP: publicar, encontrar y contactar.
 
 ### **Historia de Usuario 1** — HU-07 Publicar un anuncio
 

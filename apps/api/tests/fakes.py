@@ -16,7 +16,11 @@ from entrevecinos.domain.communities.entities import (
     MyMembership,
     NewCommunity,
 )
-from entrevecinos.domain.communities.errors import MembershipAlreadyExists, PendingCommunityExists
+from entrevecinos.domain.communities.errors import (
+    CommunityNotPending,
+    MembershipAlreadyExists,
+    PendingCommunityExists,
+)
 from entrevecinos.domain.users.entities import (
     EmailVerification,
     NewUser,
@@ -37,6 +41,14 @@ class InMemoryUserRepository:
 
     def get_by_email(self, email: str) -> User | None:
         return next((u for u in self.users.values() if u.email == email), None)
+
+    def list_platform_admins(self) -> list[User]:
+        admins = (
+            u
+            for u in self.users.values()
+            if u.platform_role is PlatformRole.PLATFORM_ADMIN and u.can_authenticate
+        )
+        return sorted(admins, key=lambda u: u.full_name)
 
     def get_credentials(self, email: str) -> tuple[User, str] | None:
         user = self.get_by_email(email)
@@ -226,6 +238,17 @@ class InMemoryCommunityRepository:
             self.communities[community_id], is_active=True
         )
         return self.communities[community_id]
+
+    def delete_pending(self, community_id: uuid.UUID) -> Community | None:
+        community = self.communities.get(community_id)
+        if community is None:
+            return None
+        if community.is_active:
+            raise CommunityNotPending
+        del self.communities[community_id]
+        for key in [k for k in self.memberships if k[0] == community_id]:
+            del self.memberships[key]
+        return community
 
 
 class InMemoryMembershipRepository:

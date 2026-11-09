@@ -26,6 +26,10 @@ class UserRepository(Protocol):
 
     def get_by_email(self, email: str) -> User | None: ...
 
+    def list_platform_admins(self) -> list[User]:
+        """Administradores de plataforma con la cuenta activa y no borrada, por nombre (TK-111)."""
+        ...
+
     def get_credentials(self, email: str) -> tuple[User, str] | None:
         """Usuario y hash de su contraseña, o `None` si el correo no existe."""
         ...

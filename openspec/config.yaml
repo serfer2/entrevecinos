@@ -79,3 +79,4 @@ rules:
     - Incluir las pruebas en la tarea que implementa el comportamiento ("…, con pruebas").
     - La verificación final ejecuta lint, typecheck y tests en contenedores.
     - Si el change toca las rutas de infraestructura, incluir en el grupo Documentación una tarea que actualice infra/aws/README.md (guía, runbook, costes o decisiones, según corresponda).
+    - Si el change añade o cambia funcionalidad, incluir en el grupo Documentación una tarea que actualice readme.md (§1.2 y MVP; §3.2 si cambian las operaciones de una entidad), el README de la app afectada (apps/api/README.md o apps/web/README.md) y, si cambia un rol o un alcance, docs/product/user-stories.md.

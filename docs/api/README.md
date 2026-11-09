@@ -89,6 +89,8 @@ Cambios del contrato durante el desarrollo del MVP (compatibles salvo que se ind
 | TK-106 | `requestMembership`: avisa por correo a cada `community_admin` aprobado de la comunidad (consume cupo). Sin cambios de esquema ni de respuestas. |
 | TK-108 | `updateMembership`: al aprobar una solicitud `pending`, avisa por correo al vecino (consume cupo). Sin cambios de esquema ni de respuestas. |
 | TK-109 | `updateMembership`: `role` (`member` ↔ `community_admin`) solo para `platform_admin` y membresías aprobadas; `status` o `role`, no ambos (`MembershipUpdate.oneOf`); `409` (`Conflict`) documentado para membresía no aprobada, último administrador y transiciones no permitidas. Antes, solo un `community_admin` asignaba el rol. |
+| TK-112 | Nuevo `adminRejectCommunity` (`DELETE /admin/communities/{community_id}`, `x-mvp: true`): solo `platform_admin`; elimina una comunidad pendiente y la membresía de su creador (`204`); una activa → `409`. Compatible: una operación nueva. |
+| TK-111 | `createCommunity`: al crear una comunidad pendiente, avisa por correo a cada `platform_admin` con los datos de la comunidad y del creador (consume cupo). Sin cambios de esquema ni de respuestas. |
 
 ## Resumen de endpoints
 
@@ -103,10 +105,10 @@ El contrato tiene 61 operaciones: 29 del MVP (`x-mvp: true`) y 32 de versiones f
 | Usuarios | `GET/PATCH /users/me`, `GET /users/me/memberships` |
 | Categorías | `GET /categories` |
 | Comunidades | `GET/POST /communities`, `GET /communities/{community_id}` |
-| Membresías | `GET/POST /communities/{community_id}/memberships`, `PATCH/DELETE .../memberships/{user_id}` |
+| Membresías | `GET/POST /communities/{community_id}/memberships`, `PATCH/DELETE .../memberships/{user_id}` (revisar solicitudes, bloquear, expulsar y, el `platform_admin`, cambiar el rol) |
 | Anuncios | `GET/POST /communities/{community_id}/listings`, `GET/PATCH/DELETE /listings/{listing_id}`, `PATCH .../status`, `PUT .../images` |
 | Media | `POST /media`, `GET /media/{asset_id}` |
-| Administración | `GET /admin/communities`, `PATCH /admin/communities/{community_id}` (aprobación de comunidades) |
+| Administración | `GET /admin/communities`, `PATCH /admin/communities/{community_id}` (aprobar) y `DELETE /admin/communities/{community_id}` (rechazar una pendiente) |
 
 ### Versiones futuras
 

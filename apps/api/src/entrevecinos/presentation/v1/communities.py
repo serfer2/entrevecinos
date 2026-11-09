@@ -18,6 +18,7 @@ from entrevecinos.application.communities.search_communities import SearchCommun
 from entrevecinos.domain.communities.entities import CommunitySearch, MembershipStatus
 from entrevecinos.presentation.dependencies import (
     CommunityAccessDep,
+    CommunityNoticesDep,
     CommunityRepositoryDep,
     CurrentUserDep,
     EmailSenderDep,
@@ -84,14 +85,23 @@ def list_communities(
         "El creador queda registrado como `community_admin` con membresía `approved`. La "
         "comunidad se crea pendiente de aprobación (`is_active: false`), salvo si la crea un "
         "`platform_admin`, que la crea activa. Cada usuario puede tener solo una comunidad "
-        "pendiente: si ya tiene una, responde 409. Requiere estar autenticado."
+        "pendiente: si ya tiene una, responde 409. Al crear una comunidad pendiente avisa por "
+        "correo a cada `platform_admin` con sus datos y los del creador (una plaza del cupo por "
+        "correo; sin cupo, se crea igual y no se avisa). Requiere estar autenticado."
     ),
     responses={**UNAUTHORIZED, **CONFLICT, **VALIDATION_ERROR},
 )
 def create_community(
-    body: CommunityCreateRequest, user: CurrentUserDep, communities: CommunityRepositoryDep
+    body: CommunityCreateRequest,
+    user: CurrentUserDep,
+    communities: CommunityRepositoryDep,
+    notices: CommunityNoticesDep,
+    sender: EmailSenderDep,
+    background_tasks: BackgroundTasks,
 ) -> CommunityResponse:
     community = CreateCommunity(communities).execute(body.to_domain(), creator=user)
+    for message in notices.community_created(community, user):
+        background_tasks.add_task(send_in_background, sender, message)
     return CommunityResponse.from_domain(community)
 
 

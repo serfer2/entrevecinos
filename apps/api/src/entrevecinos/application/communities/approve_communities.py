@@ -26,6 +26,23 @@ class ListAllCommunities:
         return self._communities.list_all(is_active, page)
 
 
+class RejectCommunity:
+    """Rechaza una comunidad pendiente eliminándola, con la membresía de su creador (HU-47).
+
+    El creador puede crear otra después. Una comunidad activa no se puede rechazar (409).
+    """
+
+    def __init__(self, communities: CommunityRepository) -> None:
+        self._communities = communities
+
+    def execute(self, user: User, community_id: uuid.UUID) -> Community:
+        _require_platform_admin(user)
+        community = self._communities.delete_pending(community_id)
+        if community is None:
+            raise CommunityNotFound
+        return community
+
+
 class ApproveCommunity:
     """Activa una comunidad pendiente. Aprobar una ya activa no cambia nada."""
 

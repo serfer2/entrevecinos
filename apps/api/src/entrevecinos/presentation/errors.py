@@ -4,6 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from entrevecinos.domain.communities.errors import (
+    CommunityNotPending,
     MembershipAlreadyExists,
     MembershipAlreadyReviewed,
     MembershipChangeRejected,
@@ -196,6 +197,13 @@ async def membership_already_exists_handler(
     )
 
 
+async def community_not_pending_handler(request: Request, exc: CommunityNotPending) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={"detail": "Solo se pueden rechazar comunidades pendientes de aprobación."},
+    )
+
+
 async def pending_community_exists_handler(
     request: Request, exc: PendingCommunityExists
 ) -> JSONResponse:
@@ -307,6 +315,7 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(NotFoundError, not_found_handler)
     app.add_exception_handler(MembershipAlreadyExists, membership_already_exists_handler)
     app.add_exception_handler(PendingCommunityExists, pending_community_exists_handler)
+    app.add_exception_handler(CommunityNotPending, community_not_pending_handler)
     app.add_exception_handler(PermissionDenied, permission_denied_handler)
     app.add_exception_handler(ImageTooLarge, image_too_large_handler)
     app.add_exception_handler(UnsupportedImageType, unsupported_image_type_handler)

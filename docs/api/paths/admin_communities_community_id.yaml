@@ -30,3 +30,26 @@ patch:
       $ref: ../components/responses/NotFound.yaml
     "422":
       $ref: ../components/responses/ValidationError.yaml
+delete:
+  tags: [Administración]
+  operationId: adminRejectCommunity
+  summary: Rechazar una comunidad pendiente
+  description: >-
+    Solo `platform_admin`. Elimina una comunidad pendiente de aprobación (`is_active: false`) y la
+    membresía de su creador, que deja de verla en sus comunidades y puede crear otra. No se puede
+    deshacer. Una comunidad activa responde 409: desactivar o borrar comunidades activas no forma
+    parte del MVP.
+  x-mvp: true
+  responses:
+    "204":
+      description: Comunidad rechazada y eliminada.
+    "401":
+      $ref: ../components/responses/Unauthorized.yaml
+    "403":
+      $ref: ../components/responses/Forbidden.yaml
+    "404":
+      $ref: ../components/responses/NotFound.yaml
+    "409":
+      $ref: ../components/responses/Conflict.yaml
+    "422":
+      $ref: ../components/responses/ValidationError.yaml

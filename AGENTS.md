@@ -106,6 +106,7 @@ styles/       globals.css: tema (@theme), paletas y estilos base
 - **Estilo:** imita el código de alrededor (nombres, densidad de comentarios, estructura). Python: ruff, línea de 100. TypeScript: ESLint de Next y alias `@/*`.
 - **Pruebas:** todo cambio de comportamiento lleva pruebas. API en `apps/api/tests/`; web junto al código (`*.test.ts(x)`).
 - **Contrato:** si cambia una petición o respuesta de la API, actualiza `docs/api/openapi.yaml`.
+- **Documentación funcional:** toda funcionalidad nueva o cambiada queda documentada en el mismo cambio: `readme.md` (§1.2 y MVP; §3.2 si cambian las operaciones de una entidad), el README de la app afectada (`apps/api/README.md`, `apps/web/README.md`) y, si cambia un rol o el alcance, `docs/product/user-stories.md`. Cada ticket lo recoge en su definición de terminado.
 - **Esquema:** cualquier cambio de modelo lleva una migración Alembic revisada a mano, con `downgrade()`.
 - **Infraestructura:** si cambias `infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`, actualiza `infra/aws/README.md` en el mismo cambio (guía, *runbook*, costes y, si cambia una decisión, «Decisiones de arquitectura»).
 - **Dependencias:** se añaden con uv o npm dentro de contenedores (ver los README de cada app) y se versionan los *lockfiles*.

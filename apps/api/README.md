@@ -111,8 +111,9 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 
 ## Comunidades
 
-- `POST /v1/communities` crea la comunidad; el creador queda como `community_admin` con membresía `approved` (misma transacción).
+- `POST /v1/communities` crea la comunidad; el creador queda como `community_admin` con membresía `approved` (misma transacción). Si queda pendiente, `CommunityNotices` (HU-46) prepara un aviso por correo para cada `platform_admin` activo (`UserRepository.list_platform_admins`), con los datos de la comunidad y del creador (incluidos su correo y su teléfono) y el enlace `/admin/comunidades#comunidad-<id>`. Cada aviso reserva una plaza del cupo; sin cupo no se prepara ninguno más. Se envían con `BackgroundTasks` tras confirmar la transacción.
 - `GET /v1/communities/{community_id}` devuelve una comunidad activa a cualquier usuario autenticado.
+- Aprobación (`/v1/admin/communities`, solo `platform_admin`, `approve_communities.py`): `GET` lista todas (filtro `is_active`), `PATCH` con `is_active: true` aprueba (`ApproveCommunity`) y `DELETE` rechaza una pendiente (`RejectCommunity`, HU-47). Rechazar elimina la comunidad y, en cascada, la membresía de su creador, que puede crear otra; `delete_pending` bloquea la fila (`FOR UPDATE`) para no borrar una comunidad que se está aprobando. Una activa → `409`; inexistente → `404`.
 
 - `GET /v1/communities` busca comunidades activas: `q` (nombre o descripción), `city` y `postal_code` (prefijo), sin distinguir mayúsculas ni tildes (`f_unaccent`, migración `0003`; helpers en `infrastructure/db/text_search.py`).
 - `POST /v1/communities/{id}/memberships` crea una solicitud `pending`. Si ya existe una membresía en cualquier estado responde `409 {"detail": …, "status": "<estado>"}`.
@@ -120,6 +121,7 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 
 - `GET /v1/communities/{id}/memberships` (gestores: `community_admin`, `moderator`, `platform_admin`) y `PATCH /v1/communities/{id}/memberships/{user_id}` (`community_admin`, `platform_admin`) revisan las solicitudes: solo `pending → approved | rejected`; otra transición → `409`.
 
+- Cambio de rol (`ChangeMembershipRole`, HU-45): `PATCH …/memberships/{user_id}` con `{"role": "member" | "community_admin"}`, solo `platform_admin` (`403` para el resto, también para un `community_admin`) y solo sobre membresías `approved` (`409`). El cuerpo lleva `status` o `role`, no ambos (`422`); `moderator` → `422`. Quitar el rol al último administrador → `409`: `count_admins(lock=True)` bloquea las filas de administradores (`FOR UPDATE`) para que dos cambios simultáneos no dejen la comunidad sin administrador. No envía correo.
 - Gestión de miembros (`ChangeMembershipStatus`, `RemoveMembership`): bloquear (`approved → blocked`) y desbloquear (`blocked → approved`, conserva `joined_at`); no se puede bloquear a un administrador ni a uno mismo (`409`). `DELETE …/memberships/{user_id}` expulsa (o sale, si es la propia); nunca deja la comunidad sin administrador (`409`). El bloqueado no puede volver a solicitar el acceso; el expulsado sí.
 - Los anuncios de autores sin membresía aprobada (bloqueados o expulsados) no se muestran: `OWNER_IS_MEMBER` en el filtro del listado y `Listing.owner_is_member` en `ListingVisibility` (solo los ven el autor y los gestores). Se calcula al consultar, sin cambiar el estado del anuncio.
 
