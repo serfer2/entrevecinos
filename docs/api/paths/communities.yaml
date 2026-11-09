@@ -54,8 +54,10 @@ post:
     con `is_active: false`, pendiente de aprobación por un `platform_admin` (`PATCH
     /admin/communities/{community_id}`): hasta entonces no aparece en las búsquedas ni admite
     solicitudes ni anuncios. Las que crea un `platform_admin` se crean con `is_active: true`. Cada
-    usuario puede tener solo una comunidad pendiente: si ya tiene una, responde 409. Requiere estar
-    autenticado.
+    usuario puede tener solo una comunidad pendiente: si ya tiene una, responde 409. Al crear una
+    comunidad pendiente, avisa por correo a cada `platform_admin` con los datos de la comunidad y de
+    su creador, y un enlace a `/admin/comunidades` (una plaza del cupo de correos por aviso; sin
+    cupo, se crea igual y no se avisa). Requiere estar autenticado.
   x-mvp: true
   requestBody:
     required: true

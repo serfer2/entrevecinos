@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import exists, func, or_, select
+from sqlalchemy import delete, exists, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,7 @@ from entrevecinos.domain.communities.entities import (
     MembershipStatus,
     NewCommunity,
 )
-from entrevecinos.domain.communities.errors import PendingCommunityExists
+from entrevecinos.domain.communities.errors import CommunityNotPending, PendingCommunityExists
 from entrevecinos.infrastructure.db.models import CommunityMembershipModel, CommunityModel
 from entrevecinos.infrastructure.db.text_search import contains_text, starts_with_text
 
@@ -135,3 +135,15 @@ class SqlAlchemyCommunityRepository:
         self._session.flush()
         self._session.refresh(model)
         return community_to_domain(model)
+
+    def delete_pending(self, community_id: uuid.UUID) -> Community | None:
+        model = self._session.get(CommunityModel, community_id, with_for_update=True)
+        if model is None:
+            return None
+        if model.is_active:
+            raise CommunityNotPending
+        community = community_to_domain(model)
+        # Las membresías se borran en cascada en la base de datos (`ON DELETE CASCADE`).
+        self._session.execute(delete(CommunityModel).where(CommunityModel.id == community_id))
+        self._session.expire_all()
+        return community

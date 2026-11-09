@@ -13,7 +13,7 @@ Historias del MVP definido en la sección 1.2 del `readme.md`. Las inferencias q
 
 ## Fuera de alcance
 
-No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Las entidades y operaciones de la API de estas funcionalidades están marcadas como versión futura en el modelo de datos (`readme.md` §3.2) y en el contrato (`x-mvp: false` en `docs/api/`). La recuperación de la contraseña sí forma parte del MVP (Épica 14): sin ella, quien olvida su contraseña pierde el acceso a su cuenta. También los avisos por correo de las solicitudes de acceso: a la administración de la comunidad cuando alguien solicita unirse (HU-43) y al solicitante cuando lo aprueban (HU-44); sin ellos, las solicitudes quedan pendientes sin que nadie se entere. Las notificaciones dentro de la aplicación siguen fuera del MVP.
+No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificaciones automáticas, sistema completo de denuncias, panel avanzado de administración y mensajería interna. Las entidades y operaciones de la API de estas funcionalidades están marcadas como versión futura en el modelo de datos (`readme.md` §3.2) y en el contrato (`x-mvp: false` en `docs/api/`). La recuperación de la contraseña sí forma parte del MVP (Épica 14): sin ella, quien olvida su contraseña pierde el acceso a su cuenta. También los avisos por correo de las solicitudes de acceso: a la administración de la comunidad cuando alguien solicita unirse (HU-43) y al solicitante cuando lo aprueban (HU-44), y a los administradores de plataforma cuando se crea una comunidad (HU-46); sin ellos, las solicitudes y las comunidades nuevas quedan pendientes sin que nadie se entere. Las notificaciones dentro de la aplicación siguen fuera del MVP.
 
 ## Índice
 
@@ -26,7 +26,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 5. Detalle y contacto | HU-14, HU-15 |
 | 6. Administración mínima | HU-16, HU-17 |
 | 7. Mejora de funcionalidades del MVP | HU-18, HU-19, HU-20 |
-| 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23, HU-43, HU-44, HU-45 |
+| 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23, HU-43, HU-44, HU-45, HU-46, HU-47 |
 | 9. Cierre de sesión | HU-24 |
 | 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
 | 11. Experiencia de usuario | HU-28, HU-29, HU-30, HU-31, HU-32 |
@@ -733,6 +733,72 @@ Hoy solo es administrador de una comunidad quien la crea (HU-04); no hay forma d
 - **Given** que soy administrador de una comunidad o miembro sin rol
 - **When** intento cambiar el rol de un miembro (también llamando a la API directamente)
 - **Then** no tengo acceso a esa función (asumido: el nombramiento lo decide la plataforma; delegarlo en los administradores de la comunidad sería otra historia)
+
+### HU-46 Recibir un aviso por correo cuando alguien crea una comunidad
+
+**Como** administrador de plataforma, **quiero** recibir un correo cada vez que un vecino crea una comunidad, con los datos de la comunidad y de quien la ha creado, **para** revisarla enseguida sin tener que entrar a mirar si hay alguna pendiente.
+
+Hoy una comunidad nueva queda pendiente (HU-21) sin que nadie se entere: el administrador de plataforma solo la ve si entra en «Comunidades pendientes».
+
+**AC1 — Aviso con todos los detalles**
+
+- **Given** que soy administrador de plataforma
+- **When** un vecino crea una comunidad
+- **Then** recibo un correo de EntreVecinos con el nombre, la descripción, la ciudad, el código postal y la fecha de creación de la comunidad, y el nombre, el correo, el teléfono y la fecha de alta de quien la ha creado
+
+**AC2 — Enlace para revisarla**
+
+- **Given** el correo de aviso
+- **When** pulso su enlace
+- **Then** llego a «Comunidades pendientes», donde puedo aprobarla (HU-21) o rechazarla (HU-47); si no tengo la sesión iniciada, primero inicio sesión y después llego a esa página
+
+**AC3 — Todos los administradores de plataforma, por separado**
+
+- **Given** que hay varios administradores de plataforma
+- **When** se crea una comunidad
+- **Then** cada uno recibe su propio correo, sin ver las direcciones de los demás
+
+**AC4 — Solo comunidades pendientes**
+
+- **Given** que un administrador de plataforma crea una comunidad
+- **When** queda activa al momento (HU-22)
+- **Then** no se envía ningún aviso
+
+**AC5 — La creación no depende del correo**
+
+- **Given** que el envío falla o no queda cupo de correos (HU-40 AC5)
+- **When** un vecino crea una comunidad
+- **Then** la comunidad se crea igual y queda pendiente; el equipo recibe la alarma correspondiente
+
+### HU-47 Rechazar una comunidad pendiente
+
+**Como** administrador de plataforma, **quiero** rechazar las comunidades pendientes que no deben existir (duplicadas, falsas o de prueba), **para** que no se queden pendientes para siempre ni bloqueen a su creador.
+
+Hoy solo se pueden aprobar (HU-21); una comunidad que no procede se queda pendiente indefinidamente y su creador no puede crear otra (HU-23).
+
+**AC1 — Rechazar**
+
+- **Given** que soy administrador de plataforma y hay una comunidad pendiente
+- **When** la rechazo en «Comunidades pendientes» y confirmo
+- **Then** veo «Se ha rechazado la comunidad <nombre>.», desaparece de la lista y deja de existir (asumido: se elimina; no queda un historial de comunidades rechazadas)
+
+**AC2 — El creador puede crear otra**
+
+- **Given** que han rechazado mi comunidad pendiente
+- **When** abro mis comunidades o creo una nueva
+- **Then** la rechazada ya no aparece y puedo crear otra comunidad
+
+**AC3 — Solo pendientes**
+
+- **Given** una comunidad activa
+- **When** se intenta rechazar
+- **Then** no se permite (asumido: desactivar o borrar comunidades activas sería otra historia)
+
+**AC4 — Restricción**
+
+- **Given** que no soy administrador de plataforma
+- **When** intento rechazar una comunidad
+- **Then** no tengo acceso a esa función
 
 ---
 

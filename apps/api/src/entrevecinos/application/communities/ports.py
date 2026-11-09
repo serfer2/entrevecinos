@@ -44,6 +44,14 @@ class CommunityRepository(Protocol):
         """Activa la comunidad (esté o no activa), o `None` si no existe."""
         ...
 
+    def delete_pending(self, community_id: uuid.UUID) -> Community | None:
+        """Elimina una comunidad pendiente y, en cascada, sus membresías; devuelve la eliminada.
+
+        `None` si no existe. Lanza `CommunityNotPending` si está activa. Bloquea la fila para que
+        un rechazo y una aprobación simultáneos no se pisen.
+        """
+        ...
+
 
 class MembershipRepository(Protocol):
     def get(self, community_id: uuid.UUID, user_id: uuid.UUID) -> Membership | None: ...

@@ -37,6 +37,18 @@ class SqlAlchemyUserRepository:
         model = self._session.scalars(select(UserModel).where(UserModel.email == email)).first()
         return to_domain(model) if model else None
 
+    def list_platform_admins(self) -> list[User]:
+        models = self._session.scalars(
+            select(UserModel)
+            .where(
+                UserModel.platform_role == PlatformRole.PLATFORM_ADMIN,
+                UserModel.is_active.is_(True),
+                UserModel.deleted_at.is_(None),
+            )
+            .order_by(UserModel.full_name, UserModel.id)
+        )
+        return [to_domain(model) for model in models]
+
     def get_credentials(self, email: str) -> tuple[User, str] | None:
         model = self._session.scalars(select(UserModel).where(UserModel.email == email)).first()
         return (to_domain(model), model.password_hash) if model else None

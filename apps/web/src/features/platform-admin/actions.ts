@@ -26,3 +26,26 @@ export async function approveCommunity(formData: FormData): Promise<void> {
   revalidatePath("/inicio");
   redirect(pendingCommunitiesPath(result.ok ? "aprobada" : "error"));
 }
+
+/**
+ * Rechaza (elimina) una comunidad pendiente y vuelve a la lista con el resultado en la URL. El
+ * nombre solo sirve para el mensaje; la API decide si se puede rechazar (`409` si ya está activa).
+ */
+export async function rejectCommunity(formData: FormData): Promise<void> {
+  await requireUser();
+
+  const communityId = formText(formData, "community_id");
+  const name = formText(formData, "name").slice(0, 120);
+  if (!isUuid(communityId)) redirect(pendingCommunitiesPath("error-rechazo"));
+
+  const result = await userApiFetch<null>(`/admin/communities/${communityId}`, {
+    method: "DELETE",
+  });
+
+  revalidatePath(PENDING_COMMUNITIES_PATH);
+  revalidatePath("/inicio");
+  if (result.ok) redirect(pendingCommunitiesPath("rechazada", name));
+  if (result.error.status === 409) redirect(pendingCommunitiesPath("ya-activa"));
+  if (result.error.status === 404) redirect(pendingCommunitiesPath("no-existe"));
+  redirect(pendingCommunitiesPath("error-rechazo"));
+}

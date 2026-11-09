@@ -108,6 +108,20 @@ export default async function MiPagina() {
 4. `/iniciar-sesion` con una cuenta sin validar muestra «Tienes que validar tu correo electrónico antes de iniciar sesión.».
 5. `ResendVerificationButton` (*Server Action* `resendVerification`) pide otro enlace en tres sitios: el registro con un correo pendiente, la página de enlace caducado o sustituido y el inicio de sesión sin validar. Se renderiza fuera del formulario principal (no se pueden anidar formularios).
 
+## Gestión de comunidades y administración
+
+La web solo muestra u oculta acciones; quién puede hacer cada una lo decide la API (`403`/`409`), y cada página y *Server Action* llama a `requireUser()`.
+
+| Ruta | Quién | Qué permite |
+|---|---|---|
+| `/comunidades/[communityId]/gestion/solicitudes` | `community_admin` y `platform_admin` | Aprobar o rechazar solicitudes de acceso (`reviewRequest`) |
+| `/comunidades/[communityId]/gestion/miembros` | `community_admin` y `platform_admin` | Listar miembros por estado; «Bloquear», «Desbloquear» y «Expulsar». Solo el `platform_admin` ve además «Nombrar administrador» y «Quitar administrador» (HU-45) |
+| `/admin/comunidades` | `platform_admin` (al resto, `404`) | Aprobar (`approveCommunity`) o rechazar con confirmación (`rejectCommunity`, HU-47) las comunidades pendientes. Cada una tiene el ancla `#comunidad-<id>`, a la que enlaza el correo de una comunidad nueva (HU-46) |
+
+- Las acciones de miembros pasan por una única *Server Action*, `manageMember` (`src/features/communities/admin/actions.ts`). `MEMBER_ACTIONS` (`members.ts`) define el cuerpo de la petición de cada acción (`status`, `role` o `DELETE`) y `rowActions(member, currentUserId, isPlatformAdmin)` decide qué botones lleva cada fila.
+- El resultado vuelve en la URL con códigos fijos (`?resultado=…&nombre=…` o `?error=…`). Los `409` de la API se traducen con `conflictCode` a los mensajes de `MEMBER_CONFLICTS`, como «La comunidad debe tener al menos un administrador.».
+- Las acciones irreversibles o con efecto sobre otra persona piden confirmación con `ConfirmDialog` (`src/components/ui/`).
+
 ## Pruebas
 
 Vitest + Testing Library (`vitest.config.mts`). Las pruebas viven junto al código (`*.test.ts(x)`). Los formularios reciben su *Server Action* por *props*, así que se prueban con una acción simulada; las acciones se prueban simulando `apiFetch`, `next/headers` y `next/navigation`.

@@ -10,6 +10,10 @@ class PendingCommunityExists(Exception):
     """El usuario ya tiene una comunidad pendiente de aprobación: no puede crear otra."""
 
 
+class CommunityNotPending(Exception):
+    """La comunidad ya está activa: solo se pueden rechazar las pendientes de aprobación (409)."""
+
+
 class MembershipAlreadyExists(Exception):
     """El usuario ya tiene una membresía (en cualquier estado) en la comunidad."""
 

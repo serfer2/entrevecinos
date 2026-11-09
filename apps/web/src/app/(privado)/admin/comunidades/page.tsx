@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Pagination } from "@/components/ui/Pagination";
 import { requireUser } from "@/features/auth/dal";
-import { approveCommunity } from "@/features/platform-admin/actions";
+import { approveCommunity, rejectCommunity } from "@/features/platform-admin/actions";
 import { getPendingCommunities } from "@/features/platform-admin/data";
 import {
+  PENDING_COMMUNITIES_ERRORS,
   PENDING_COMMUNITIES_PATH,
   PENDING_COMMUNITIES_RESULT_MESSAGES,
   type PendingCommunitiesResult,
+  pendingCommunityAnchor,
 } from "@/features/platform-admin/paths";
 import { formatLongDate } from "@/lib/dates";
 import { firstParam, pageParam, type SearchParams } from "@/lib/search-params";
@@ -25,10 +28,9 @@ export default async function PendingCommunitiesPage({ searchParams }: PendingCo
   const query = await searchParams;
   const communities = await getPendingCommunities(pageParam(query));
   const result = firstParam(query, "resultado");
-  const message =
-    result in PENDING_COMMUNITIES_RESULT_MESSAGES
-      ? PENDING_COMMUNITIES_RESULT_MESSAGES[result as PendingCommunitiesResult]
-      : null;
+  const known = result in PENDING_COMMUNITIES_RESULT_MESSAGES ? (result as PendingCommunitiesResult) : null;
+  const message = known ? PENDING_COMMUNITIES_RESULT_MESSAGES[known](firstParam(query, "nombre")) : null;
+  const isError = known !== null && PENDING_COMMUNITIES_ERRORS.has(known);
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10">
@@ -36,8 +38,8 @@ export default async function PendingCommunitiesPage({ searchParams }: PendingCo
 
       {message && (
         <p
-          role={result === "error" ? "alert" : "status"}
-          className={`rounded-lg px-3 py-2 text-sm ${result === "error" ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-900"}`}
+          role={isError ? "alert" : "status"}
+          className={`rounded-lg px-3 py-2 text-sm ${isError ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-900"}`}
         >
           {message}
         </p>
@@ -50,7 +52,8 @@ export default async function PendingCommunitiesPage({ searchParams }: PendingCo
           {communities.items.map((community) => (
             <li
               key={community.id}
-              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between"
+              id={pendingCommunityAnchor(community.id)}
+              className="flex scroll-mt-6 flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between"
             >
               <div className="flex flex-col gap-1">
                 <p className="font-medium text-gray-900">{community.name}</p>
@@ -63,15 +66,27 @@ export default async function PendingCommunitiesPage({ searchParams }: PendingCo
                   <p className="text-sm whitespace-pre-line text-gray-700">{community.description}</p>
                 )}
               </div>
-              <form action={approveCommunity}>
-                <input type="hidden" name="community_id" value={community.id} />
-                <button
-                  type="submit"
-                  className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800"
+              <div className="flex flex-wrap gap-2">
+                <form action={approveCommunity}>
+                  <input type="hidden" name="community_id" value={community.id} />
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800"
+                  >
+                    Aprobar
+                  </button>
+                </form>
+                <ConfirmDialog
+                  action={rejectCommunity}
+                  triggerLabel="Rechazar"
+                  title={`¿Rechazar la comunidad ${community.name}?`}
+                  message="Se eliminará y desaparecerá de las comunidades de quien la creó, que podrá crear otra. No se puede deshacer."
+                  confirmLabel="Rechazar"
                 >
-                  Aprobar
-                </button>
-              </form>
+                  <input type="hidden" name="community_id" value={community.id} />
+                  <input type="hidden" name="name" value={community.name} />
+                </ConfirmDialog>
+              </div>
             </li>
           ))}
         </ul>
