@@ -57,7 +57,7 @@ npx @redocly/cli preview-docs openapi.yaml
 
 ## Extracto del `readme.md`
 
-`docs/api/openapi.yaml` es la fuente de verdad del contrato. `readme.md` §4 incluye un extracto con `listCommunityListings`, `createListing`, `registerUser` y `loginUser` y los componentes que usan, entre los marcadores `<!-- openapi-extract:start -->` y `<!-- openapi-extract:end -->`. No se edita a mano: tras cambiar alguna de esas operaciones, se regenera a partir del bundle, desde la raíz del repositorio:
+`docs/api/openapi.yaml` es la fuente de verdad del contrato. `readme.md` §4 incluye un extracto con `listCommunityListings`, `createListing` y `registerUser` y los componentes que usan, entre los marcadores `<!-- openapi-extract:start -->` y `<!-- openapi-extract:end -->`. No se edita a mano: tras cambiar alguna de esas operaciones, se regenera a partir del bundle, desde la raíz del repositorio:
 
 ```bash
 (cd docs/api && npx @redocly/cli bundle openapi.yaml -o dist/openapi.bundled.yaml)

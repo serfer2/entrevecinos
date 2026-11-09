@@ -189,8 +189,6 @@ Quedan para una fase posterior el perfil profesional, las notificaciones dentro 
 
 ### **1.3. Diseño y experiencia de usuario:**
 
-> Proporciona imágenes y/o videotutorial mostrando la experiencia del usuario desde que aterriza en la aplicación, pasando por todas las funcionalidades principales.
-
 **Pendiente** (imágenes y videotutorial). Se proporcionará una vez completado el desarrollo del frontend.
 
 La Épica 11 (HU-28 a HU-32, TK-066 a TK-072) fija la identidad visual y mejora el uso de la web:
@@ -205,7 +203,6 @@ La Épica 11 (HU-28 a HU-32, TK-066 a TK-072) fija la identidad visual y mejora 
 ---
 
 ### **1.4. Instrucciones de instalación:**
-> Documenta de manera precisa las instrucciones para instalar y poner en marcha el proyecto en local (librerías, backend, frontend, servidor, base de datos, migraciones y semillas de datos, etc.)
 
 Todo se ejecuta en contenedores: no hace falta instalar Python, Node.js ni PostgreSQL en el equipo.
 
@@ -296,14 +293,14 @@ flowchart TB
         IMG --- IMGVOL
     end
 
-    SMTP["Servidor SMTP<br/>Mailpit en desarrollo"]
+    SMTP["Servidor SMTP<br/>Mailpit en desarrollo · Brevo en producción"]
 
     U -->|"HTTPS"| NEXT
     NEXT -->|"Solicitudes API con JWT"| CORS
     API -->|"Consultas y transacciones"| DB
     API -->|"Carga y lectura de imágenes"| IMG
-    API -->|"Correo de validación"| SMTP
-    U <-.-|"Enlace de validación"| SMTP
+    API -->|"Correos de la aplicación"| SMTP
+    U <-.-|"Enlaces de los correos"| SMTP
 ```
 
 #### Patrón arquitectónico
@@ -340,7 +337,7 @@ La seguridad de la API se aplica dentro de FastAPI, en este orden: CORS restring
 
 - **Almacenamiento de imágenes:** un servicio compatible con S3, como **MinIO**, almacena las fotografías de los anuncios y perfiles. Sus ficheros se conservan en un volumen persistente. PostgreSQL guarda las referencias y metadatos de cada imagen, mientras que el backend gestiona las cargas y lecturas.
 
-- **Envío de correo:** la API envía por **SMTP** los correos de la aplicación, como el enlace de validación del registro. En desarrollo los recoge **Mailpit**, que los muestra en `http://localhost:8025` sin enviarlos a nadie; en producción se envían con **Amazon SES** (por su API, con las credenciales del rol de la instancia).
+- **Envío de correo:** la API envía por **SMTP** los correos de la aplicación: el enlace de validación del registro, el de restablecimiento de la contraseña y su aviso, y los avisos de las solicitudes de acceso a una comunidad. En desarrollo los recoge **Mailpit**, que los muestra en `http://localhost:8025` sin enviarlos a nadie; en producción se envían con **Brevo**, un proveedor transaccional externo, con un tope propio de la API de 5.000 correos por periodo. **Amazon SES** queda configurado como vuelta atrás.
 
 - **Contenedores y red de despliegue:** **Docker** ejecuta frontend, backend, PostgreSQL y almacenamiento de imágenes en servicios separados. La base de datos y el almacenamiento deberían permanecer en una red interna, accesibles desde el backend, y no exponerse directamente a los usuarios.
 
@@ -472,7 +469,6 @@ flowchart LR
 
         S3_MEDIA[("S3<br/>imágenes · URL prefirmadas")]
         S3_BACKUP[("S3<br/>copias de la base")]
-        SES["SES<br/>correo de validación"]
         SSM_PS["Parameter Store<br/>secretos"]
         CW["CloudWatch<br/>registros, métricas y alarmas"]
         SNS["SNS<br/>avisos por correo"]
@@ -482,7 +478,6 @@ flowchart LR
         CDN -->|"HTTP + X-Origin-Verify"| PROXY
         USER -.->|"Imágenes"| S3_MEDIA
         API_PROD --> S3_MEDIA
-        API_PROD --> SES
         DB_PROD -.->|"backup.sh"| S3_BACKUP
         SSM_PS -.->|"deploy.sh"| EC2
         EC2 -.-> CW
@@ -493,6 +488,9 @@ flowchart LR
         GHA["GitHub Actions<br/>CI en cada pull request<br/>despliegue al fusionar en main"]
         ECR[("ECR<br/>imágenes de api y web")]
     end
+
+    BREVO["Brevo<br/>correo por SMTP<br/>proveedor externo"]
+    API_PROD -->|"SMTP"| BREVO
 
     GHA -->|"publica"| ECR
     GHA -->|"SSM Run Command"| EC2
@@ -513,7 +511,7 @@ Producción está en `https://entrevecinos.org`, en la región `eu-north-1` de A
 - **Aplicación:** una sola instancia EC2 `t4g.small` (Graviton, Amazon Linux 2023) ejecuta con Docker Compose el proxy nginx, la web, la API y PostgreSQL, con contenedores sin privilegios. Solo el proxy publica un puerto, y solo CloudFront puede llegar a él; **la API no es pública**: la web la llama por una red interna de Docker. No hay balanceador ni API Gateway.
 - **Datos:** **PostgreSQL 16 en la propia instancia**, sobre un volumen EBS cifrado que sobrevive a la instancia, con copias de `pg_dump` cada 6 horas en S3 (30 días) y *snapshots* diarios (7). Las imágenes de los anuncios, en un bucket S3 privado con versionado, se leen con URL prefirmadas.
 - **Secretos:** en Parameter Store; llegan a los contenedores solo por entorno durante el despliegue, sin ficheros `.env` en la instancia.
-- **Correo:** SES, con el dominio verificado (DKIM, SPF y DMARC).
+- **Correo:** Brevo por SMTP en su plan gratuito (300 correos al día), con el dominio verificado (DKIM, SPF y DMARC) y una IP elástica como única IP autorizada. La API no envía más de 5.000 correos por periodo, y una alarma avisa si Brevo rechaza un envío. SES sigue configurado como vuelta atrás: no llegó a salir del *sandbox*, que solo entrega a direcciones verificadas.
 - **Operación:** registros, métricas y alarmas en CloudWatch con aviso por correo, y procedimientos de recuperación ensayados (RPO 6 horas, RTO 4 horas). Sin SSH: la instancia se opera con Session Manager.
 
 #### Diferencias con la arquitectura prevista
@@ -528,6 +526,7 @@ La arquitectura prevista usaba contenedores gestionados detrás de un balanceado
 | DNS | Sin detallar | Route 53, sin DNSSEC | DNSSEC |
 | Red | Base de datos en red privada | Subred pública sin NAT; base solo en la red interna de Compose; origen por HTTP con cabecera secreta | Origen cifrado y orígenes VPC de CloudFront |
 | Secretos | Gestor de secretos | Parameter Store, solo por entorno | Secrets Manager para la contraseña de RDS |
+| Correo | Proveedor transaccional por SMTP, sin detallar | Brevo por SMTP en el plan gratuito (300 al día); SES configurado como vuelta atrás porque seguía en *sandbox* | Volver a SES con acceso de producción o pasar al plan de pago de Brevo |
 
 Cada diferencia, con su motivo, coste evitado y riesgo aceptado, está en [«Decisiones de arquitectura»](infra/aws/README.md#decisiones-de-arquitectura); los pasos de evolución, en orden y con su señal de disparo y su coste, en [«Evolución»](infra/aws/README.md#evolución).
 
@@ -546,7 +545,7 @@ Al fusionar, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) repi
 - **Ejecución:** en local, Compose con imágenes de desarrollo; en producción, el mismo Compose con imágenes de producción por *digest*, contenedores endurecidos y una sola instancia, sin autoescalado.
 - **Persistencia:** en local, volúmenes de Docker; en producción, PostgreSQL en un volumen EBS propio con copias en S3, e imágenes en S3 en lugar de MinIO.
 - **Secretos:** en local, `.env`; en producción, Parameter Store y solo por entorno (sin Secrets Manager: el nivel estándar de Parameter Store es gratuito).
-- **Correo:** en local, Mailpit por SMTP; en producción, SES por su API.
+- **Correo:** en local, Mailpit por SMTP; en producción, Brevo por SMTP.
 - **Red:** en producción la web solo es accesible a través de CloudFront, la API y PostgreSQL solo desde redes internas de Docker, y la instancia no tiene SSH.
 - **Despliegue:** en local, `make dev`; en producción, GitHub Actions y SSM en cada fusión a `main`.
 
@@ -582,9 +581,7 @@ Medidas implementadas en la aplicación y en producción (detalle en [`infra/aws
 
 ### **2.6. Tests**
 
-> Describe brevemente algunos de los tests realizados
-
-Cada ticket se implementa con sus pruebas (regla de OpenSpec: las tareas que cambian comportamiento incluyen las pruebas) y todas se ejecutan en contenedores, igual en local que en la integración continua. Recuento de la entrega 3: **485 pruebas de la API** y **358 de la web**.
+Cada ticket se implementa con sus pruebas (regla de OpenSpec: las tareas que cambian comportamiento incluyen las pruebas) y todas se ejecutan en contenedores, igual en local que en la integración continua. Recuento de la entrega 3: **586 pruebas de la API** y **408 de la web**, todas en verde.
 
 ```bash
 make ci-api    # ruff (lint y formato), alembic check y pytest con PostgreSQL de pruebas
@@ -650,6 +647,12 @@ erDiagram
         UUID user_id FK "NOT NULL; FK a user.id; ON DELETE CASCADE"
         TIMESTAMPTZ expires_at "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
+    }
+
+    EMAIL_QUOTA {
+        DATE period_start PK "Inicio del periodo; NOT NULL"
+        INTEGER sent "NOT NULL; DEFAULT 0; CHECK sent >= 0"
+        TIMESTAMPTZ updated_at "NOT NULL"
     }
 
     COMMUNITY {
@@ -836,6 +839,7 @@ El modelo cubre las funciones descritas en el README: usuarios, comunidades, anu
 | `listing` | MVP | `GET/POST /communities/{community_id}/listings`, `GET/PATCH/DELETE /listings/{listing_id}`, `PATCH /listings/{listing_id}/status` |
 | `media_asset` | MVP | `POST /media`, `GET /media/{asset_id}`. Versión futura: `DELETE /media/{asset_id}` |
 | `listing_image` | MVP | `PUT /listings/{listing_id}/images` |
+| `email_quota` | MVP | Ninguna propia: la usan las que envían correo (`POST /auth/register`, `POST /auth/email-verification/resend`, `POST /auth/password-reset`, `POST /auth/password-reset/confirm`, `POST /communities/{community_id}/memberships` y `PATCH /communities/{community_id}/memberships/{user_id}`) |
 | `conversation`, `message` | Versión futura | Mensajería: `/listings/{listing_id}/conversations`, `/conversations…`, `/messages/{message_id}` |
 | `notification` | Versión futura | Notificaciones: `/notifications…` |
 | `professional_profile`, `professional_service`, `professional_profile_image` | Versión futura | Perfil profesional: `/professionals…`, `/users/me/professional-profile…` |
@@ -1029,6 +1033,14 @@ Solo vale el último enlace: emitir uno marca los anteriores como sustituidos y 
 
 Solo vale el último enlace: pedir uno nuevo borra los anteriores del usuario, y cambiar la contraseña borra el usado. A diferencia de `email_verification`, no se conservan: a quien abre un enlace que ya no vale le basta con pedir otro.
 
+#### 17. `email_quota` — Cupo de correos por periodo
+
+- `period_start DATE` — **PK**; primer día del periodo, que empieza el día `EMAIL_QUOTA_RESET_DAY` de cada mes (por defecto, el 6) en hora de Madrid.
+- `sent INTEGER` — `NOT NULL`, `DEFAULT 0`; correos enviados en el periodo. `CHECK (sent >= 0)` (`ck_email_quota_sent_not_negative`).
+- `updated_at TIMESTAMPTZ` — `NOT NULL`, `DEFAULT now()`; último correo contado.
+
+Una fila por periodo y sin relaciones: es una restricción de costes, no un dato de negocio. Antes de cada correo, la API suma uno al periodo con una sola sentencia atómica (`INSERT … ON CONFLICT DO UPDATE … WHERE sent < límite`), así que dos peticiones simultáneas no pueden pasar del límite (`EMAIL_MONTHLY_LIMIT`, 5.000 por defecto). Al llegar al 80 % y al límite lo anota en el registro, y producción tiene alarmas para ambos casos. Sin cupo, el registro, el reenvío de la validación y la petición de restablecimiento responden `503` con `code: email_quota_exceeded`; los avisos (cambio de contraseña y solicitudes de acceso) se omiten sin impedir la operación.
+
 #### Tipos enumerados
 
 Se recomienda definir estos enums en PostgreSQL:
@@ -1074,7 +1086,7 @@ Las reglas `ON DELETE` deben definirse explícitamente. Para anuncios y usuarios
 
 La especificación completa de la API es [`docs/api/openapi.yaml`](docs/api/openapi.yaml) (OpenAPI 3.1), la **fuente de verdad** del contrato. [`docs/api/README.md`](docs/api/README.md) explica su estructura y convenciones, cómo validarla y previsualizarla, y resume qué operaciones son del MVP y cuáles de versiones futuras: `x-mvp: true` marca las implementadas en el MVP y `x-mvp: false` las pendientes, y las pruebas de la API comprueban que coinciden con lo implementado.
 
-Este es un extracto del contrato con tres operaciones del recorrido principal: listar y publicar anuncios en una comunidad, registrarse e iniciar sesión. El listado incluye búsqueda, filtros y ordenación; la publicación exige un JWT y una membresía aprobada en la comunidad. El contacto del MVP usa los datos del anunciante; la mensajería interna es de una versión futura. **Si el extracto y el contrato difieren, prevalece el contrato**; para regenerarlo, consulta `docs/api/README.md`.
+Este es un extracto del contrato con tres operaciones del recorrido principal: listar y publicar anuncios en una comunidad y registrarse. El listado incluye búsqueda, filtros y ordenación; la publicación exige un JWT y una membresía aprobada en la comunidad. El contacto del MVP usa los datos del anunciante; la mensajería interna es de una versión futura. **Si el extracto y el contrato difieren, prevalece el contrato**; para regenerarlo, consulta `docs/api/README.md`.
 
 <!-- openapi-extract:start -->
 ```yaml
@@ -1291,58 +1303,6 @@ paths:
               example:
                 detail: Ahora mismo no podemos enviar correos. Inténtalo de nuevo más tarde.
                 code: email_quota_exceeded
-  /auth/token:
-    post:
-      tags:
-      - Autenticación
-      operationId: loginUser
-      summary: Iniciar sesión
-      description: Valida las credenciales y emite un token JWT. Acceso público.
-      x-mvp: true
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LoginRequest'
-            example:
-              email: vecino@example.com
-              password: UnaClaveSegura123!
-      responses:
-        '200':
-          description: Inicio de sesión correcto.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '401':
-          description: Correo o contraseña incorrectos, o cuenta desactivada.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '403':
-          description: Credenciales correctas, pero la cuenta no ha validado su correo (no aplica a un
-            `platform_admin`). Solo se responde tras comprobar la contraseña.
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/Error'
-                - type: object
-                  required:
-                  - code
-                  properties:
-                    code:
-                      type: string
-                      enum:
-                      - email_not_verified
-              example:
-                detail: Tienes que validar tu correo electrónico antes de iniciar sesión.
-                code: email_not_verified
-        '422':
-          $ref: '#/components/responses/ValidationError'
 components:
   securitySchemes:
     bearerAuth:
@@ -1430,26 +1390,6 @@ components:
           schema:
             $ref: '#/components/schemas/ValidationError'
   schemas:
-    AuthResponse:
-      type: object
-      required:
-      - access_token
-      - token_type
-      - expires_in
-      - user
-      properties:
-        access_token:
-          type: string
-          description: JWT de acceso.
-        token_type:
-          type: string
-          enum:
-          - Bearer
-        expires_in:
-          type: integer
-          description: Duración del token en segundos.
-        user:
-          $ref: '#/components/schemas/User'
     EmailQuotaExceeded:
       description: Cupo de correos del periodo agotado (extensión de `Error`, TK-099). Por coste, la aplicación
         envía como mucho un número fijo de correos entre el día 6 de un mes y el día 6 del siguiente;
@@ -1632,19 +1572,6 @@ components:
       - need_service
       - free
       - other
-    LoginRequest:
-      type: object
-      additionalProperties: false
-      required:
-      - email
-      - password
-      properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          format: password
     MembershipError:
       description: Error de una operación sobre la membresía del usuario autenticado, con su estado actual
         (extensión de `Error`). Permite mostrar «Solicitud pendiente» o «Sin acceso».
@@ -1682,12 +1609,6 @@ components:
           type: integer
           minimum: 0
           description: Total de elementos que cumplen el filtro.
-    PlatformRole:
-      type: string
-      description: Rol global del usuario en la plataforma.
-      enum:
-      - user
-      - platform_admin
     RegisterRequest:
       type: object
       additionalProperties: false
@@ -1744,42 +1665,6 @@ components:
           type: string
           format: date-time
           description: Caducidad del enlace de validación (24 horas tras el registro).
-    User:
-      type: object
-      description: Datos completos del usuario autenticado (nunca incluye el hash de contraseña).
-      required:
-      - id
-      - email
-      - full_name
-      - platform_role
-      - is_active
-      - created_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        email:
-          type: string
-          format: email
-        full_name:
-          type: string
-        phone:
-          type:
-          - string
-          - 'null'
-        avatar_url:
-          type:
-          - string
-          - 'null'
-          format: uri-reference
-          description: URL relativa del avatar (`/media/{asset_id}`).
-        platform_role:
-          $ref: '#/components/schemas/PlatformRole'
-        is_active:
-          type: boolean
-        created_at:
-          type: string
-          format: date-time
     ValidationError:
       type: object
       required:
@@ -1904,195 +1789,142 @@ Las historias completas del MVP (18 historias en 6 épicas) están en [`docs/pro
 
 ## 6. Tickets de Trabajo
 
-Los tickets completos están en [`docs/product/tickets/`](docs/product/tickets/). Los tres primeros tickets del desarrollo preparan el entorno: base de datos (Docker Compose con PostgreSQL 16), esqueleto del backend (FastAPI) y configuración del frontend (Next.js).
+Los tickets completos están en [`docs/product/tickets/`](docs/product/tickets/). Se documenta uno de cada tipo: base de datos (tablas de anuncios e imágenes, TK-020), backend (esqueleto de FastAPI, TK-002) y frontend (configuración de Next.js, TK-003).
 
-**Ticket 1** — TK-001 · Infraestructura: Docker Compose con PostgreSQL 16
+**Ticket 1** — TK-020 · Base de datos: categorías, anuncios e imágenes
 
 | Campo | Valor |
 |---|---|
-| **Tipo** | Infraestructura / DevOps |
-| **Componente** | `infra/` |
-| **Prioridad** | Alta (bloquea TK-002 y TK-003) |
-| **Depende de** | — |
-| **Referencias** | `readme.md` §2.1 (arquitectura), §2.3 (estructura de ficheros), §2.4 (desarrollo local), §2.5 (seguridad) |
+| **Tipo** | Base de datos |
+| **Componente** | `apps/api/` (`infrastructure/db/models/`, `migrations/`) |
+| **Historia** | HU-07 Publicar un anuncio (Épica 3) |
+| **Prioridad** | Alta (bloquea las Épicas 3, 4 y 5) |
+| **Depende de** | TK-012, TK-015 (migración `0003`) |
+| **Referencias** | `readme.md` §3.2 (`category`, `listing`, `media_asset`, `listing_image`; enums `listing_type` y `listing_status`; índices recomendados) |
 
 Las inferencias que no aparecen explícitamente en el README se marcan con `(asumido)`.
 
 #### 1. Contexto y objetivo
 
-El README define que el entorno local se levanta con Docker Compose y que PostgreSQL 16 se ejecuta en un contenedor con volumen persistente, dentro de una red interna y sin exponerse a Internet. El repositorio aún no contiene ninguna configuración de Docker.
+Publicar un anuncio requiere categorías, el propio anuncio y sus imágenes. El modelo de datos los define, pero no existen en la base de datos.
 
-**Objetivo:** crear la base de la configuración de Docker Compose del proyecto con un primer servicio, `db` (PostgreSQL 16), con datos persistentes, credenciales fuera del repositorio y comprobación de salud, de forma que TK-002 y TK-003 puedan añadir sus servicios sobre esta base.
+**Objetivo:** crear la migración `0004` con los enums `listing_type` y `listing_status`, las tablas `category`, `listing`, `media_asset` y `listing_image`, los índices recomendados y las categorías iniciales.
 
 #### 2. Alcance
 
 **Incluye**
-- Fichero `infra/docker-compose.yml` con el servicio `db`, un volumen con nombre y las redes.
-- Fichero `.env.example` con las variables de la base de datos y `.env` excluido del repositorio.
-- Carpeta `infra/postgres/` con el espacio previsto en el README para inicialización y configuración.
-- Ajustes de `.gitignore` necesarios.
-- Documentación breve de uso en `infra/README.md`.
+- Modelos ORM y migración reversible.
+- Datos iniciales de categorías (en la propia migración).
+- Restricciones de precio y moneda, y de portada única.
+- Pruebas de restricciones.
 
 **No incluye**
-- Esquema, tablas, enums, migraciones ni datos semilla (tickets posteriores de base de datos).
-- Servicios `api` y `web` (TK-002 y TK-003).
-- Almacenamiento de imágenes, copias de seguridad automáticas y configuración de producción.
+- Índice de búsqueda de texto completo: lo añade TK-030 junto con la búsqueda.
+- Tablas posteriores al MVP (conversaciones, denuncias…).
+- La FK `users.avatar_asset_id → media_asset.id` sí se añade aquí, ahora que existe la tabla (pendiente desde TK-005).
 
 #### 3. Requisitos técnicos
 
-##### 3.1 Servicio `db`
+##### 3.1 Enums
 
-- **Imagen:** `postgres:16` (Debian) (asumido: se prefiere a la variante Alpine porque el modelo de datos prevé búsqueda de texto completo y la variante glibc evita diferencias de *collation* respecto a producción). Fijar solo la versión mayor en local; fijar la menor en el ticket de producción.
-- **Volumen persistente:** volumen con nombre `db_data` montado en `/var/lib/postgresql/data`. No usar *bind mounts* a carpetas del repositorio para los datos.
-- **Credenciales:** `POSTGRES_USER`, `POSTGRES_PASSWORD` y `POSTGRES_DB` se leen del entorno. `POSTGRES_PASSWORD` es obligatoria: si falta, Compose debe fallar con un mensaje claro (`${POSTGRES_PASSWORD:?...}`).
-- **Zona horaria:** `TZ=UTC` y `PGTZ=UTC` (asumido: el modelo usa `TIMESTAMPTZ`).
-- **Healthcheck:** `pg_isready -U $POSTGRES_USER -d $POSTGRES_DB` con intervalo, *timeout*, reintentos y `start_period` explícitos. Los servicios que dependan de `db` usarán `depends_on: condition: service_healthy`.
-- **Reinicio:** `restart: unless-stopped`.
-- **Inicialización:** montar `infra/postgres/initdb/` en `/docker-entrypoint-initdb.d/` en modo solo lectura. Esos scripts solo se ejecutan cuando el volumen está vacío; documentarlo. La carpeta se entrega vacía (con `.gitkeep`).
+- `listing_type`: `sell`, `wanted`, `offer_service`, `need_service`, `free`, `other`.
+- `listing_status`: `draft`, `active`, `reserved`, `completed`, `hidden`, `deleted` (todos los del modelo; la API solo expone algunos).
 
-##### 3.2 Redes
+##### 3.2 `category`
 
-- `data`: red interna (`internal: true`) para `db` y, más adelante, `api`. Impide que la base de datos sea accesible desde fuera de Docker.
-- `edge`: red normal donde se conectarán `web` y `api` (se usa en TK-002 y TK-003; se declara ya para no reescribir el fichero).
+`id` UUID PK · `name VARCHAR(80)` `NOT NULL UNIQUE` · `slug VARCHAR(100)` `NOT NULL UNIQUE`, `CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$')` · `is_active BOOLEAN NOT NULL DEFAULT true`.
 
-##### 3.3 Acceso desde el host
+Categorías iniciales (asumido, revisables por negocio): Hogar y jardín · Electrónica · Moda y complementos · Infantil · Deporte y ocio · Libros y música · Motor · Servicios · Mascotas · Otros.
 
-- Por defecto, `db` **no publica puertos**, en línea con §2.5 del README.
-- Para depurar con un cliente local se ofrece un mecanismo opcional (asumido): un fichero `infra/docker-compose.db-debug.yml` que publica `127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432`. Nunca se publica en `0.0.0.0`.
+##### 3.3 `listing`
 
-##### 3.4 Variables de entorno (`.env.example`, valores ficticios)
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | `UUID` | PK |
+| `community_id` | `UUID` | `NOT NULL`, FK → `community.id` |
+| `owner_id` | `UUID` | `NOT NULL`, FK → `users.id` |
+| `category_id` | `UUID` | `NOT NULL`, FK → `category.id` |
+| `title` | `VARCHAR(160)` | `NOT NULL`, `CHECK (length(trim(title)) > 0)` |
+| `description` | `TEXT` | `NOT NULL`, `CHECK (length(trim(description)) > 0)` |
+| `type` | `listing_type` | `NOT NULL` |
+| `price` | `NUMERIC(10,2)` | `NULL`, `CHECK (price IS NULL OR price >= 0)` |
+| `currency` | `CHAR(3)` | `NULL`, `CHECK (currency ~ '^[A-Z]{3}$')` |
+| `status` | `listing_status` | `NOT NULL`, `DEFAULT 'active'` |
+| `published_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` |
+| `created_at`, `updated_at` | `TIMESTAMPTZ` | `NOT NULL`; `updated_at` con `onupdate=statement_timestamp()` |
+| `deleted_at` | `TIMESTAMPTZ` | `NULL` |
 
-```dotenv
-# --- PostgreSQL ---
-POSTGRES_USER=entrevecinos
-POSTGRES_PASSWORD=change-me
-POSTGRES_DB=entrevecinos
-POSTGRES_HOST_PORT=5432   # solo para docker-compose.db-debug.yml
-```
+- `CHECK ((price IS NULL) = (currency IS NULL))`: hay moneda si y solo si hay precio (asumido: el README dice «exigir moneda cuando hay precio»; tampoco tiene sentido una moneda sin precio).
+- Índices del README: `(community_id, status, published_at DESC)`, `(community_id, type, published_at DESC)`, `(category_id, published_at DESC)`, `(price)`, y además `(owner_id)` para «mis anuncios».
+- Las FK usan `ON DELETE RESTRICT`: el borrado es lógico.
 
-`.env` real: excluido en `.gitignore`. Docker Compose lo lee desde la raíz del repositorio (`--env-file .env` al usar `-f infra/docker-compose.yml`).
+##### 3.4 `media_asset`
 
-##### 3.5 Referencia de `infra/docker-compose.yml`
+`id` UUID PK · `uploaded_by UUID NOT NULL` FK → `users.id` · `object_key VARCHAR(512) NOT NULL UNIQUE` · `mime_type VARCHAR(100) NOT NULL`, `CHECK (mime_type IN ('image/jpeg','image/png','image/webp'))` · `size_bytes BIGINT NOT NULL CHECK (size_bytes > 0)` · `sha256 CHAR(64) NULL` · `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`. Índice `(uploaded_by)`.
 
-```yaml
-name: entrevecinos
+##### 3.5 `listing_image`
 
-services:
-  db:
-    image: postgres:16
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-entrevecinos}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
-      POSTGRES_DB: ${POSTGRES_DB:-entrevecinos}
-      TZ: UTC
-      PGTZ: UTC
-    volumes:
-      - db_data:/var/lib/postgresql/data
-      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
-    networks:
-      - data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+`listing_id` (PK compuesta, FK → `listing.id` `ON DELETE CASCADE`) · `asset_id` (PK compuesta, FK → `media_asset.id` `ON DELETE RESTRICT`) · `position SMALLINT NOT NULL DEFAULT 0 CHECK (position >= 0)` · `is_cover BOOLEAN NOT NULL DEFAULT false`.
 
-volumes:
-  db_data:
+- Índice `(asset_id)` (README) e índice único parcial `UNIQUE (listing_id) WHERE is_cover` (como máximo una portada por anuncio, `ListingImagesUpdate`).
+- `UNIQUE (listing_id, position)` para un orden sin empates (asumido).
 
-networks:
-  data:
-    internal: true
-  edge:
-```
+##### 3.6 Pruebas (`@pytest.mark.db`)
 
-##### 3.6 Ficheros a crear o modificar
-
-```
-.env.example
-.gitignore                         # añadir: .env
-infra/
-├── README.md                      # cómo levantar, parar, borrar datos, depurar
-├── docker-compose.yml
-├── docker-compose.db-debug.yml    # publicación opcional en 127.0.0.1
-└── postgres/
-    └── initdb/.gitkeep
-```
+- Categorías iniciales presentes tras la migración.
+- Precio negativo, precio sin moneda y moneda sin precio rechazados; anuncio sin precio aceptado.
+- Título o descripción en blanco rechazados.
+- Dos portadas en el mismo anuncio rechazadas.
+- `alembic check` y migraciones reversibles.
 
 #### 4. Criterios de aceptación
 
-**AC1 — Arranque con base de datos sana**
+**AC1 — Migración aplicada**
+- **Given** `make dev`
+- **When** consulto las tablas y `select name from category`
+- **Then** existen con las restricciones e índices de §3 y las diez categorías iniciales
 
-- **Given** un `.env` creado a partir de `.env.example` y Docker instalado
-- **When** ejecuto `docker compose --env-file .env -f infra/docker-compose.yml up -d db`
-- **Then** el contenedor `db` alcanza el estado `healthy` y acepta conexiones con las credenciales del `.env`
+**AC2 — Coherencia del precio**
+- **Given** la tabla `listing`
+- **When** inserto un anuncio con `price = -1`, con precio y sin moneda, o con moneda y sin precio
+- **Then** la base de datos lo rechaza; sin precio ni moneda lo acepta
 
-**AC2 — Persistencia de datos**
+**AC3 — Portada única**
+- **Given** un anuncio con una imagen de portada
+- **When** marco otra como portada
+- **Then** la base de datos lo rechaza
 
-- **Given** que `db` está en marcha y he creado una tabla de prueba con un registro
-- **When** ejecuto `down` (sin `-v`) y vuelvo a ejecutar `up -d db`
-- **Then** la tabla y el registro siguen existiendo
-
-**AC3 — Contraseña obligatoria**
-
-- **Given** que no existe `.env` o no define `POSTGRES_PASSWORD`
-- **When** ejecuto `docker compose -f infra/docker-compose.yml config`
-- **Then** el comando falla con el mensaje que pide definir `POSTGRES_PASSWORD`
-
-**AC4 — Base de datos no expuesta**
-
-- **Given** que `db` está en marcha con la configuración por defecto
-- **When** intento conectarme a `localhost:5432` desde el host
-- **Then** la conexión es rechazada porque el puerto no está publicado
-
-**AC5 — Secretos fuera del repositorio**
-
-- **Given** un `.env` local con credenciales
-- **When** ejecuto `git status`
-- **Then** `.env` no aparece como fichero a añadir y `.env.example` solo contiene valores ficticios
+**AC4 — Reversible**
+- **Given** la base de datos en `0004`
+- **When** ejecuto `alembic downgrade 0003` y `upgrade head`
+- **Then** ambos terminan sin errores
 
 #### 5. Plan de tareas
 
-1. Crear la estructura `infra/` y `infra/postgres/initdb/`.
-2. Escribir `infra/docker-compose.yml` con `db`, `db_data`, redes `data` y `edge`.
-3. Escribir `.env.example` y actualizar `.gitignore`.
-4. Crear `infra/docker-compose.db-debug.yml`.
-5. Redactar `infra/README.md` (comandos, advertencia sobre `initdb`, cómo borrar el volumen con `down -v`).
-6. Validar con la lista de verificación de la sección 6.
+1. Modelos ORM.
+2. Migración `0004` (enums, tablas, índices, FK del avatar, datos iniciales).
+3. Pruebas de §3.6.
 
 #### 6. Verificación
 
 ```bash
-cp .env.example .env
-docker compose --env-file .env -f infra/docker-compose.yml config          # sintaxis y variables
-docker compose --env-file .env -f infra/docker-compose.yml up -d db
-docker compose --env-file .env -f infra/docker-compose.yml ps               # estado healthy
-docker compose --env-file .env -f infra/docker-compose.yml exec db \
-  psql -U entrevecinos -d entrevecinos -c "select version();"               # PostgreSQL 16.x
-docker compose --env-file .env -f infra/docker-compose.yml exec db \
-  psql -U entrevecinos -c "create table t(id int); insert into t values (1);"
-docker compose --env-file .env -f infra/docker-compose.yml down
-docker compose --env-file .env -f infra/docker-compose.yml up -d db
-docker compose --env-file .env -f infra/docker-compose.yml exec db \
-  psql -U entrevecinos -c "select * from t;"                                # el dato persiste
-docker compose --env-file .env -f infra/docker-compose.yml down -v          # limpieza
+make dev
+COMPOSE="docker compose --env-file .env -f infra/docker-compose.yml"
+$COMPOSE exec db psql -U entrevecinos -c '\d listing' -c 'select name, slug from category'
+$COMPOSE run --rm api alembic downgrade 0003 && $COMPOSE run --rm api alembic upgrade head
+$COMPOSE run --rm api alembic check && $COMPOSE run --rm api pytest -m db
 ```
 
 #### 7. Definición de terminado
 
-- [ ] Los cinco criterios de aceptación se cumplen.
-- [ ] `docker compose config` no emite advertencias.
-- [ ] No hay credenciales reales en el repositorio.
-- [ ] `infra/README.md` permite a otra persona levantar la base de datos sin ayuda.
+- [ ] Los cuatro criterios de aceptación se cumplen.
+- [ ] `pytest`, `ruff check` y `alembic check` pasan.
 - [ ] Cambios revisados y fusionados mediante pull request.
 
 #### 8. Riesgos y decisiones abiertas
 
-- **Conflicto de puerto 5432:** por eso no se publica por defecto y el puerto del host es configurable.
-- **Scripts de `initdb` no se reejecutan** si el volumen ya existe; documentado en `infra/README.md`.
-- **Copias de seguridad de `db_data`:** el README las exige en producción; quedan fuera de este ticket.
+- **Categorías iniciales:** propuesta; la gestión por `platform_admin` (`POST/PATCH /categories`) no tiene historia en el MVP.
+- **`published_at`:** igual a la creación mientras no haya borradores (`draft` no se usa en el MVP).
 
 **Ticket 2** — TK-002 · Backend: esqueleto de FastAPI y su contenedor
 

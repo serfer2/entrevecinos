@@ -16,7 +16,7 @@ BUNDLE = ROOT / "docs" / "api" / "dist" / "openapi.bundled.yaml"
 README = ROOT / "readme.md"
 START = "<!-- openapi-extract:start -->"
 END = "<!-- openapi-extract:end -->"
-PATHS = ["/communities/{community_id}/listings", "/auth/register", "/auth/token"]
+PATHS = ["/communities/{community_id}/listings", "/auth/register"]
 
 
 class LiteralDumper(yaml.SafeDumper):
