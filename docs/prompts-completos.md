@@ -486,3 +486,50 @@ cuando un usuario hace click en "Solicitar acceso", no aparece mensaje alguno. E
 **Nota**
 
 La API enviaba los correos en segundo plano antes de confirmar la transacción. La corrección confirma primero la transacción y después envía los correos. Se comprueba en producción: el aviso aparece y los correos llegan.
+
+**Prompt 12:** Alinear el `readme.md` con la plantilla de la entrega
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Antes de la tercera entrega; el `readme.md` sigue la plantilla del proyecto final, pero ha crecido con cada entrega
+
+```
+echa un vistazo a https://github.com/LIDR-academy-temp/AI4Devs-finalproject. El README tiene la plantilla que estamos usando en este proyecto.
+```
+
+```
+en el punto 7, se deben incluir sólo 3 PR, no más de 3. Mira la rama de la entrega 2. Si esta sección ya incluía algunas PR documentadas, respétalas esas y si falta alguna más para tener las 3, deja alguna de las que hay ahora (respetando el orden). El resto, bórralas
+```
+
+**Nota**
+
+El agente compara el `readme.md` con la plantilla. Encuentra un título repetido y el cuerpo de una PR pegado en una sola línea. En GitHub estaba igual de roto, así que el agente lo reconstruye. Después deja §7 en tres PR: las dos documentadas en la entrega 2 y la siguiente en orden.
+
+**Prompt 13:** Completar la documentación de la entrega
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** `readme.md` alineado con la plantilla; falta comprobar que está completo y al día, igual que `prompts.md`
+
+```
+vamos a completar la documentación que hay que entregar con el proyecto. De momento, dejamos a un lado el punto 1.3. Lo que quiero es completar el readme.md y asegurarme de que prompts.md también está completo. Antes de hacer cualquier cambio, pregúntame, sólo hazme el listado de cambios
+```
+
+**Nota**
+
+El agente propone una lista de cambios y la persona decide cada punto. Se aplican estos:
+- el correo de producción pasa de SES a Brevo en la arquitectura;
+- la tabla `email_quota` entra en el modelo de datos;
+- el recuento de pruebas se actualiza tras ejecutar las suites;
+- el extracto de la API queda en tres operaciones y el Ticket 1 pasa a ser de base de datos (TK-020);
+- `prompts.md` queda con tres *prompts* por sección y este anexo recoge el resto, con los de la entrega 3 tomados de las sesiones de trabajo.
+
+Las erratas de los contextos se corrigen una a una, con confirmación.
+
+**Prompt 14:** Revisión completa: documentación y seguridad
+
+**Agente:** Claude Code (Opus 5.5) - **Contexto:** Documentación de la entrega completada; última revisión antes de abrir la PR
+
+```
+vamos a hacer, una vez más una revisión completa del proyecto. Buscamos fallos en la documentación, partes incompletas, erratas, información desactualizada y leaks de información de seguridad, fallos de seguridad, etc ... hazme un listado con lo que encuentres, si es que encuentras algo
+```
+
+**Nota**
+
+El agente busca secretos en los ficheros y en todo el historial de git, y revisa la autenticación, la CSP, el proxy y los *workflows*: no encuentra fallos de seguridad. Señala como riesgos menores el ID de la cuenta de AWS y una IP antigua de la instancia en la documentación. Entre los fallos de documentación, el más relevante es que el contrato de `PATCH /users/me` prometía cambiar el avatar y la contraseña, y la API no lo implementa. Se corrigen el contrato, varios textos desactualizados (Brevo, uso del servidor MCP de AWS y redacción del modelo de datos como diseño implementado) y un enlace roto. La IP antigua se quita de la documentación.
