@@ -1122,7 +1122,7 @@ La aplicación se despliega en AWS (región `eu-north-1`) con toda la infraestru
 
 **Como** vecino que se registra, **quiero** recibir el correo de validación en mi dirección habitual, sea cual sea su proveedor, **para** poder activar mi cuenta y usar EntreVecinos en producción.
 
-Hoy SES sigue en *sandbox* en `eu-north-1`: solo entrega a direcciones verificadas en la cuenta (como mucho 200 correos al día), así que cualquier otra persona se registra pero nunca recibe el enlace. La revisión de la solicitud figura como `GRANTED`, pero el acceso de producción sigue desactivado.
+Al crear esta historia, SES seguía en *sandbox* en `eu-north-1`: solo entregaba a direcciones verificadas en la cuenta (como mucho 200 correos al día), así que cualquier otra persona se registraba pero nunca recibía el enlace. La revisión de la solicitud figuraba como `GRANTED`, pero el acceso de producción seguía desactivado. Se resolvió pasando el correo de producción a Brevo por SMTP (TK-096 a TK-098), con SES configurado como vuelta atrás.
 
 **AC1 — Correo en cualquier dirección**
 

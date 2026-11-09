@@ -27,7 +27,8 @@ class Settings(BaseSettings):
     storage_addressing_style: str = "path"
     media_max_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
     media_url_ttl_seconds: int = Field(default=300, gt=30)
-    # `smtp` (Mailpit en local) o `ses` (API de SES con el rol de la instancia, en AWS).
+    # `smtp` (Mailpit en local, Brevo en producción) o `ses` (API de SES con el rol de la instancia,
+    # configurada en AWS como vuelta atrás).
     mail_backend: str = "smtp"
     smtp_host: str = ""
     smtp_port: int = Field(default=587, gt=0, lt=65536)

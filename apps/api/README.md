@@ -77,17 +77,17 @@ Las pruebas se copian en la imagen: tras cambiarlas, `make build-backend`.
 | `STORAGE_ADDRESSING_STYLE` | `path` (MinIO) o `virtual` (S3 de AWS) | `path` |
 | `MEDIA_MAX_BYTES` | Tamaño máximo de una imagen | `5242880` (5 MB) |
 | `MEDIA_URL_TTL_SECONDS` | Validez de las URL prefirmadas | `300` |
-| `MAIL_BACKEND` | `smtp` (Mailpit en desarrollo) o `ses` (API de Amazon SES con el rol de la instancia) | `smtp` |
-| `SMTP_HOST` | Servidor SMTP (`mail` en desarrollo) | obligatoria con `MAIL_BACKEND=smtp` |
+| `MAIL_BACKEND` | `smtp`: Mailpit en desarrollo y Brevo (`smtp-relay.brevo.com`) en producción. `ses`: API de Amazon SES con el rol de la instancia, configurada en AWS como vuelta atrás | `smtp` |
+| `SMTP_HOST` | Servidor SMTP (`mail` en desarrollo, `smtp-relay.brevo.com` en producción) | obligatoria con `MAIL_BACKEND=smtp` |
 | `SMTP_PORT` | Puerto SMTP | `587` (`1025` en `.env.example`) |
-| `SMTP_USERNAME` / `SMTP_PASSWORD` | Credenciales SMTP | vacías |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | Credenciales SMTP (en producción, las de Brevo, desde Parameter Store) | vacías |
 | `SMTP_STARTTLS` | STARTTLS; en producción con `smtp` debe ser `true` | `true` |
 | `SES_REGION` / `SES_CONFIGURATION_SET` | Región de SES y *configuration set* (eventos de envío) con `MAIL_BACKEND=ses` | `eu-north-1` / vacío |
 | `MAIL_FROM` | Remitente de los correos | obligatoria |
 | `WEB_PUBLIC_URL` | Origen de los enlaces que se envían por correo; en producción, `https` | obligatoria |
 | `EMAIL_VERIFICATION_TTL_HOURS` | Caducidad del enlace de validación del correo (`> 0`) | `24` |
 | `PASSWORD_RESET_TTL_MINUTES` | Caducidad del enlace para restablecer la contraseña, en minutos (`> 0`) | `60` |
-| `EMAIL_MONTHLY_LIMIT` | Correos que la API puede enviar por periodo (registro, reenvío, restablecimiento de la contraseña y avisos de las solicitudes de acceso y de su aprobación); al llegar, responde `503` (`email_quota_exceeded`) sin crear nada. **Restricción de costes**: en producción, 5.000, el plan más barato de Brevo (TK-099) | `5000` |
+| `EMAIL_MONTHLY_LIMIT` | Correos que la API puede enviar por periodo (registro, reenvío, restablecimiento de la contraseña y avisos del cambio de contraseña, de las solicitudes de acceso y de su aprobación). Al llegar al límite, el registro, el reenvío y la petición de restablecimiento responden `503` (`email_quota_exceeded`) sin crear nada; los avisos no se envían, pero la operación que los origina sigue adelante. **Restricción de costes**: en producción, 5.000, el plan más barato de Brevo (TK-099) | `5000` |
 | `EMAIL_QUOTA_RESET_DAY` | Día del mes (1-28) en que empieza cada periodo del cupo, a las 00:00 en hora de Madrid | `6` |
 
 ## Salud

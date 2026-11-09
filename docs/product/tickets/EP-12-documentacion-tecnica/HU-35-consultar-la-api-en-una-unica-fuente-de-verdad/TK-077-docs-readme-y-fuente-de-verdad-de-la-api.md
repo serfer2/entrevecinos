@@ -23,7 +23,7 @@ Las inferencias que no aparecen explícitamente en el README se marcan con `(asu
 ## 2. Alcance
 
 **Incluye**
-- Párrafo inicial de §4: el contrato completo está en [`docs/api/openapi.yaml`](docs/api/openapi.yaml), que es la fuente de verdad; enlace a `docs/api/README.md` (estructura, convenciones, lint, previsualización y resumen MVP / versiones futuras).
+- Párrafo inicial de §4: el contrato completo está en [`docs/api/openapi.yaml`](../../../../api/openapi.yaml), que es la fuente de verdad; enlace a `docs/api/README.md` (estructura, convenciones, lint, previsualización y resumen MVP / versiones futuras).
 - Sustituir el fragmento por un extracto del contrato *bundled* con las mismas tres rutas (`listCommunityListings`, `createListing`, `registerUser`, `loginUser`) y los componentes que referencian, sin editar a mano.
 - Encabezado del bloque: «Extracto de `docs/api/openapi.yaml`; si difieren, prevalece el contrato.».
 - Revisar el texto de §4 sobre contacto y mensajería, coherente con TK-074 y TK-075.
