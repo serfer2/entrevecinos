@@ -2982,3 +2982,102 @@ Sin cambios de código ni de infraestructura: al fusionar, el despliegue vuelve 
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ~~~
+
+**Pull Request 9**
+
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/43
+
+#### Título
+
+```
+Feature/entrega 3 sfg - feat: avisos por correo de las solicitudes de acceso (HU-43 y HU-44, TK-106 a TK-108)
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+Las solicitudes de acceso a una comunidad quedaban pendientes sin que nadie se enterase: la administración solo las veía si entraba en «Gestionar comunidad», y el vecino tenía que volver para saber si lo habían aceptado. En producción ya pasó el 2026-11-08. HU-43 y HU-44 (Épica 8) añaden avisos por correo y los documentan como parte del MVP (`readme.md` §1.2 y `user-stories.md`); las notificaciones dentro de la aplicación siguen fuera del MVP.
+
+### Avisos
+
+- **Nueva solicitud (TK-106):** al pedir el acceso, cada `community_admin` aprobado y activo de la comunidad recibe «Nueva solicitud para unirse a {comunidad}», con el nombre del solicitante (sin su correo ni su teléfono) y un enlace a las solicitudes pendientes. Un correo por administrador; los moderadores y los miembros no reciben nada.
+- **Solicitud aprobada (TK-108):** al aprobar una solicitud pendiente, la apruebe un `community_admin` o un `platform_admin`, el vecino recibe «Ya eres miembro de {comunidad}» con un enlace a la comunidad. Rechazar, bloquear o desbloquear no envía correo.
+- **Web (TK-107):** con la solicitud pendiente, la comunidad muestra «Hemos enviado tu solicitud a la administración de la comunidad, que la revisará. Te avisaremos por correo cuando la apruebe.».
+
+### Garantías
+
+- El correo nunca condiciona la operación: sin cupo o con el proveedor caído, la solicitud se crea y la aprobación se hace igual. Los avisos se envían en segundo plano y las respuestas de la API no cambian.
+- Cada aviso gasta una plaza del cupo de 5.000 correos por periodo; un fallo de envío dispara la alarma `email-send-failures`.
+- Una persona solo puede tener una solicitud por comunidad (`409` si la repite), así que no puede inundar de avisos a una administración.
+
+### Código
+
+- `MembershipNotices` (`application/communities/membership_notices.py`) prepara los dos avisos y reserva el cupo.
+- `ChangeMembershipStatus` devuelve también el estado anterior, para avisar solo en `pending → approved`.
+- `send_in_background` pasa a `presentation/v1/mail.py`, compartido por autenticación y comunidades, con el mismo mensaje que vigila la alarma.
+
+### Contrato y documentación
+
+- Descripciones de `requestMembership` y `updateMembership`; tabla de cambios de `docs/api/README.md`. Sin cambios de esquemas ni de respuestas.
+- `infra/aws/README.md` y `apps/api/README.md`: el cupo cuenta estos avisos.
+
+## Despliegue
+
+Sin migraciones ni cambios de infraestructura: no hace falta `make tf-apply`.
+
+Tras desplegar se comprueba en «Prueba TK-087»: aprobar la solicitud pendiente de `serfer2@protonmail.com` (debe recibir «Ya eres miembro de Prueba TK-087») y pedir el acceso con otra cuenta (la administración debe recibir «Nueva solicitud para unirse a Prueba TK-087»).
+
+## Comprobaciones
+
+- [x] Pruebas, lint y formato pasan en contenedores (ver `AGENTS.md`, «Entorno y comandos»): `make ci-api` (585 pruebas) y `make ci-web` (408 pruebas); avisos comprobados en local con Mailpit y aviso de la web en el navegador.
+- [x] Si cambia una petición o respuesta de la API, he actualizado `docs/api/openapi.yaml` (solo descripciones; `redocly lint` sin errores).
+- [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()`. (No cambia)
+- [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md`. (No cambia; la guía se actualiza por el cupo)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+~~~
+
+**Pull Request 10**
+
+#### URL
+
+https://github.com/serfer2/entrevecinos/pull/44
+
+#### Título
+
+```
+fix(api): confirmar la transacción antes de enviar los correos en segundo plano
+```
+
+#### Contenido
+
+~~~markdown
+## Qué cambia y por qué
+
+En producción, al pulsar «Solicitar acceso» el botón parpadeaba y volvía a aparecer, aunque la solicitud llegaba a la administración; al refrescar ya salía «Solicitud pendiente».
+
+**Causa:** con FastAPI 0.148, el código tras el `yield` de una dependencia (el `commit` de `get_session`) se ejecuta después de las tareas en segundo plano. Desde TK-106, la solicitud de acceso envía los avisos en segundo plano, así que la transacción seguía abierta mientras Brevo enviaba el correo (≈ 1 s) y la web volvía a leer la página antes del `commit`. En local no se veía porque Mailpit responde al instante.
+
+Tenían la misma ventana la aprobación de una solicitud (TK-108) y el cambio de contraseña (TK-102); el registro, el reenvío y la petición del enlace mantenían una conexión abierta durante el envío.
+
+**Arreglo:** `SessionDep` usa `Depends(get_session, scope="function")`: la transacción se confirma al terminar el endpoint, antes de responder y antes de los envíos.
+
+## Despliegue
+
+Sin migraciones ni cambios de infraestructura.
+
+Tras desplegar se comprueba en producción que «Solicitar acceso» muestra el aviso de solicitud pendiente al momento, y se completa la comprobación de los avisos por correo de HU-43 y HU-44.
+
+## Comprobaciones
+
+- [x] Pruebas, lint y formato pasan en contenedores (ver `AGENTS.md`, «Entorno y comandos»): `make ci-api` (586 pruebas). Prueba nueva `test_session_commit_order.py`, que falla sin el arreglo (`['correo', 'commit']`).
+- [x] Si cambia una petición o respuesta de la API, he actualizado `docs/api/openapi.yaml`. (No cambia)
+- [x] Si cambia el modelo de datos, hay una migración Alembic revisada a mano, con `downgrade()`. (No cambia)
+- [x] Si cambia la infraestructura (`infra/aws/`, `infra/prod/`, `infra/docker-compose.prod.yml` o `.github/workflows/`), he actualizado `infra/aws/README.md`. (No cambia)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+~~~
