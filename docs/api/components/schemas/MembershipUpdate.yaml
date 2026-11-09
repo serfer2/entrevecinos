@@ -1,9 +1,14 @@
 type: object
 additionalProperties: false
-minProperties: 1
-description: Revisión de una solicitud o cambio de rol. `status` admite `approved`, `rejected` o `blocked`.
+description: >-
+  Revisión de una solicitud o cambio de rol: exactamente uno de `status` o `role`. `status` admite
+  `approved`, `rejected` o `blocked`. `role` admite `member` o `community_admin` (solo
+  `platform_admin`); `moderator` no está disponible en el MVP.
 properties:
   status:
     $ref: ./MembershipStatus.yaml
   role:
     $ref: ./MembershipRole.yaml
+oneOf:
+  - required: [status]
+  - required: [role]

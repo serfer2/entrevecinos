@@ -88,6 +88,7 @@ Cambios del contrato durante el desarrollo del MVP (compatibles salvo que se ind
 | TK-102 | Nuevo `confirmPasswordReset` (`POST /auth/password-reset/confirm`, `x-mvp: true`): `204` sin iniciar sesión; `400`/`410` con `PasswordResetError` (`password_reset_invalid`, `password_reset_expired`). Esquema `PasswordResetConfirmRequest`. Los JWT emitidos antes del último cambio de contraseña reciben `401` en las operaciones autenticadas. Compatible: una operación nueva. |
 | TK-106 | `requestMembership`: avisa por correo a cada `community_admin` aprobado de la comunidad (consume cupo). Sin cambios de esquema ni de respuestas. |
 | TK-108 | `updateMembership`: al aprobar una solicitud `pending`, avisa por correo al vecino (consume cupo). Sin cambios de esquema ni de respuestas. |
+| TK-109 | `updateMembership`: `role` (`member` ↔ `community_admin`) solo para `platform_admin` y membresías aprobadas; `status` o `role`, no ambos (`MembershipUpdate.oneOf`); `409` (`Conflict`) documentado para membresía no aprobada, último administrador y transiciones no permitidas. Antes, solo un `community_admin` asignaba el rol. |
 
 ## Resumen de endpoints
 

@@ -7,7 +7,7 @@ Historias del MVP definido en la sección 1.2 del `readme.md`. Las inferencias q
 - **Visitante**: persona sin cuenta.
 - **Vecino**: usuario registrado con sesión iniciada.
 - **Miembro**: vecino con acceso aprobado a una comunidad.
-- **Administrador de comunidad**: persona que gestiona los miembros y los anuncios de su comunidad.
+- **Administrador de comunidad**: persona que gestiona los miembros y los anuncios de su comunidad. Lo es quien la crea y a quien nombre el administrador de plataforma (HU-45).
 - **Administrador de plataforma** (`platform_admin`): persona que aprueba las comunidades nuevas y puede gestionar cualquier comunidad. Se nombra directamente en la base de datos (asumido).
 - **Desarrollador**: persona que mantiene o evalúa el código y la documentación técnica del proyecto (asumido).
 
@@ -26,7 +26,7 @@ No se incluyen funcionalidades posteriores al MVP: perfil profesional, notificac
 | 5. Detalle y contacto | HU-14, HU-15 |
 | 6. Administración mínima | HU-16, HU-17 |
 | 7. Mejora de funcionalidades del MVP | HU-18, HU-19, HU-20 |
-| 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23, HU-43, HU-44 |
+| 8. Mejora de la gestión de comunidades | HU-21, HU-22, HU-23, HU-43, HU-44, HU-45 |
 | 9. Cierre de sesión | HU-24 |
 | 10. Validación del correo electrónico | HU-25, HU-26, HU-27 |
 | 11. Experiencia de usuario | HU-28, HU-29, HU-30, HU-31, HU-32 |
@@ -691,6 +691,48 @@ Hoy una solicitud queda pendiente sin que nadie se entere: la administración so
 - **Given** que el envío falla o no queda cupo de correos (HU-40 AC5)
 - **When** un administrador aprueba mi solicitud
 - **Then** la aprobación se hace igual y ya puedo entrar en la comunidad; el equipo recibe la alarma correspondiente
+
+### HU-45 Nombrar a los administradores de una comunidad
+
+**Como** administrador de plataforma, **quiero** ver quiénes son los miembros de una comunidad y decidir quién la administra, **para** que cada comunidad tenga a las personas adecuadas gestionándola aunque quien la creó ya no pueda o no deba hacerlo.
+
+Hoy solo es administrador de una comunidad quien la crea (HU-04); no hay forma de nombrar a otro desde la aplicación.
+
+**AC1 — Ver los miembros y su rol**
+
+- **Given** que soy administrador de plataforma
+- **When** entro en cualquier comunidad y abro «Gestionar comunidad» → «Miembros»
+- **Then** veo sus miembros con su rol («Administrador» o «Miembro») y su estado, y puedo filtrar por estado (ya disponible por HU-16 y HU-31)
+
+**AC2 — Nombrar administrador**
+
+- **Given** un miembro aprobado de la comunidad que no es administrador
+- **When** lo nombro administrador y confirmo
+- **Then** pasa a tener el rol de administrador de la comunidad: gestiona solicitudes, miembros y anuncios, y recibe los avisos de nuevas solicitudes (HU-43)
+
+**AC3 — Quitar el rol de administrador**
+
+- **Given** un administrador de la comunidad
+- **When** le quito el rol y confirmo
+- **Then** sigue siendo miembro aprobado, pero deja de poder gestionar la comunidad
+
+**AC4 — Siempre queda un administrador**
+
+- **Given** que la comunidad tiene un único administrador
+- **When** intento quitarle el rol
+- **Then** veo «La comunidad debe tener al menos un administrador.» y no cambia nada
+
+**AC5 — Solo miembros aprobados**
+
+- **Given** una solicitud pendiente, rechazada o un miembro bloqueado
+- **When** intento nombrarlo administrador
+- **Then** no se permite (asumido: primero hay que aprobarlo o desbloquearlo)
+
+**AC6 — Solo el administrador de plataforma**
+
+- **Given** que soy administrador de una comunidad o miembro sin rol
+- **When** intento cambiar el rol de un miembro (también llamando a la API directamente)
+- **Then** no tengo acceso a esa función (asumido: el nombramiento lo decide la plataforma; delegarlo en los administradores de la comunidad sería otra historia)
 
 ---
 

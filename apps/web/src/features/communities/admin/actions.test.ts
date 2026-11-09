@@ -94,6 +94,8 @@ describe("manageMember", () => {
     ["bloquear", "PATCH", { status: "blocked" }, "bloqueado"],
     ["desbloquear", "PATCH", { status: "approved" }, "desbloqueado"],
     ["expulsar", "DELETE", undefined, "expulsado"],
+    ["nombrar-admin", "PATCH", { role: "community_admin" }, "nombrado-admin"],
+    ["quitar-admin", "PATCH", { role: "member" }, "quitado-admin"],
   ])("%s", async (action, method, body, done) => {
     userApiFetch.mockResolvedValue({ ok: true, status: 200, data: null });
 
@@ -115,10 +117,22 @@ describe("manageMember", () => {
     await expect(manageMember(memberForm("expulsar"))).rejects.toThrow(`${members}?error=ultimo-admin`);
   });
 
+  it.each([
+    ["quitar-admin", "La comunidad debe tener al menos un administrador.", "ultimo-admin"],
+    ["nombrar-admin", "Solo se puede cambiar el rol de un miembro aprobado.", "solo-aprobados"],
+  ])("409 al cambiar el rol (%s): %s", async (action, detail, code) => {
+    userApiFetch.mockResolvedValue({ ok: false, error: { status: 409, detail } });
+
+    await expect(manageMember(memberForm(action))).rejects.toThrow(`${members}?error=${code}`);
+  });
+
   it("403: vuelve a la página (aviso de permisos)", async () => {
     userApiFetch.mockResolvedValue({ ok: false, error: { status: 403, detail: "x" } });
 
     await expect(manageMember(memberForm("bloquear"))).rejects.toThrow(`NEXT_REDIRECT:${members}`);
+    await expect(manageMember(memberForm("nombrar-admin"))).rejects.toThrow(
+      `NEXT_REDIRECT:${members}`,
+    );
   });
 
   it("acción o id no válidos: no llama a la API", async () => {

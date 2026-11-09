@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from entrevecinos.domain.communities.entities import (
     Community,
@@ -143,11 +143,21 @@ class MembershipErrorResponse(BaseModel):
 
 
 class MembershipUpdateRequest(BaseModel):
-    """Subconjunto implementado de `MembershipUpdate`: revisar, bloquear y desbloquear.
-
-    El cambio de rol (`role`) no tiene historia en el MVP y se rechaza con 422.
+    """Subconjunto implementado de `MembershipUpdate`: revisar, bloquear y desbloquear
+    (`status`) o nombrar y quitar administradores (`role`, HU-45). Exactamente uno de los dos;
+    `moderator` no tiene historia en el MVP y se rechaza con 422.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal[MembershipStatus.APPROVED, MembershipStatus.REJECTED, MembershipStatus.BLOCKED]
+    status: (
+        Literal[MembershipStatus.APPROVED, MembershipStatus.REJECTED, MembershipStatus.BLOCKED]
+        | None
+    ) = None
+    role: Literal[MembershipRole.MEMBER, MembershipRole.COMMUNITY_ADMIN] | None = None
+
+    @model_validator(mode="after")
+    def exactly_one_change(self) -> Self:
+        if (self.status is None) == (self.role is None):
+            raise ValueError("Exactly one of status or role is required")
+        return self

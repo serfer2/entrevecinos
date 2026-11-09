@@ -10,6 +10,7 @@ from entrevecinos.application.communities.list_community_memberships import (
 )
 from entrevecinos.application.communities.request_membership import RequestMembership
 from entrevecinos.application.communities.review_membership import (
+    ChangeMembershipRole,
     ChangeMembershipStatus,
     RemoveMembership,
 )
@@ -171,14 +172,17 @@ def list_community_memberships(
 @router.patch(
     "/{community_id}/memberships/{user_id}",
     operation_id="updateMembership",
-    summary="Revisar una solicitud o bloquear a un miembro",
+    summary="Revisar una solicitud, bloquear a un miembro o cambiar su rol",
     description=(
-        "Solo `community_admin` de la comunidad o `platform_admin`. Aprueba o rechaza una "
-        "solicitud `pending` (al aprobar se fija `joined_at`), bloquea a un miembro aprobado "
-        "(`blocked`: pierde el acceso, sus anuncios dejan de mostrarse y no puede volver a "
-        "solicitarlo) o lo desbloquea (`approved`). Al aprobar una solicitud avisa por correo al "
-        "vecino (una plaza del cupo; sin cupo, no se avisa). Otras transiciones, bloquear a un "
-        "administrador o a uno mismo responden 409. **Pendiente:** `role` se rechaza con 422."
+        "Se envía `status` o `role`, no ambos (422). Con `status`, solo `community_admin` de la "
+        "comunidad o `platform_admin`: aprueba o rechaza una solicitud `pending` (al aprobar se "
+        "fija `joined_at`), bloquea a un miembro aprobado (`blocked`: pierde el acceso, sus "
+        "anuncios dejan de mostrarse y no puede volver a solicitarlo) o lo desbloquea "
+        "(`approved`). Al aprobar una solicitud avisa por correo al vecino (una plaza del cupo; "
+        "sin cupo, no se avisa). Otras transiciones, bloquear a un administrador o a uno mismo "
+        "responden 409. Con `role` (`member` o `community_admin`), solo `platform_admin`: nombra "
+        "o quita administradores de un miembro aprobado, sin correo; un miembro no aprobado o "
+        "dejar la comunidad sin administrador responden 409."
     ),
     responses={**UNAUTHORIZED, **FORBIDDEN, **NOT_FOUND, **CONFLICT, **VALIDATION_ERROR},
 )
@@ -193,6 +197,12 @@ def update_membership(
     sender: EmailSenderDep,
     background_tasks: BackgroundTasks,
 ) -> MembershipResponse:
+    if body.role is not None:
+        detail = ChangeMembershipRole(access, memberships).execute(
+            user, community_id, user_id, body.role
+        )
+        return MembershipResponse.from_domain(detail)
+    assert body.status is not None  # garantizado por `MembershipUpdateRequest`
     change = ChangeMembershipStatus(access, memberships).execute(
         user, community_id, user_id, body.status
     )

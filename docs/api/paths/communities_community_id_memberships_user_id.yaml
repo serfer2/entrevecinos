@@ -4,13 +4,18 @@ parameters:
 patch:
   tags: [Membresías]
   operationId: updateMembership
-  summary: Revisar una solicitud o cambiar el rol de un miembro
+  summary: Revisar una solicitud, bloquear a un miembro o cambiar su rol
   description: >-
-    Aprobar, rechazar o bloquear (`status`) y asignar rol (`role`). Solo `community_admin` de la
-    comunidad o `platform_admin`; solo un `community_admin` puede asignar el rol `community_admin`.
-    Al aprobar se fijan `reviewed_by`, `reviewed_at` y `joined_at`. Al aprobar una solicitud
-    `pending`, avisa por correo al vecino (una plaza del cupo de correos; sin cupo, se aprueba igual
-    y no se avisa); rechazar, bloquear o desbloquear no envía correo.
+    Se envía `status` o `role`, no ambos (422). Con `status`, solo `community_admin` de la
+    comunidad o `platform_admin`: aprobar o rechazar una solicitud `pending`, bloquear a un miembro
+    aprobado o desbloquearlo (`approved`). Al aprobar se fijan `reviewed_by`, `reviewed_at` y
+    `joined_at`. Al aprobar una solicitud `pending`, avisa por correo al vecino (una plaza del cupo
+    de correos; sin cupo, se aprueba igual y no se avisa); rechazar, bloquear o desbloquear no envía
+    correo. Otras transiciones, bloquear a un administrador o a uno mismo responden 409. Con `role`
+    (`member` o `community_admin`; `moderator` responde 422), solo `platform_admin` (403 para el
+    resto, también para un `community_admin`): nombra o quita administradores de una membresía
+    `approved`, sin cambiar su estado ni enviar correo. Una membresía no aprobada o quitar el rol
+    al último administrador responden 409; enviar el rol actual responde 200 sin cambios.
   x-mvp: true
   requestBody:
     required: true
@@ -18,8 +23,15 @@ patch:
       application/json:
         schema:
           $ref: ../components/schemas/MembershipUpdate.yaml
-        example:
-          status: approved
+        examples:
+          aprobar:
+            summary: Aprobar una solicitud
+            value:
+              status: approved
+          nombrarAdministrador:
+            summary: Nombrar administrador (solo `platform_admin`)
+            value:
+              role: community_admin
   responses:
     "200":
       description: Membresía actualizada.
@@ -33,6 +45,8 @@ patch:
       $ref: ../components/responses/Forbidden.yaml
     "404":
       $ref: ../components/responses/NotFound.yaml
+    "409":
+      $ref: ../components/responses/Conflict.yaml
     "422":
       $ref: ../components/responses/ValidationError.yaml
 delete:

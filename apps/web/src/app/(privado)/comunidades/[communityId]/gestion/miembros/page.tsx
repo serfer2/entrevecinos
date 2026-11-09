@@ -7,6 +7,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { requireUser } from "@/features/auth/dal";
 import { manageMember } from "@/features/communities/admin/actions";
 import {
+  type MemberAction,
   MEMBER_CONFLICTS,
   type MemberConflict,
   membersPath,
@@ -28,13 +29,53 @@ type MembersPageProps = {
   searchParams: Promise<SearchParams>;
 };
 
+const button = "rounded-lg px-3 py-1.5 text-sm font-medium";
+
 const DONE_MESSAGES = {
   bloqueado: (name: string) => `${name} ha sido bloqueado.`,
   desbloqueado: (name: string) => `${name} ha sido desbloqueado.`,
   expulsado: (name: string) => `${name} ha sido expulsado.`,
+  "nombrado-admin": (name: string) => `${name} ha sido nombrado administrador.`,
+  "quitado-admin": (name: string) => `${name} ya no es administrador.`,
 } as const;
 
-const button = "rounded-lg px-3 py-1.5 text-sm font-medium";
+/** Textos de las acciones que piden confirmación (todas salvo «Desbloquear»). */
+const CONFIRMATIONS: Record<
+  Exclude<MemberAction, "desbloquear">,
+  {
+    label: string;
+    title: (name: string) => string;
+    message: (community: string) => string;
+    /** Estilo del botón; por defecto, el destructivo de `ConfirmDialog`. */
+    trigger?: string;
+  }
+> = {
+  bloquear: {
+    label: "Bloquear",
+    title: (name) => `¿Bloquear a ${name}?`,
+    message: () =>
+      "Dejará de ver y publicar anuncios, sus anuncios dejarán de mostrarse en la comunidad y no podrá volver a solicitar el acceso.",
+  },
+  expulsar: {
+    label: "Expulsar",
+    title: (name) => `¿Expulsar a ${name}?`,
+    message: () =>
+      "Dejará de ver y publicar anuncios y sus anuncios dejarán de mostrarse, aunque podrá volver a solicitar el acceso.",
+  },
+  "nombrar-admin": {
+    label: "Nombrar administrador",
+    trigger: `${button} border border-emerald-700 text-emerald-800 hover:bg-emerald-50`,
+    title: (name) => `¿Nombrar a ${name} administrador?`,
+    message: (community) =>
+      `Podrá aprobar solicitudes, gestionar miembros y ocultar anuncios de ${community}, y recibirá los avisos de nuevas solicitudes.`,
+  },
+  "quitar-admin": {
+    label: "Quitar administrador",
+    title: (name) => `¿Quitar a ${name} el rol de administrador?`,
+    message: () => "Seguirá siendo miembro, pero dejará de gestionar la comunidad.",
+  },
+};
+
 
 export default async function MembersPage({ params, searchParams }: MembersPageProps) {
   const user = await requireUser();
@@ -70,6 +111,7 @@ export default async function MembersPage({ params, searchParams }: MembersPageP
   const error = errorCode in MEMBER_CONFLICTS ? MEMBER_CONFLICTS[errorCode as MemberConflict] : null;
   const list = memberships.page;
   const filterQuery = filter ? { estado: filter } : undefined;
+  const isPlatformAdmin = user.platform_role === "platform_admin";
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
@@ -121,7 +163,7 @@ export default async function MembersPage({ params, searchParams }: MembersPageP
       ) : (
         <ul className="flex flex-col divide-y divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-white">
           {list.items.map(({ user: member, role, status, joined_at }) => {
-            const actions = rowActions({ status, role, userId: member.id }, user.id);
+            const actions = rowActions({ status, role, userId: member.id }, user.id, isPlatformAdmin);
             const hidden = (
               <>
                 <input type="hidden" name="community_id" value={communityId} />
@@ -158,14 +200,11 @@ export default async function MembersPage({ params, searchParams }: MembersPageP
                         <ConfirmDialog
                           key={action}
                           action={manageMember}
-                          triggerLabel={action === "bloquear" ? "Bloquear" : "Expulsar"}
-                          title={action === "bloquear" ? `¿Bloquear a ${member.full_name}?` : `¿Expulsar a ${member.full_name}?`}
-                          message={
-                            action === "bloquear"
-                              ? "Dejará de ver y publicar anuncios, sus anuncios dejarán de mostrarse en la comunidad y no podrá volver a solicitar el acceso."
-                              : "Dejará de ver y publicar anuncios y sus anuncios dejarán de mostrarse, aunque podrá volver a solicitar el acceso."
-                          }
-                          confirmLabel={action === "bloquear" ? "Bloquear" : "Expulsar"}
+                          triggerLabel={CONFIRMATIONS[action].label}
+                          title={CONFIRMATIONS[action].title(member.full_name)}
+                          message={CONFIRMATIONS[action].message(community.name)}
+                          confirmLabel={CONFIRMATIONS[action].label}
+                          triggerClassName={CONFIRMATIONS[action].trigger}
                         >
                           {hidden}
                           <input type="hidden" name="action" value={action} />
