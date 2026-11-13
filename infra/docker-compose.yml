@@ -66,7 +66,7 @@ services:
 
   mail:
     # Buzón de pruebas: recoge por SMTP todo el correo que envía la API y lo muestra en su interfaz web.
-    image: axllent/mailpit:v1.31.4
+    image: axllent/mailpit:v1.33.1
     restart: unless-stopped
     # `data` para la API (SMTP en mail:1025); `edge` solo para publicar la interfaz web.
     networks:
